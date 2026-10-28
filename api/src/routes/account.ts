@@ -1,8 +1,7 @@
 // Sign-in, sessions, API tokens and usage — the account side of the site.
 //
-// Google sign-in (Authorization Code + PKCE, id_token verified against
-// Google's JWKS) is adapted from agentdraft's worker/src/routes/google.ts. It
-// stays dormant until GOOGLE_OAUTH_ENABLED and both client credentials are set.
+// Google sign-in (lib/google.ts) stays dormant until GOOGLE_OAUTH_ENABLED and
+// both client credentials are set.
 // AUTH_DEV_LOGIN gives a local sign-in so the whole flow is testable without
 // a Google project. It trusts whatever email is typed, so anywhere reachable
 // from outside (a test tunnel) it must be gated by AUTH_DEV_LOGIN_CODE, and in
@@ -11,7 +10,8 @@
 import { Hono } from "hono";
 import type { Account, AppEnv, Env } from "../env.js";
 import { dailyLimit, usageToday } from "../handlers/call.js";
-import { b64url, b64urlDecode, hashToken, newApiToken, newId, randomString, secretEquals } from "../lib/crypto.js";
+import { hashToken, newApiToken, newId, randomString, secretEquals } from "../lib/crypto.js";
+import { beginGoogleSignIn, clearHandshakeCookie, finishGoogleSignIn, googleConfigured } from "../lib/google.js";
 import { sessionCookie } from "../lib/cookie.js";
 import { jsonError } from "../lib/http.js";
 import { requireSession } from "../middleware/auth.js";
@@ -22,7 +22,6 @@ const MAX_TOKENS = 10;
 
 export const account = new Hono<AppEnv>();
 
-const googleEnabled = (env: Env) => env.GOOGLE_OAUTH_ENABLED === "true" && !!env.GOOGLE_CLIENT_ID && !!env.GOOGLE_CLIENT_SECRET;
 const devEnabled = (env: Env) => env.AUTH_DEV_LOGIN === "true";
 const isSecure = (env: Env) => env.PUBLIC_SITE_ORIGIN.startsWith("https://");
 /** Only same-site relative paths, so return_to cannot become an open redirect. */
@@ -37,7 +36,7 @@ async function startSession(env: Env, accountId: string, method: "google" | "dev
 
 account.get("/auth/config", (c) =>
   c.json({
-    ok: true, google: googleEnabled(c.env), dev_login: devEnabled(c.env), dev_login_code: !!c.env.AUTH_DEV_LOGIN_CODE,
+    ok: true, google: googleConfigured(c.env), dev_login: devEnabled(c.env), dev_login_code: !!c.env.AUTH_DEV_LOGIN_CODE,
     invite_only: inviteOnly(c.env),
   }),
 );
@@ -64,93 +63,35 @@ account.post("/auth/dev", async (c) => {
   return c.json({ ok: true });
 });
 
-// ── Google sign-in ─────────────────────────────────────────────────
-
-const GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth";
-const GOOGLE_TOKEN = "https://oauth2.googleapis.com/token";
-const GOOGLE_JWKS = "https://www.googleapis.com/oauth2/v3/certs";
-const GOOGLE_ISSUERS = ["https://accounts.google.com", "accounts.google.com"];
-const redirectUri = (env: Env) => `${env.PUBLIC_SITE_ORIGIN.replace(/\/$/, "")}/api/auth/google/callback`;
+// ── Google sign-in (flow in lib/google.ts) ─────────────────────────
 
 account.get("/auth/google/start", async (c) => {
-  if (!googleEnabled(c.env)) return jsonError(c, 503, "E_OAUTH_NOT_CONFIGURED", "Google sign-in is not configured.");
-  const state = randomString(32);
-  const verifier = randomString(64);
-  const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
-  const expires = new Date(Date.now() + 600_000).toISOString().replace("T", " ").slice(0, 19);
-  await c.env.DB.prepare("DELETE FROM oauth_states WHERE expires_at < datetime('now')").run();
-  await c.env.DB.prepare("INSERT INTO oauth_states (state, verifier, return_to, expires_at) VALUES (?, ?, ?, ?)")
-    .bind(state, verifier, safeReturn(c.req.query("return_to")), expires).run();
-
-  const url = new URL(GOOGLE_AUTH);
-  url.search = new URLSearchParams({
-    client_id: c.env.GOOGLE_CLIENT_ID!, redirect_uri: redirectUri(c.env), response_type: "code",
-    scope: "openid email profile", state, code_challenge: challenge, code_challenge_method: "S256", prompt: "select_account",
-  }).toString();
-  return c.redirect(url.toString());
+  if (!googleConfigured(c.env)) return jsonError(c, 503, "E_OAUTH_NOT_CONFIGURED", "Google sign-in is not configured.");
+  const { location, cookie } = await beginGoogleSignIn(c.env, safeReturn(c.req.query("return_to")));
+  c.header("Set-Cookie", cookie);
+  return c.redirect(location);
 });
 
-type Claims = { iss: string; aud: string | string[]; sub: string; exp: number; email?: string; email_verified?: boolean; name?: string; picture?: string };
-
-async function verifyGoogleIdToken(idToken: string, clientId: string): Promise<Claims | null> {
-  const [h, p, s] = idToken.split(".");
-  if (!h || !p || !s) return null;
-  let header: { kid?: string; alg?: string };
-  let claims: Claims;
-  try {
-    header = JSON.parse(new TextDecoder().decode(b64urlDecode(h)));
-    claims = JSON.parse(new TextDecoder().decode(b64urlDecode(p)));
-  } catch {
-    return null;
-  }
-  if (header.alg !== "RS256" || !header.kid) return null;
-  const jwks = (await (await fetch(GOOGLE_JWKS)).json()) as { keys: JsonWebKey[] & { kid: string }[] };
-  const jwk = jwks.keys.find((k: any) => k.kid === header.kid) as JsonWebKey | undefined;
-  if (!jwk) return null;
-  const key = await crypto.subtle.importKey("jwk", { ...jwk, alg: "RS256", ext: true }, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
-  const valid = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, b64urlDecode(s), new TextEncoder().encode(`${h}.${p}`));
-  if (!valid) return null;
-  // Google signs every project's tokens with the same keys, so the audience pin is what ties it to us.
-  const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-  if (!GOOGLE_ISSUERS.includes(claims.iss) || !aud.includes(clientId) || claims.exp * 1000 <= Date.now() || !claims.sub) return null;
-  return claims;
-}
-
 account.get("/auth/google/callback", async (c) => {
-  if (!googleEnabled(c.env)) return jsonError(c, 503, "E_OAUTH_NOT_CONFIGURED", "Google sign-in is not configured.");
-  const { code, state } = c.req.query();
-  if (!code || !state) return c.redirect("/login?error=missing_code");
-  const stored = await c.env.DB.prepare("SELECT * FROM oauth_states WHERE state = ? AND expires_at > datetime('now')").bind(state)
-    .first<{ verifier: string; return_to: string }>();
-  await c.env.DB.prepare("DELETE FROM oauth_states WHERE state = ?").bind(state).run();
-  if (!stored) return c.redirect("/login?error=bad_state");
+  if (!googleConfigured(c.env)) return jsonError(c, 503, "E_OAUTH_NOT_CONFIGURED", "Google sign-in is not configured.");
+  const result = await finishGoogleSignIn(c.env, c.req.query(), c.req.header("cookie"));
+  c.header("Set-Cookie", clearHandshakeCookie(c.env), { append: true });
+  if (!result.ok) return c.redirect(`/login?error=${result.reason}`);
+  const { identity } = result;
+  if (!(await isInvited(c.env, identity.email))) return c.redirect("/login?error=not_invited");
 
-  const tokenRes = await fetch(GOOGLE_TOKEN, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code, client_id: c.env.GOOGLE_CLIENT_ID!, client_secret: c.env.GOOGLE_CLIENT_SECRET!,
-      redirect_uri: redirectUri(c.env), grant_type: "authorization_code", code_verifier: stored.verifier,
-    }),
-  });
-  const tokens = (await tokenRes.json().catch(() => ({}))) as { id_token?: string };
-  const claims = tokens.id_token ? await verifyGoogleIdToken(tokens.id_token, c.env.GOOGLE_CLIENT_ID!) : null;
-  if (!claims) return c.redirect("/login?error=google_failed");
-  if (claims.email && claims.email_verified === false) return c.redirect("/login?error=email_unverified");
-  if (!(await isInvited(c.env, claims.email))) return c.redirect("/login?error=not_invited");
-
-  // Link on the immutable sub claim, never on email.
-  let acct = await c.env.DB.prepare("SELECT id FROM accounts WHERE google_sub = ?").bind(claims.sub).first<{ id: string }>();
-  if (!acct) {
-    acct = { id: newId("acct_") };
-    await c.env.DB.prepare("INSERT INTO accounts (id, name, email, avatar_url, google_sub) VALUES (?, ?, ?, ?, ?)")
-      .bind(acct.id, claims.name ?? claims.email ?? "Account", claims.email ?? null, claims.picture ?? null, claims.sub).run();
-  } else {
+  // Accounts are keyed on Google's permanent subject id; emails can change.
+  const existing = await c.env.DB.prepare("SELECT id FROM accounts WHERE google_sub = ?").bind(identity.sub).first<{ id: string }>();
+  const accountId = existing?.id ?? newId("acct_");
+  if (existing) {
     await c.env.DB.prepare("UPDATE accounts SET name = COALESCE(?, name), email = COALESCE(?, email), avatar_url = COALESCE(?, avatar_url), updated_at = datetime('now') WHERE id = ?")
-      .bind(claims.name ?? null, claims.email ?? null, claims.picture ?? null, acct.id).run();
+      .bind(identity.name, identity.email, identity.picture, accountId).run();
+  } else {
+    await c.env.DB.prepare("INSERT INTO accounts (id, name, email, avatar_url, google_sub) VALUES (?, ?, ?, ?, ?)")
+      .bind(accountId, identity.name ?? identity.email ?? "Account", identity.email, identity.picture, identity.sub).run();
   }
-  c.header("Set-Cookie", await startSession(c.env, acct.id, "google"));
-  return c.redirect(stored.return_to || "/settings/tokens");
+  c.header("Set-Cookie", await startSession(c.env, accountId, "google"), { append: true });
+  return c.redirect(result.returnTo);
 });
 
 account.post("/auth/logout", async (c) => {

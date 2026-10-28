@@ -114,10 +114,13 @@ Every trading day after the local pipeline: `npm run data:daily && npm run d1:pu
 
 Sign-in in production is Google only (`AUTH_DEV_LOGIN` is false). Create an OAuth client in
 Google Cloud Console (Web application, redirect URI `https://arthscan.me/api/auth/google/callback`),
-then `wrangler secret put GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in `api/` and set
-`GOOGLE_OAUTH_ENABLED` to `"true"` in `api/wrangler.jsonc`.
+put its client ID in `GOOGLE_CLIENT_ID` in `api/wrangler.jsonc` (it is public), run
+`wrangler secret put GOOGLE_CLIENT_SECRET` in `api/`, and set `GOOGLE_OAUTH_ENABLED` to `"true"`.
 
-`vendor/` holds the four reference repositories (MIT / CC BY 4.0). agentdraft's Worker supplied
-the Google sign-in and token-hashing approach; the Tapetide MCP bridge supplied the protocol-version
-negotiation and anonymous "discovery mode"; the tapetide-score methodology is the spec for the
-Phase 3 score.
+## Security notes
+
+- Every issued secret (API tokens, OAuth codes, access/refresh tokens, client secrets) is stored only
+  as HMAC-SHA256 keyed by `TOKEN_PEPPER`; the raw value is shown once and never stored.
+- Google sign-in (`api/src/lib/google.ts`) is OpenID Connect with PKCE, a `nonce`, and the in-flight
+  handshake held in a sealed, HttpOnly cookie scoped to `/api/auth/google`.
+- Changing `TOKEN_PEPPER` invalidates every issued token and OAuth grant.
