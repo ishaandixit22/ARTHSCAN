@@ -24,6 +24,7 @@ export async function sha256Hex(input: string): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// The namespace predates the Arthscan rename; changing it would invalidate every stored hash.
 export const hashToken = (full: string, pepper: string) => sha256Hex(`arthlens.token.v1|${pepper}|${full}`);
 
 /** Constant-time compare via fixed-length digests. */

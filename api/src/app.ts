@@ -13,6 +13,14 @@ import { jsonError } from "./lib/http.js";
 
 export const app = new Hono<AppEnv>();
 
+// API responses are JSON, never meant to be framed or sniffed.
+app.use("*", async (c, next) => {
+  await next();
+  c.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Frame-Options", "DENY");
+  c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+});
 app.use("*", resolvePrincipal());
 
 app.get("/", (c) => c.json({ ok: true, service: SERVER_INFO.name, version: SERVER_INFO.version, rest: "/v1", mcp: "/mcp" }));

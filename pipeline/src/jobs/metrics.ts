@@ -82,8 +82,8 @@ export function rebuildMetrics(db: SqliteDatabase): number {
   const ins = db.raw.prepare(`
     INSERT INTO stock_metrics (symbol, as_of, close, change_pct, volume, turnover, avg_volume_20d,
       high_52w, low_52w, pct_from_high, ret_1w, ret_1m, ret_3m, ret_6m, ret_1y, volatility_1y,
-      sma_50, sma_200, pe, eps_ttm, promoter_pct)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      sma_50, sma_200, pe, eps_ttm, promoter_pct, first_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
   let n = 0;
   db.raw.exec("BEGIN");
@@ -123,6 +123,7 @@ export function rebuildMetrics(db: SqliteDatabase): number {
         eps && eps > 0 ? round(last.close / eps) : null,
         round(eps),
         promoter.get(sym) ?? null,
+        series[0].date,
       );
       n++;
     }

@@ -73,7 +73,11 @@
       {#if range !== null}<div class="range" aria-hidden="true"><span style="left: {Math.min(100, Math.max(0, range * 100))}%"></span></div>{/if}
     </div>
     <div class="card stat"><div class="label">From 52W high</div><div class="value {tone(m.pct_from_high)}">{pct(m.pct_from_high)}</div></div>
-    <div class="card stat"><div class="label">P/E (TTM)</div><div class="value">{num(m.pe, 1)}</div></div>
+    {#if m.pe != null}
+      <div class="card stat"><div class="label">P/E (TTM)</div><div class="value">{num(m.pe, 1)}</div></div>
+    {:else}
+      <div class="card stat"><div class="label">Return 1Y</div><div class="value {tone(m.ret_1y)}">{pct(m.ret_1y)}</div></div>
+    {/if}
     <div class="card stat"><div class="label">Volume · Avg 20D</div><div class="value small">{compact(m.volume)} · {compact(m.avg_volume_20d)}</div></div>
   </div>
 
@@ -110,6 +114,8 @@
     </section>
   </div>
 
+  <!-- One placeholder instead of two empty sections until fundamentals are loaded. -->
+  {#if fin.length || latestSh}
   <section class="card">
     <div class="card-head"><h2>Quarterly results</h2><span class="sub">INR crore · consolidated where filed</span></div>
     {#if fin.length}
@@ -153,6 +159,13 @@
     {/if}
   </section>
 
+  {:else}
+    <section class="card card-body soon">
+      <h2>Financials & shareholding</h2>
+      <p class="sub">Quarterly results, P/E and the shareholding pattern for {c.symbol} are coming in a later update.</p>
+    </section>
+  {/if}
+
   {#if c.peers?.length}
     <section class="card">
       <div class="card-head"><h2>Peers in {c.sector}</h2></div>
@@ -175,6 +188,7 @@
   .returns div { padding: 12px 16px; display: grid; gap: 2px; }
   .returns b { font-variant-numeric: tabular-nums; font-weight: 600; }
   .kv td:first-child { color: var(--ink-2); }
+  .soon { display: grid; gap: 6px; }
   .stack { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--panel-2); }
   .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; }
   @media (max-width: 640px) { .returns { grid-template-columns: repeat(3, 1fr); } .quote { text-align: left; } }

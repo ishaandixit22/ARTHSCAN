@@ -74,7 +74,7 @@ const protectedResource = (c: Context<AppEnv>) =>
     authorization_servers: [origin(c.env)],
     scopes_supported: [SCOPE],
     bearer_methods_supported: ["header"],
-    resource_name: "Arthlens MCP server",
+    resource_name: "Arthscan MCP server",
   });
 oauth.get("/.well-known/oauth-protected-resource", protectedResource);
 oauth.get("/.well-known/oauth-protected-resource/mcp", protectedResource);

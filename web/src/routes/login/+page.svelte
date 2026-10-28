@@ -14,6 +14,7 @@
     google_failed: "Google sign-in failed. Please try again.",
     email_unverified: "Your Google email address is not verified.",
     missing_code: "Sign-in was cancelled.",
+    not_invited: "That Google account isn't on the invite list yet. Ask for an invite, or sign in with the email you were invited with.",
   };
 
   async function devLogin(e: Event) {
@@ -37,7 +38,11 @@
 <div class="page narrow">
   <div class="card card-body box">
     <h1>Sign in to {BRAND}</h1>
-    <p class="sub">An account gives you API tokens for the REST API and the MCP server — 50 free calls a day. Browsing the site needs no account.</p>
+    {#if data.config.invite_only}
+      <p class="sub">{BRAND} is in private beta. Sign in with the Google account you were invited with to browse the research pages and get API and MCP access (50 calls a day).</p>
+    {:else}
+      <p class="sub">An account gives you API tokens for the REST API and the MCP server — 50 free calls a day. Browsing the site needs no account.</p>
+    {/if}
 
     {#if data.error}<div class="notice">{ERRORS[data.error] ?? "Sign-in failed."}</div>{/if}
 

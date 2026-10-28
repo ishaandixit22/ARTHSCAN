@@ -10,3 +10,7 @@ web/build/
 .DS_Store
 bin/
 data/*.log
+data/d1/
+.wrangler/
+*.prod-secrets.env
+arthscan-mcp/

@@ -59,10 +59,15 @@
 
   const fieldLabel = (k: string) => data.fields.find((f: any) => f.key === k)?.label ?? k;
   const pages = $derived(Math.max(1, Math.ceil(data.result.total / 50)));
-  const COLS = [
-    ["close", "Price"], ["change_pct", "Day"], ["ret_1m", "1M"], ["ret_1y", "1Y"],
-    ["pct_from_high", "From high"], ["volatility_1y", "Vol."], ["pe", "P/E"], ["turnover", "Turnover"],
-  ];
+  // Fields with no data anywhere yet (P/E before fundamentals load) are left out
+  // of both the filter list and the table, so nothing looks broken.
+  const usable = $derived(data.fields.filter((f: any) => f.available !== false));
+  const showPe = $derived(usable.some((f: any) => f.key === "pe"));
+  // [key, label, phones too?]
+  const COLS = $derived(([
+    ["close", "Price", true], ["change_pct", "Day", true], ["ret_1m", "1M", true], ["ret_1y", "1Y", true],
+    ["pct_from_high", "From high", false], ["volatility_1y", "Vol.", false], ["pe", "P/E", true], ["turnover", "Turnover", false],
+  ] as [string, string, boolean][]).filter(([k]) => k !== "pe" || showPe));
 </script>
 
 <svelte:head><title>Stock screener — {BRAND}</title></svelte:head>
@@ -83,7 +88,7 @@
     {#each rows as row, i}
       <div class="frow">
         <select bind:value={row.field} aria-label="Field">
-          {#each data.fields as f}<option value={f.key}>{f.label} ({f.unit})</option>{/each}
+          {#each usable as f}<option value={f.key}>{f.label} ({f.unit === "INR" ? "₹" : f.unit})</option>{/each}
         </select>
         <select bind:value={row.op} aria-label="Operator" class="op">
           {#each OPS as [v, l]}<option value={v}>{l}</option>{/each}
@@ -101,7 +106,7 @@
       <label class="check"><input type="checkbox" bind:checked={above200} /> Above 200-day average</label>
       <button class="btn primary" type="submit">Run screen</button>
     </div>
-    <p class="sub hint">Turnover and volume are in rupees / shares — ₹1 Cr = 10000000. Returns and distances are in %.</p>
+    <p class="sub hint">Turnover is in ₹ (₹1 Cr = 1,00,00,000), volume in shares, returns and distances in %.</p>
   </form>
 
   <section class="card">
@@ -115,26 +120,30 @@
         <thead>
           <tr>
             <th>Stock</th>
-            {#each COLS as [k, l]}
-              <th><button class="sort" class:on={data.query.sort === k} onclick={() => sortBy(k)}>{l}{data.query.sort === k ? (data.query.order === "asc" ? " ↑" : " ↓") : ""}</button></th>
+            {#each COLS as [k, l, phone]}
+              <th class:wide-only={!phone}><button class="sort" class:on={data.query.sort === k} onclick={() => sortBy(k)}>{l}{data.query.sort === k ? (data.query.order === "asc" ? " ↑" : " ↓") : ""}</button></th>
             {/each}
           </tr>
         </thead>
         <tbody>
           {#each data.result.results as r (r.symbol)}
             <tr>
-              <td><a href="/stock/{r.symbol}" class="sym">{r.symbol}</a><span class="name">{r.name}</span></td>
+              <td>
+                <a href="/stock/{r.symbol}" class="sym">{r.symbol}</a>
+                {#if r.listed_today}<span class="chip new" title="First trading day: change is measured against the issue price">New</span>{/if}
+                <span class="name">{r.name}</span>
+              </td>
               <td>{price(r.close)}</td>
-              <td class={tone(r.change_pct)}>{pct(r.change_pct)}</td>
+              <td class={r.listed_today ? "muted" : tone(r.change_pct)}>{pct(r.change_pct)}{r.listed_today ? "*" : ""}</td>
               <td class={tone(r.ret_1m)}>{pct(r.ret_1m)}</td>
               <td class={tone(r.ret_1y)}>{pct(r.ret_1y)}</td>
-              <td class={tone(r.pct_from_high)}>{pct(r.pct_from_high)}</td>
-              <td>{pct(r.volatility_1y, false)}</td>
-              <td>{num(r.pe, 1)}</td>
-              <td>{crore(r.turnover)}</td>
+              <td class="wide-only {tone(r.pct_from_high)}">{pct(r.pct_from_high)}</td>
+              <td class="wide-only">{pct(r.volatility_1y, false)}</td>
+              {#if showPe}<td>{num(r.pe, 1)}</td>{/if}
+              <td class="wide-only">{crore(r.turnover)}</td>
             </tr>
           {:else}
-            <tr><td colspan="9" class="empty">No stocks match these filters.</td></tr>
+            <tr><td colspan={COLS.length + 1} class="empty">No stocks match these filters.</td></tr>
           {/each}
         </tbody>
       </table>
@@ -152,6 +161,9 @@
 
 <style>
   .presets { display: flex; gap: 8px; flex-wrap: wrap; }
+  .new { margin-left: 6px; font-size: 11px; padding: 1px 6px; background: var(--brand-soft); color: var(--brand); }
+  .muted { color: var(--ink-3); }
+  @media (max-width: 640px) { .wide-only { display: none; } }
   .presets .chip { padding: 6px 12px; font-size: 13px; border: 1px solid var(--line); background: var(--panel); }
   .presets .chip:hover { border-color: var(--brand-2); }
   .filters { display: grid; gap: 10px; }

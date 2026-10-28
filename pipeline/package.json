@@ -1,5 +1,5 @@
 {
-  "name": "@arthlens/pipeline",
+  "name": "@arthscan/pipeline",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,7 +8,8 @@
     "daily": "tsx --env-file-if-exists=../.env src/cli.ts daily",
     "backfill": "tsx --env-file-if-exists=../.env src/cli.ts backfill",
     "metrics": "tsx --env-file-if-exists=../.env src/cli.ts metrics",
-    "import": "tsx --env-file-if-exists=../.env src/cli.ts import"
+    "import": "tsx --env-file-if-exists=../.env src/cli.ts import",
+    "d1": "tsx --env-file-if-exists=../.env src/d1.ts"
   },
   "dependencies": {
     "fflate": "^0.8.2"

@@ -1,4 +1,4 @@
--- Arthlens initial schema. Plain SQLite so it runs unchanged on Cloudflare D1.
+-- Arthscan initial schema. Plain SQLite so it runs unchanged on Cloudflare D1.
 --
 -- Market data tables are written only by the pipeline; every surface (website,
 -- REST, MCP) reads them through the shared handlers in api/src/handlers.

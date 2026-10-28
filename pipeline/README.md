@@ -1,6 +1,6 @@
 # Data pipeline
 
-All commands run from the repo root and write to `DATABASE_PATH` (default `data/arthlens.db`).
+All commands run from the repo root and write to `DATABASE_PATH` (default `data/arthscan.db`).
 Downloads are cached in `data/cache/`, so re-running a backfill is cheap.
 
 | Command | Does |

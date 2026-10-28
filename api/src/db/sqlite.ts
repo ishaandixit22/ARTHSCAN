@@ -95,7 +95,7 @@ export class SqliteDatabase implements Database {
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 export function defaultDbPath(): string {
-  return resolve(ROOT, process.env.DATABASE_PATH ?? "./data/arthlens.db");
+  return resolve(ROOT, process.env.DATABASE_PATH ?? "./data/arthscan.db");
 }
 
 let shared: SqliteDatabase | null = null;

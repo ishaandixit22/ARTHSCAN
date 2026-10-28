@@ -1,8 +1,12 @@
 {
-  "name": "arthlens",
+  "name": "arthscan",
   "private": true,
   "type": "module",
-  "workspaces": ["api", "pipeline", "web"],
+  "workspaces": [
+    "api",
+    "pipeline",
+    "web"
+  ],
   "scripts": {
     "db:migrate": "npm run migrate -w api",
     "data:stocks": "npm run stocks -w pipeline",
@@ -12,6 +16,10 @@
     "dev:api": "npm run dev -w api",
     "dev:web": "npm run dev -w web",
     "tunnel": "node scripts/tunnel.mjs",
-    "test": "npm test -w api"
+    "test": "npm test -w api",
+    "d1:push": "npm run d1 -w pipeline --",
+    "cf:dev": "npm run cf:build -w web && wrangler dev -c web/wrangler.jsonc -c api/wrangler.jsonc --persist-to api/.wrangler/state",
+    "cf:deploy": "npm run cf:deploy -w api && npm run cf:deploy -w web",
+    "invite": "node scripts/invite.mjs"
   }
 }

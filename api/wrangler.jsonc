@@ -1,0 +1,39 @@
+// Arthscan API Worker: REST (/v1), MCP (/mcp), OAuth (/oauth, /.well-known)
+// and the website's account API (/api). These path routes run in front of the
+// website Worker, which owns arthscan.me itself.
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "arthscan-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "arthscan.me/api/*", "zone_name": "arthscan.me" },
+    { "pattern": "arthscan.me/v1*", "zone_name": "arthscan.me" },
+    { "pattern": "arthscan.me/mcp*", "zone_name": "arthscan.me" },
+    { "pattern": "arthscan.me/oauth/*", "zone_name": "arthscan.me" },
+    { "pattern": "arthscan.me/.well-known/*", "zone_name": "arthscan.me" },
+    { "pattern": "arthscan.me/health", "zone_name": "arthscan.me" }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "arthscan",
+      "database_id": "bf1e0ffa-4c90-47df-ab89-aa9dd5541d9e",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "PUBLIC_SITE_ORIGIN": "https://arthscan.me",
+    "FREE_DAILY_QUOTA": "50",
+    "AUTH_DEV_LOGIN": "false",
+    "GOOGLE_OAUTH_ENABLED": "true",
+    // Private beta until the NSE display licence question is settled (see README).
+    "INVITE_ONLY": "true",
+    // Public by design (it appears in every Google sign-in URL); only the secret is a secret.
+    "GOOGLE_CLIENT_ID": "511904650558-4dt7sqlhv7hns55tkm2isc5frr645tv8.apps.googleusercontent.com"
+  },
+  // Secrets (wrangler secret put): TOKEN_PEPPER, INTERNAL_API_KEY,
+  // GOOGLE_CLIENT_SECRET, and AUTH_DEV_LOGIN_CODE if dev sign-in is ever enabled.
+  "observability": { "enabled": true }
+}

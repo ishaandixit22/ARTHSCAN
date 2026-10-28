@@ -57,7 +57,8 @@ export const SCREENER_FIELDS: Record<string, { label: string; unit: string; desc
 const OPS: Record<string, string> = { gt: ">", gte: ">=", lt: "<", lte: "<=", eq: "=" };
 
 const LIST_COLUMNS = `s.symbol, s.name, s.sector, s.series, m.close, m.change_pct, m.volume, m.turnover,
-  m.ret_1m, m.ret_1y, m.high_52w, m.low_52w, m.pct_from_high, m.pe, m.as_of`;
+  m.ret_1m, m.ret_1y, m.high_52w, m.low_52w, m.pct_from_high, m.pe, m.as_of,
+  COALESCE(m.first_date = m.as_of, 0) AS listed_today`;
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -278,14 +279,20 @@ export const TOOLS: Tool[] = [
     name: "list_screener_fields",
     route: "/screener/fields",
     title: "Screener fields",
-    description: "Lists every field screen_stocks can filter and sort on, with units and definitions.",
+    description: "Lists every field screen_stocks can filter and sort on, with units, definitions and whether any stock has data for it yet.",
     inputSchema: { type: "object", properties: {} },
     metered: false,
-    handler: async () => ({
-      fields: Object.entries(SCREENER_FIELDS).map(([key, f]) => ({ key, ...f })),
+    handler: async (db) => {
+      // Fundamentals-based fields stay empty until results are imported; say so
+      // rather than letting a screen on them silently return nothing.
+      const counts = await db.prepare(`SELECT COUNT(pe) AS pe, COUNT(eps_ttm) AS eps_ttm, COUNT(promoter_pct) AS promoter_pct FROM stock_metrics`)
+        .first<Record<string, number>>();
+      return {
+      fields: Object.entries(SCREENER_FIELDS).map(([key, f]) => ({ key, ...f, available: counts?.[key] === undefined || counts[key] > 0 })),
       operators: Object.keys(OPS),
       extra_filters: ["sector (exact match)", "series (EQ, BE, SM ...)"],
-    }),
+      };
+    },
   },
   {
     name: "screen_stocks",
@@ -393,7 +400,7 @@ export const TOOLS: Tool[] = [
     name: "get_market_movers",
     route: "/market/movers",
     title: "Market movers",
-    description: "Top gainers, top losers or most active stocks (by turnover) for the latest trading day. Ignores illiquid stocks.",
+    description: "Top gainers, top losers or most active stocks (by turnover) for the latest trading day. Ignores illiquid stocks; gainers and losers also leave out stocks on their listing day, whose change is measured against the issue price.",
     inputSchema: {
       type: "object",
       properties: {
@@ -405,9 +412,11 @@ export const TOOLS: Tool[] = [
     handler: async (db, { kind, limit }) => {
       const k = kind === "losers" || kind === "active" ? kind : "gainers";
       const order = k === "gainers" ? "m.change_pct DESC" : k === "losers" ? "m.change_pct ASC" : "m.turnover DESC";
+      // A listing-day "change" is vs the IPO price, not a prior close — it would top every gainers list.
+      const listing = k === "active" ? "" : "AND (m.first_date IS NULL OR m.first_date < m.as_of)";
       // ₹1 crore of turnover keeps penny-stock noise out of the lists.
       const { results } = await db.prepare(`SELECT ${LIST_COLUMNS} FROM stocks s JOIN stock_metrics m ON m.symbol = s.symbol
-        WHERE m.turnover >= 1e7 AND m.change_pct IS NOT NULL
+        WHERE m.turnover >= 1e7 AND m.change_pct IS NOT NULL ${listing}
           AND m.as_of = (SELECT MAX(as_of) FROM stock_metrics)
         ORDER BY ${order} LIMIT ?`).bind(clampLimit(limit, 10, 50)).all();
       return { kind: k, results };

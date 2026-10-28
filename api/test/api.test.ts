@@ -50,7 +50,7 @@ describe("MCP", () => {
 
   it("initializes with a token", async () => {
     const init = (await (await rpc("initialize", { protocolVersion: "2025-06-18" }, { authorization: `Bearer ${token}` })).json()) as any;
-    expect(init.result.serverInfo.name).toBe("arthlens");
+    expect(init.result.serverInfo.name).toBe("arthscan");
   });
 
   it("answers with a token", async () => {

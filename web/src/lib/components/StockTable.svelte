@@ -8,6 +8,11 @@
     close: "Price", change_pct: "Day", turnover: "Turnover", ret_1m: "1M", ret_3m: "3M", ret_1y: "1Y",
     pct_from_high: "From 52W high", pe: "P/E", sector: "Sector", volatility_1y: "Volatility",
   };
+  // Secondary columns that drop out on phones so price and change stay visible.
+  const WIDE_ONLY = new Set<Col>(["turnover", "sector", "volatility_1y", "pct_from_high", "ret_3m"]);
+
+  // A column with no data in any row (P/E before fundamentals are loaded) reads as broken; leave it out.
+  const shown = $derived(cols.filter((c) => c !== "pe" || rows.some((r) => r.pe != null)));
 </script>
 
 <div class="table-scroll">
@@ -15,7 +20,7 @@
     <thead>
       <tr>
         <th>Stock</th>
-        {#each cols as c}<th class:left={c === "sector"}>{LABELS[c]}</th>{/each}
+        {#each shown as c}<th class:left={c === "sector"} class:wide-only={WIDE_ONLY.has(c)}>{LABELS[c]}</th>{/each}
       </tr>
     </thead>
     <tbody>
@@ -23,20 +28,22 @@
         <tr>
           <td>
             <a href="/stock/{r.symbol}"><span class="sym">{r.symbol}</span></a>
+            {#if r.listed_today}<span class="chip new" title="First trading day: change is measured against the issue price">New</span>{/if}
             {#if !compact}<span class="name">{r.name}</span>{/if}
           </td>
-          {#each cols as c}
+          {#each shown as c}
             {#if c === "close"}<td>{price(r.close)}</td>
-            {:else if c === "turnover"}<td>{crore(r.turnover)}</td>
+            {:else if c === "turnover"}<td class="wide-only">{crore(r.turnover)}</td>
             {:else if c === "pe"}<td>{num(r.pe, 1)}</td>
-            {:else if c === "volatility_1y"}<td>{pct(r.volatility_1y, false)}</td>
-            {:else if c === "sector"}<td class="left sector">{r.sector ?? "—"}</td>
-            {:else}<td class={tone(r[c])}>{pct(r[c])}</td>
+            {:else if c === "volatility_1y"}<td class="wide-only">{pct(r.volatility_1y, false)}</td>
+            {:else if c === "sector"}<td class="left sector wide-only">{r.sector ?? "—"}</td>
+            {:else if c === "change_pct" && r.listed_today}<td class="muted" title="vs issue price">{pct(r[c])}*</td>
+            {:else}<td class="{tone(r[c])}" class:wide-only={WIDE_ONLY.has(c)}>{pct(r[c])}</td>
             {/if}
           {/each}
         </tr>
       {:else}
-        <tr><td colspan={cols.length + 1} class="empty">No stocks match.</td></tr>
+        <tr><td colspan={shown.length + 1} class="empty">No stocks match.</td></tr>
       {/each}
     </tbody>
   </table>
@@ -45,4 +52,9 @@
 <style>
   .compact td, .compact th { padding: 7px 12px; }
   .sector { color: var(--ink-3); font-size: 13px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+  .new { margin-left: 6px; font-size: 11px; padding: 1px 6px; background: var(--brand-soft); color: var(--brand); }
+  .muted { color: var(--ink-3); }
+  @media (max-width: 640px) {
+    .wide-only { display: none; }
+  }
 </style>

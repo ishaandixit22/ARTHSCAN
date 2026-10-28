@@ -6,6 +6,18 @@
 
   let { data, children } = $props();
 
+  // On phones the menu scrolls sideways; fade the edge while more items are hidden.
+  let navEl: HTMLElement | undefined = $state();
+  let moreRight = $state(false);
+  function updateFade() {
+    if (navEl) moreRight = navEl.scrollLeft + navEl.clientWidth < navEl.scrollWidth - 4;
+  }
+  $effect(() => {
+    void page.url.pathname;
+    navEl?.querySelector(".active")?.scrollIntoView({ inline: "nearest", block: "nearest" });
+    updateFade();
+  });
+
   const nav = [
     { href: "/", label: "Markets" },
     { href: "/stocks", label: "Stocks" },
@@ -16,6 +28,8 @@
   ];
   const isActive = (href: string) => (href === "/" ? page.url.pathname === "/" : page.url.pathname.startsWith(href));
 </script>
+
+<svelte:window onresize={updateFade} />
 
 <header>
   <div class="wrap bar">
@@ -32,7 +46,7 @@
       {/if}
     </div>
   </div>
-  <nav class="wrap" aria-label="Main">
+  <nav class="wrap" class:more-right={moreRight} aria-label="Main" bind:this={navEl} onscroll={updateFade}>
     {#each nav as item}
       <a href={item.href} class:active={isActive(item.href)} aria-current={isActive(item.href) ? "page" : undefined}>{item.label}</a>
     {/each}
@@ -46,7 +60,7 @@
 <footer>
   <div class="wrap">
     <p>
-      End-of-day data from NSE public files. Prices are not real-time. {BRAND} is not a SEBI-registered research analyst or
+      Private beta for invited testers. End-of-day prices, not real-time. {BRAND} is not a SEBI-registered research analyst or
       investment adviser; nothing here is investment advice.
     </p>
   </div>
@@ -57,7 +71,9 @@
   .bar { display: flex; align-items: center; gap: 20px; height: 60px; }
   .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 18px; letter-spacing: -0.02em; color: var(--ink); }
   .account { margin-left: auto; }
-  nav { display: flex; gap: 4px; overflow-x: auto; }
+  nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+  nav::-webkit-scrollbar { display: none; }
+  nav.more-right { mask-image: linear-gradient(to right, #000 80%, transparent); }
   nav a { padding: 8px 10px 10px; font-size: 14px; color: var(--ink-2); border-bottom: 2px solid transparent; white-space: nowrap; }
   nav a.active { color: var(--ink); border-bottom-color: var(--brand); font-weight: 500; }
   footer { border-top: 1px solid var(--line); padding: 20px 0 32px; color: var(--ink-3); font-size: 13px; }

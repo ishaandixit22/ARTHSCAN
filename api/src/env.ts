@@ -9,6 +9,8 @@ export interface Env {
   INTERNAL_API_KEY: string;
   FREE_DAILY_QUOTA: string;
   AUTH_DEV_LOGIN?: string;
+  /** "true" = private beta: only emails in the invites table can sign in or use tokens. */
+  INVITE_ONLY?: string;
   /** When set, dev sign-in also needs this code — required before exposing the site publicly. */
   AUTH_DEV_LOGIN_CODE?: string;
   GOOGLE_OAUTH_ENABLED?: string;

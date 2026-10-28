@@ -15,6 +15,7 @@ import { b64url, b64urlDecode, hashToken, newApiToken, newId, randomString, secr
 import { sessionCookie } from "../lib/cookie.js";
 import { jsonError } from "../lib/http.js";
 import { requireSession } from "../middleware/auth.js";
+import { inviteOnly, isInvited } from "../lib/access.js";
 
 const SESSION_TTL_SEC = 30 * 24 * 3600;
 const MAX_TOKENS = 10;
@@ -35,7 +36,10 @@ async function startSession(env: Env, accountId: string, method: "google" | "dev
 }
 
 account.get("/auth/config", (c) =>
-  c.json({ ok: true, google: googleEnabled(c.env), dev_login: devEnabled(c.env), dev_login_code: !!c.env.AUTH_DEV_LOGIN_CODE }),
+  c.json({
+    ok: true, google: googleEnabled(c.env), dev_login: devEnabled(c.env), dev_login_code: !!c.env.AUTH_DEV_LOGIN_CODE,
+    invite_only: inviteOnly(c.env),
+  }),
 );
 
 // ── Dev sign-in ────────────────────────────────────────────────────
@@ -48,6 +52,7 @@ account.post("/auth/dev", async (c) => {
   }
   const email = String(body.email ?? "").trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return jsonError(c, 400, "E_BAD_EMAIL", "Enter a valid email.");
+  if (!(await isInvited(c.env, email))) return jsonError(c, 403, "E_NOT_INVITED", "This email is not on the invite list.");
   const sub = `dev:${email}`;
   let acct = await c.env.DB.prepare("SELECT id FROM accounts WHERE google_sub = ?").bind(sub).first<{ id: string }>();
   if (!acct) {
@@ -132,6 +137,7 @@ account.get("/auth/google/callback", async (c) => {
   const claims = tokens.id_token ? await verifyGoogleIdToken(tokens.id_token, c.env.GOOGLE_CLIENT_ID!) : null;
   if (!claims) return c.redirect("/login?error=google_failed");
   if (claims.email && claims.email_verified === false) return c.redirect("/login?error=email_unverified");
+  if (!(await isInvited(c.env, claims.email))) return c.redirect("/login?error=not_invited");
 
   // Link on the immutable sub claim, never on email.
   let acct = await c.env.DB.prepare("SELECT id FROM accounts WHERE google_sub = ?").bind(claims.sub).first<{ id: string }>();

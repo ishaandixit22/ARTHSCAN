@@ -1,9 +1,8 @@
-# Arthlens — Indian stock research platform
+# Arthscan — Indian stock research platform (arthscan.me)
 
 Phase 1 of the build plan: an NSE research website, a REST API and an MCP server,
-all reading one shared data layer. "Arthlens" is a working name — change it in
-`web/src/lib/brand.ts` and `api/src/mcp/server.ts` once the real name clears the
-domain and trademark checks.
+all reading one shared data layer. The brand lives in `web/src/lib/brand.ts` and
+`api/src/mcp/server.ts`.
 
 ```
                  ┌──────────── web/ (SvelteKit) ────────────┐
@@ -79,17 +78,44 @@ Tests: `npm test` (API: MCP protocol, REST, screener validation, quota, token re
   simple CSV so either source can feed it.
 - End-of-day only. Showing exchange data publicly needs NSE's display licence (see the plan).
 
-## Moving to Cloudflare later
+## Production on Cloudflare (arthscan.me)
 
-The code is written for it; nothing needs rewriting:
+```
+ arthscan.me/*                         → arthscan-web Worker (SvelteKit, custom domain)
+ arthscan.me/{api,v1,mcp,oauth,.well-known,health}
+                                       → arthscan-api Worker (path routes, run first)
+ web → api page loads                  → service binding (no public hop)
+ arthscan-api                          → D1 database "arthscan"
+```
 
-- `api/src/app.ts` is a plain Hono app. A Worker entry is `export default { fetch: app.fetch }` with
-  a D1 binding named `DB` — the `Database` interface in `api/src/db/types.ts` is D1's own API.
-- `api/migrations/*.sql` are plain SQLite and apply with `wrangler d1 migrations apply`.
-- All crypto uses Web Crypto; no Node APIs outside `api/src/server.ts` and `api/src/db/sqlite.ts`.
-- `web/` switches from `@sveltejs/adapter-node` to `@sveltejs/adapter-cloudflare` in `svelte.config.js`.
-- The pipeline is a batch job (the plan puts it on Heroku); point it at D1 via the HTTP API or
-  export/import, or run it as a Worker Cron Trigger once rewritten to stream into D1.
+The pipeline still runs against local SQLite; `npm run d1:push` publishes to D1.
+
+Rehearse locally with the real Workers runtime (local D1, no Cloudflare account needed):
+
+```bash
+(cd api && npx wrangler d1 migrations apply arthscan --local)
+npm run d1:push -- seed --local
+npm run cf:dev                    # both Workers on http://localhost:8787 (secrets from */.dev.vars)
+```
+
+First deploy (needs the domain active on Cloudflare and `npx wrangler login`):
+
+```bash
+cd api && npx wrangler d1 create arthscan     # copy database_id into api/wrangler.jsonc
+npx wrangler d1 migrations apply arthscan --remote
+npx wrangler secret put TOKEN_PEPPER          # new random value, never reuse the local one
+npx wrangler secret put INTERNAL_API_KEY      # same value for both Workers
+(cd ../web && npx wrangler secret put INTERNAL_API_KEY)
+cd .. && npm run d1:push -- seed              # ~110 MB of market data
+npm run cf:deploy                             # API first (the website binds to it), then website
+```
+
+Every trading day after the local pipeline: `npm run data:daily && npm run d1:push -- sync` (about 15k row writes; add `--fundamentals` after importing results).
+
+Sign-in in production is Google only (`AUTH_DEV_LOGIN` is false). Create an OAuth client in
+Google Cloud Console (Web application, redirect URI `https://arthscan.me/api/auth/google/callback`),
+then `wrangler secret put GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in `api/` and set
+`GOOGLE_OAUTH_ENABLED` to `"true"` in `api/wrangler.jsonc`.
 
 `vendor/` holds the four reference repositories (MIT / CC BY 4.0). agentdraft's Worker supplied
 the Google sign-in and token-hashing approach; the Tapetide MCP bridge supplied the protocol-version
