@@ -1,0 +1,68 @@
+<script lang="ts">
+  import "../app.css";
+  import { page } from "$app/state";
+  import Search from "$lib/components/Search.svelte";
+  import { BRAND } from "$lib/brand";
+
+  let { data, children } = $props();
+
+  const nav = [
+    { href: "/", label: "Markets" },
+    { href: "/stocks", label: "Stocks" },
+    { href: "/sectors", label: "Sectors" },
+    { href: "/screener", label: "Screener" },
+    { href: "/fii-dii", label: "FII / DII" },
+    { href: "/developers", label: "API & MCP" },
+  ];
+  const isActive = (href: string) => (href === "/" ? page.url.pathname === "/" : page.url.pathname.startsWith(href));
+</script>
+
+<header>
+  <div class="wrap bar">
+    <a class="logo" href="/" aria-label="{BRAND} home">
+      <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="8" fill="var(--brand)" /><path d="M7 22l6-7 4 4 8-10" fill="none" stroke="var(--panel)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      <span>{BRAND}</span>
+    </a>
+    <Search />
+    <div class="account">
+      {#if data.account}
+        <a href="/settings/tokens" class="btn small">{data.account.name}</a>
+      {:else}
+        <a href="/login" class="btn small primary">Sign in</a>
+      {/if}
+    </div>
+  </div>
+  <nav class="wrap" aria-label="Main">
+    {#each nav as item}
+      <a href={item.href} class:active={isActive(item.href)} aria-current={isActive(item.href) ? "page" : undefined}>{item.label}</a>
+    {/each}
+  </nav>
+</header>
+
+<main class="wrap">
+  {@render children()}
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>
+      End-of-day data from NSE public files. Prices are not real-time. {BRAND} is not a SEBI-registered research analyst or
+      investment adviser; nothing here is investment advice.
+    </p>
+  </div>
+</footer>
+
+<style>
+  header { background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; }
+  .bar { display: flex; align-items: center; gap: 20px; height: 60px; }
+  .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 18px; letter-spacing: -0.02em; color: var(--ink); }
+  .account { margin-left: auto; }
+  nav { display: flex; gap: 4px; overflow-x: auto; }
+  nav a { padding: 8px 10px 10px; font-size: 14px; color: var(--ink-2); border-bottom: 2px solid transparent; white-space: nowrap; }
+  nav a.active { color: var(--ink); border-bottom-color: var(--brand); font-weight: 500; }
+  footer { border-top: 1px solid var(--line); padding: 20px 0 32px; color: var(--ink-3); font-size: 13px; }
+  @media (max-width: 640px) {
+    .bar { gap: 10px; }
+    .logo span { display: none; }
+  }
+</style>

@@ -1,0 +1,17 @@
+{
+  "name": "arthlens",
+  "private": true,
+  "type": "module",
+  "workspaces": ["api", "pipeline", "web"],
+  "scripts": {
+    "db:migrate": "npm run migrate -w api",
+    "data:stocks": "npm run stocks -w pipeline",
+    "data:daily": "npm run daily -w pipeline",
+    "data:backfill": "npm run backfill -w pipeline",
+    "data:import": "npm run import -w pipeline",
+    "dev:api": "npm run dev -w api",
+    "dev:web": "npm run dev -w web",
+    "tunnel": "node scripts/tunnel.mjs",
+    "test": "npm test -w api"
+  }
+}

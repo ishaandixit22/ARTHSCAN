@@ -1,0 +1,19 @@
+{
+  "name": "@arthlens/pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "stocks": "tsx --env-file-if-exists=../.env src/cli.ts stocks",
+    "daily": "tsx --env-file-if-exists=../.env src/cli.ts daily",
+    "backfill": "tsx --env-file-if-exists=../.env src/cli.ts backfill",
+    "metrics": "tsx --env-file-if-exists=../.env src/cli.ts metrics",
+    "import": "tsx --env-file-if-exists=../.env src/cli.ts import"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}
