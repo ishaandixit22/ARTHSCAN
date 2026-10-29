@@ -80,9 +80,16 @@ export async function loadResults(db: SqliteDatabase, { max = 250, quarter = cur
   let found = 0;
   let asked = 0;
   for (const { symbol, name } of todo) {
-    // The provider matches on the company name without "Limited".
-    const s = await fetchQuarterly(name.replace(/\s+(limited|ltd\.?)$/i, "").trim());
+    // The provider matches on the company name without "The …" / "… Limited"; when that's
+    // unknown to it (e.g. "Dr. Reddy's Laboratories"), the NSE symbol usually works.
+    const cleaned = name.replace(/^the\s+/i, "").replace(/\s+(limited|ltd\.?)$/i, "").replace(/\s+/g, " ").trim();
+    let s = await fetchQuarterly(cleaned);
     asked++;
+    if (!s?.Sales && !s?.Revenue) {
+      await sleep(350);
+      s = await fetchQuarterly(symbol);
+      asked++;
+    }
     // Banks report "Revenue" / "Financing Profit" where others report "Sales" / "Operating Profit".
     const row = (...names: string[]) => names.map((n) => s?.[n]).find(Boolean) ?? {};
     const sales = row("Sales", "Revenue"), op = row("Operating Profit", "Financing Profit");
