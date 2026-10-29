@@ -20,6 +20,16 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
 };
 
+// Whether live prices are public (the API's LIVE_ACCESS = "public"), cached for a
+// minute so signed-out page views don't each ask the API.
+let livePublic: { value: boolean; at: number } | null = null;
+async function liveIsPublic(): Promise<boolean> {
+  if (livePublic && Date.now() - livePublic.at < 60_000) return livePublic.value;
+  const cfg = await api("/api/auth/config", { allowError: true }).catch(() => null);
+  livePublic = { value: cfg?.live_public === true, at: Date.now() };
+  return livePublic.value;
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
   const binding = event.platform?.env?.API;
   if (binding && API_PATHS.test(event.url.pathname)) return binding.fetch(event.request);
@@ -40,6 +50,7 @@ export const handle: Handle = async ({ event, resolve }) => {
       /* API down: render signed-out */
     }
   }
+  if (!event.locals.live) event.locals.live = await liveIsPublic();
 
   // Private beta: exchange data stays behind sign-in until display is licensed.
   const inviteOnly = env.INVITE_ONLY === "true";

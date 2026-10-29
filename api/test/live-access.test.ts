@@ -63,3 +63,15 @@ describe("live price access", () => {
     expect((await req({ ...base, LIVE_FEED: undefined }, "/api/live/status", { headers: { cookie: owner } })).status).toBe(503);
   });
 });
+
+describe("public live access", () => {
+  it("lets signed-out visitors through and tells the website so", async () => {
+    const pub = { ...base, LIVE_ACCESS: "public", INVITE_ONLY: "false" };
+    expect((await req(pub, "/api/live/status")).status).toBe(200);
+    const cfg = (await (await req(pub, "/api/auth/config")).json()) as any;
+    expect(cfg.live_public).toBe(true);
+    const off = (await (await req({ ...pub, LIVE_ACCESS: "invited" }, "/api/auth/config")).json()) as any;
+    expect(off.live_public).toBe(false);
+    expect((await req({ ...pub, LIVE_ACCESS: "invited" }, "/api/live/status")).status).toBe(403);
+  });
+});

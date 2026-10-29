@@ -2,8 +2,11 @@
 //
 // LIVE_ACCESS decides who may see them:
 //   "owner"   only OWNER_EMAILS (personal use of the owner's Dhan Data API plan)
-//   "invited" every signed-in, invited user — only once Dhan has confirmed in
-//             writing that its feed may be shown to a platform's users
+//   "invited" every signed-in, invited user
+//   "public"  everyone, signed in or not. Turned on after Dhan's founder's office
+//             gave a verbal go-ahead (Oct 2026); written confirmation, including
+//             that Dhan's exchange licence covers public display, is pending.
+//             Set LIVE_ACCESS back to "invited" to withdraw it at once.
 //   anything else: off
 
 import { Hono, type Context } from "hono";
@@ -23,6 +26,7 @@ export function isOwner(env: Env, p: Principal | null): boolean {
 
 /** Whether this caller may see live prices. Invite-only gating already ran in the auth middleware. */
 export function canSeeLive(env: Env, p: Principal | null): boolean {
+  if (env.LIVE_ACCESS === "public") return true;
   if (!accountOf(p)) return false;
   if (env.LIVE_ACCESS === "invited") return true;
   if (env.LIVE_ACCESS === "owner") return isOwner(env, p);

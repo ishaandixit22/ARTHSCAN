@@ -39,6 +39,8 @@ account.get("/auth/config", (c) =>
   c.json({
     ok: true, google: googleConfigured(c.env), dev_login: devEnabled(c.env), dev_login_code: !!c.env.AUTH_DEV_LOGIN_CODE,
     invite_only: inviteOnly(c.env),
+    // Lets the website give signed-out visitors live prices without a session lookup.
+    live_public: c.env.LIVE_ACCESS === "public" && !!c.env.LIVE_FEED,
   }),
 );
 

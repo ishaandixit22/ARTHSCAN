@@ -30,8 +30,9 @@
     "GOOGLE_OAUTH_ENABLED": "true",
     // "true" = only emails in the invites table can sign in. Public since the open launch.
     "INVITE_ONLY": "false",
-    // Dhan live prices: "invited" = every signed-in user; "owner" = OWNER_EMAILS only.
-    "LIVE_ACCESS": "invited",
+    // Dhan live prices: "public" = everyone; "invited" = every signed-in user; "owner" = OWNER_EMAILS only.
+    // Public since Oct 2026 on Dhan's verbal go-ahead; set back to "invited" to withdraw (see routes/live.ts).
+    "LIVE_ACCESS": "public",
     "OWNER_EMAILS": "ishaandixit22@gmail.com,ylc27ishaan.dixit@mastersunion.org",
     // Public by design (it appears in every Google sign-in URL); only the secret is a secret.
     "GOOGLE_CLIENT_ID": "511904650558-4dt7sqlhv7hns55tkm2isc5frr645tv8.apps.googleusercontent.com"
