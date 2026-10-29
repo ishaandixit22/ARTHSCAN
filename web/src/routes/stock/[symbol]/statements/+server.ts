@@ -6,7 +6,7 @@
 // Returns { periods: ["Mar 2024", …, "TTM"] oldest first, rows: [{ label, note, kind, values }] }.
 
 import { json } from "@sveltejs/kit";
-import { api, ext } from "$lib/server/api";
+import { ext } from "$lib/server/api";
 
 const STATS = ["quarter_results", "yoy_results", "balancesheet", "cashflow", "ratios"] as const;
 type Series = Record<string, Record<string, number | null>>;
@@ -23,11 +23,8 @@ export async function GET({ params, url, setHeaders }) {
   const stats = url.searchParams.get("stats") as (typeof STATS)[number];
   if (!STATS.includes(stats)) return json({ error: "unknown statement" }, { status: 400 });
   const stock = encodeURIComponent(params.symbol.toUpperCase());
-  // Known symbols only, so made-up names can't be used to spend the provider plan.
-  const known = await api(`/v1/stocks/${stock}`, { allowError: true }).catch(() => null);
-  if (!known?.symbol) return json({ periods: [], rows: [] }, { status: 404 });
-
-  const r = await ext<Series>(`/statements?stock=${stock}&stats=${stats}`);
+  // listed_only: made-up names can't be used to spend the provider plan, and the API checks it in the same read as the data.
+  const r = await ext<Series>(`/statements?stock=${stock}&stats=${stats}&listed_only=true`);
   if (!r.data) return json({ periods: [], rows: [], error: r.error });
 
   // The provider keys each row by period in date order; a row may miss a period.

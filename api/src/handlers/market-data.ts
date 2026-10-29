@@ -5,6 +5,7 @@
 
 import type { Database } from "../db/types.js";
 import type { Env } from "../env.js";
+import { statementsFor } from "../lib/statements.js";
 import { indianApi } from "../lib/indianapi.js";
 import { ToolError } from "./errors.js";
 import type { Tool } from "./tools.js";
@@ -12,17 +13,39 @@ import type { Tool } from "./tools.js";
 const MIN = 60;
 const HOUR = 3600;
 
-/** The provider matches on company name; accept an NSE symbol too and swap in our name for it. */
-async function companyName(db: Database, raw: unknown): Promise<string> {
+/**
+ * What to ask the provider for one company, best first. It resolves an NSE symbol reliably, but
+ * misses many company names (anything with brackets or abbreviations: "Central Depository
+ * Services (India)", "Dr. Reddy's"), so the symbol goes first and our name is the fallback.
+ * Free text that isn't a symbol is passed through as typed.
+ */
+async function providerNames(db: Database, raw: unknown): Promise<string[]> {
   const q = String(raw ?? "").trim();
   if (!q) throw new ToolError("E_BAD_ARGS", "stock is required.");
-  const row = await db.prepare("SELECT name FROM stocks WHERE symbol = ?").bind(q.toUpperCase()).first<{ name: string }>();
-  return row?.name ? row.name.replace(/\s+(limited|ltd\.?)$/i, "").trim() : q;
+  const row = await db.prepare("SELECT symbol, name FROM stocks WHERE symbol = ?").bind(q.toUpperCase()).first<{ symbol: string; name: string }>();
+  if (!row) return [q];
+  const name = row.name?.replace(/\s+(limited|ltd\.?)$/i, "").trim();
+  return [row.symbol, ...(name && name !== row.symbol ? [name] : [])];
 }
 
 async function fetchFrom(env: Env, path: string, params: Record<string, string | undefined>, ttl: number) {
   const r = await indianApi(env, path, params, ttl);
   return { source: "Indian Stock API (indianapi.in)", fetched_at: r.fetched_at, data: r.data };
+}
+
+/** fetchFrom for one company: tries each name in turn and moves on only when the provider says it found nothing. */
+async function fetchForStock(env: Env, db: Database, path: string, key: string, stock: unknown, extra: Record<string, string | undefined>, ttl: number) {
+  const names = await providerNames(db, stock);
+  let last: unknown;
+  for (const name of names) {
+    try {
+      return await fetchFrom(env, path, { [key]: name, ...extra }, ttl);
+    } catch (err) {
+      if (!(err instanceof ToolError) || err.code !== "E_NOT_FOUND") throw err;
+      last = err;
+    }
+  }
+  throw last;
 }
 
 const stockArg = { type: "string", description: "NSE symbol (e.g. TATASTEEL) or company name (e.g. 'Tata Steel')" };
@@ -35,7 +58,7 @@ export const MARKET_DATA_TOOLS: Tool[] = [
     description: "Intraday price, company profile, key ratios, peers, recent news and analyst view for one company, from the Indian Stock API. Refreshed every few minutes, unlike get_quote's end-of-day close.",
     inputSchema: { type: "object", properties: { stock: stockArg }, required: ["stock"] },
     metered: true,
-    handler: async (db, { stock }, env) => fetchFrom(env, "/stock", { name: await companyName(db, stock) }, 5 * MIN),
+    handler: async (db, { stock }, env) => fetchForStock(env, db, "/stock", "name", stock, {}, 5 * MIN),
   },
   {
     name: "get_trending",
@@ -107,7 +130,7 @@ export const MARKET_DATA_TOOLS: Tool[] = [
     description: "Dividends, splits, bonuses, rights issues and board meetings for one company.",
     inputSchema: { type: "object", properties: { stock: stockArg }, required: ["stock"] },
     metered: true,
-    handler: async (db, { stock }, env) => fetchFrom(env, "/corporate_actions", { stock_name: await companyName(db, stock) }, 6 * HOUR),
+    handler: async (db, { stock }, env) => fetchForStock(env, db, "/corporate_actions", "stock_name", stock, {}, 6 * HOUR),
   },
   {
     name: "get_announcements",
@@ -116,7 +139,7 @@ export const MARKET_DATA_TOOLS: Tool[] = [
     description: "Recent exchange filings and announcements by one company.",
     inputSchema: { type: "object", properties: { stock: stockArg }, required: ["stock"] },
     metered: true,
-    handler: async (db, { stock }, env) => fetchFrom(env, "/recent_announcements", { stock_name: await companyName(db, stock) }, HOUR),
+    handler: async (db, { stock }, env) => fetchForStock(env, db, "/recent_announcements", "stock_name", stock, {}, HOUR),
   },
   {
     name: "get_statements",
@@ -127,6 +150,7 @@ export const MARKET_DATA_TOOLS: Tool[] = [
       type: "object",
       properties: {
         stock: stockArg,
+        listed_only: { type: "boolean", description: "Only answer for listed NSE symbols (never spend a provider request on free text)" },
         stats: {
           type: "string",
           description: "One of quarter_results, yoy_results, balancesheet, cashflow, ratios, shareholding_pattern_quarterly, shareholding_pattern_yearly, or all",
@@ -135,8 +159,19 @@ export const MARKET_DATA_TOOLS: Tool[] = [
       required: ["stock", "stats"],
     },
     metered: true,
-    handler: async (db, { stock, stats }, env) =>
-      fetchFrom(env, "/historical_stats", { stock_name: await companyName(db, stock), stats }, 24 * HOUR),
+    handler: async (db, { stock, stats, listed_only }, env) => {
+      // Listed companies are served from the stored copy (one provider request ever, not one per page view).
+      const stored = await statementsFor(env, String(stock ?? ""));
+      if (stored === undefined && listed_only) throw new ToolError("E_NOT_FOUND", "No listed stock has that symbol.", 404);
+      if (stored === null) throw new ToolError("E_NOT_FOUND", "The data provider has no statements for this company.", 404);
+      if (stored) {
+        const want = String(stats ?? "all");
+        const data = want === "all" ? stored.bundle : stored.bundle[want];
+        if (!data) throw new ToolError("E_NOT_FOUND", `The provider has no "${want}" figures for this company.`, 404);
+        return { source: "Indian Stock API (indianapi.in)", fetched_at: stored.fetched_at, data };
+      }
+      return fetchForStock(env, db, "/historical_stats", "stock_name", stock, { stats }, 24 * HOUR);
+    },
   },
   {
     name: "get_valuation_history",
@@ -158,7 +193,7 @@ export const MARKET_DATA_TOOLS: Tool[] = [
     },
     metered: true,
     handler: async (db, { stock, period, filter }, env) =>
-      fetchFrom(env, "/historical_data", { stock_name: await companyName(db, stock), period: period ?? "1yr", filter: filter ?? "default" }, 6 * HOUR),
+      fetchForStock(env, db, "/historical_data", "stock_name", stock, { period: period ?? "1yr", filter: filter ?? "default" }, 6 * HOUR),
   },
   {
     name: "get_analyst_forecasts",

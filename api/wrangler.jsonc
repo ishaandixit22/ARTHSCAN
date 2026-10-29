@@ -7,6 +7,8 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-10-01",
   "workers_dev": false,
+  // Run next to the database: a page makes many small D1 queries, each a network hop from far away.
+  "placement": { "mode": "smart" },
   "routes": [
     { "pattern": "arthscan.me/api/*", "zone_name": "arthscan.me" },
     { "pattern": "arthscan.me/v1*", "zone_name": "arthscan.me" },
@@ -47,7 +49,7 @@
   // Daily end-of-day refresh (src/jobs/daily.ts). Times are UTC: 18:15, 19:30 and
   // 22:00 IST on weekdays as NSE publishes its files, and 08:30 IST the next
   // morning to catch anything published late. Each run loads only what's new.
-  "triggers": { "crons": ["45 12 * * 1-5", "0 14 * * 1-5", "30 16 * * 1-5", "0 3 * * 2-6"] },
+  "triggers": { "crons": ["45 12 * * 1-5", "0 14 * * 1-5", "30 16 * * 1-5", "0 3 * * 2-6", "*/10 * * * *"] },
   // Recomputing every stock's metrics needs more than the default CPU time.
   "limits": { "cpu_ms": 300000 }
 }

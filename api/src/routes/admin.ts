@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../env.js";
 import { runDaily } from "../jobs/daily.js";
 import { jsonError } from "../lib/http.js";
+import { fillStatements } from "../lib/statements.js";
 import { isOwner } from "./live.js";
 
 export const admin = new Hono<AppEnv>();
@@ -25,6 +26,19 @@ admin.post("/refresh", async (c) => {
     results: c.req.query("results") ? Number(c.req.query("results")) : undefined,
   });
   return c.json({ ok: true, ...report });
+});
+
+// Fill the statement store now: POST /api/admin/statements?max=40 (default 25), optionally &cap=N for today's request cap.
+admin.post("/statements", async (c) => {
+  const max = Math.min(Number(c.req.query("max")) || 25, 150);
+  const cap = c.req.query("cap") ? Number(c.req.query("cap")) : undefined;
+  return c.json({ ok: true, ...(await fillStatements(c.env, { maxRequests: max, dailyCap: cap })) });
+});
+
+admin.get("/statements-status", async (c) => {
+  const row = await c.env.DB.prepare(`SELECT COUNT(*) AS stored, SUM(found) AS found, MIN(fetched_at) AS oldest, MAX(fetched_at) AS newest FROM company_statements`).first();
+  const total = await c.env.DB.prepare("SELECT COUNT(DISTINCT symbol) AS n FROM daily_prices WHERE date >= date((SELECT MAX(date) FROM daily_prices), '-14 days')").first<{ n: number }>();
+  return c.json({ ok: true, active_stocks: total?.n, ...row });
 });
 
 admin.get("/refresh-status", async (c) => {

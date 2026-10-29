@@ -5,6 +5,7 @@
 import { app } from "./app.js";
 import type { Env } from "./env.js";
 import { runDaily } from "./jobs/daily.js";
+import { fillStatements } from "./lib/statements.js";
 import { setBackground } from "./lib/nse.js";
 
 export { LiveFeed } from "./live/feed.js";
@@ -17,7 +18,12 @@ export default {
     setBackground((p) => (ctx as Ctx).waitUntil(p));
     return app.fetch(request, env, ctx as never);
   },
-  scheduled: (_event: { cron: string }, env: Env, ctx: Ctx) => {
+  scheduled: (event: { cron: string }, env: Env, ctx: Ctx) => {
+    // Every ten minutes: one small batch of the statement store fill (the daily cap keeps it within the provider plan).
+    if (event.cron === "*/10 * * * *") {
+      ctx.waitUntil(fillStatements(env).then((r) => r.asked && console.log(`statements: asked ${r.asked}, stored ${r.stored}, unknown ${r.unknown}${r.skipped ? ` (${r.skipped})` : ""}`)));
+      return;
+    }
     ctx.waitUntil(runDaily(env).then((r) => console.log(`daily ${r.date}: ${r.steps.map((s) => `${s.step}=${s.status}${s.rows != null ? `(${s.rows})` : ""}`).join(" ")} in ${r.ms} ms`)));
   },
 };

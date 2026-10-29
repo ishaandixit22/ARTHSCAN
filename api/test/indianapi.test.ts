@@ -12,23 +12,47 @@ const call = async (path: string, e: Env = env) => {
 
 beforeAll(() => {
   migrate(db);
-  db.raw.exec(`INSERT INTO stocks (symbol, name) VALUES ('TATASTEEL', 'Tata Steel Limited');`);
+  db.raw.exec(`INSERT INTO stocks (symbol, name) VALUES ('TATASTEEL', 'Tata Steel Limited'), ('CDSL', 'Central Depository Services (India) Limited'), ('ODDCO', 'Odd Company Limited');`);
 });
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Indian Stock API tools", () => {
-  it("sends the key, maps an NSE symbol to the company name and caches the answer", async () => {
+  it("sends the key, asks by NSE symbol and caches the answer", async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ companyName: "Tata Steel" }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const first = await call("/v1/ext/stock?stock=tatasteel");
     expect(first.status).toBe(200);
     expect(first.body.data.data.companyName).toBe("Tata Steel");
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("https://stock.indianapi.in/stock?name=Tata+Steel");
+    expect(url).toBe("https://stock.indianapi.in/stock?name=TATASTEEL");
     expect((init.headers as Record<string, string>)["x-api-key"]).toBe("k");
 
     await call("/v1/ext/stock?stock=TATASTEEL");
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks for statements by symbol first and stores the answer, so names the provider can't match (CDSL) still load", async () => {
+    // The provider rejects "Central Depository Services (India)" but knows the symbol.
+    const fetchMock = vi.fn(async (url: string) => (url.includes("stock_name=CDSL") ? new Response(JSON.stringify({ quarter_results: { Sales: { "Sep 2026": 322 } } })) : new Response(JSON.stringify({ error: "Unknown stock" }))));
+    vi.stubGlobal("fetch", fetchMock);
+    const r = await call("/v1/ext/statements?stock=CDSL&stats=quarter_results");
+    expect(r.status).toBe(200);
+    expect(r.body.data.data.Sales["Sep 2026"]).toBe(322);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("stats=all"); // one request covers every statement
+    await call("/v1/ext/statements?stock=CDSL&stats=quarter_results");
+    expect(fetchMock).toHaveBeenCalledTimes(1); // the second view is served from the store
+  });
+
+  it("falls back to the company name when the symbol isn't recognised, and gives up only when both are", async () => {
+    db.raw.exec("INSERT INTO stocks (symbol, name) VALUES ('GHOST', 'Ghost Company Limited')");
+    const seen: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      seen.push(decodeURIComponent(new URL(url).searchParams.get("stock_name") ?? ""));
+      return new Response(JSON.stringify(url.includes("Odd+Company") ? { quarter_results: { Sales: { "Sep 2026": 1 } } } : { error: "Unknown stock" }));
+    }));
+    expect((await call("/v1/ext/statements?stock=ODDCO&stats=quarter_results")).status).toBe(200);
+    expect(seen).toEqual(["ODDCO", "Odd Company"]);
+    expect((await call("/v1/ext/statements?stock=GHOST&stats=ratios")).status).toBe(404);
   });
 
   it("answers 503 when no key is configured", async () => {
