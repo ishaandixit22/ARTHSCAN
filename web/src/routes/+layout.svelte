@@ -2,6 +2,7 @@
   import "../app.css";
   import { page } from "$app/state";
   import Search from "$lib/components/Search.svelte";
+  import TickerTape from "$lib/components/TickerTape.svelte";
   import { BRAND } from "$lib/brand";
 
   let { data, children } = $props();
@@ -39,6 +40,8 @@
 </script>
 
 <svelte:window onresize={updateFade} />
+
+<TickerTape quotes={data.ticker} liveAccess={!!data.live} />
 
 <header>
   <div class="wrap bar">
