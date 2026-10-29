@@ -24,6 +24,9 @@
     { href: "/sectors", label: "Sectors" },
     { href: "/screener", label: "Screener" },
     { href: "/fii-dii", label: "FII / DII" },
+    { href: "/news", label: "News" },
+    { href: "/ipos", label: "IPOs" },
+    { href: "/mutual-funds", label: "Mutual Funds" },
     { href: "/developers", label: "API & MCP" },
   ];
   const isActive = (href: string) => (href === "/" ? page.url.pathname === "/" : page.url.pathname.startsWith(href));

@@ -10,8 +10,36 @@
   let mode = $state<"line" | "candles">("line");
 
   const range = $derived(m.high_52w && m.low_52w ? (m.close - m.low_52w) / (m.high_52w - m.low_52w) : null);
-  const fin = $derived([...data.financials.periods].reverse());
-  const sh = $derived(data.shareholding.quarters);
+  // Fundamentals not imported yet: fetch them from the Indian Stock API once the
+  // page is in the browser (crawlers don't run this, so they don't spend the plan).
+  let extFund = $state<{ periods: any[]; quarters: any[]; fetched_at: string | null } | null>(null);
+  let extLoading = $state(false);
+  $effect(() => {
+    const sym = c.symbol;
+    extFund = null;
+    if (data.financials.periods.length || data.shareholding.quarters.length) return;
+    extLoading = true;
+    let stale = false;
+    fetch(`/stock/${encodeURIComponent(sym)}/fundamentals`)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null)
+      .then((d) => {
+        if (stale) return;
+        extFund = d;
+        extLoading = false;
+      });
+    return () => (stale = true);
+  });
+  const fromExt = $derived(!data.financials.periods.length && !data.shareholding.quarters.length && !!extFund);
+  const fin = $derived([...(data.financials.periods.length ? data.financials.periods : (extFund?.periods ?? []))].reverse());
+  const sh = $derived(data.shareholding.quarters.length ? data.shareholding.quarters : (extFund?.quarters ?? []));
+  const hasPledge = $derived(sh.some((q: any) => q.pledged_pct != null));
+  // Imported results carry tax in crore; the provider gives OPM and tax as percentages.
+  const FIN_ROWS = $derived(
+    fromExt
+      ? [["Revenue", "revenue"], ["Expenses", "expenses"], ["Operating profit", "operating_profit"], ["OPM %", "opm_pct", "pct"], ["Other income", "other_income"], ["Depreciation", "depreciation"], ["Interest", "interest"], ["Profit before tax", "pbt"], ["Tax %", "tax_pct", "pct"], ["Net profit", "net_profit"]]
+      : [["Revenue", "revenue"], ["Expenses", "expenses"], ["Operating profit", "operating_profit"], ["Other income", "other_income"], ["Depreciation", "depreciation"], ["Interest", "interest"], ["Profit before tax", "pbt"], ["Tax", "tax"], ["Net profit", "net_profit"]],
+  );
   const latestSh = $derived(sh[0]);
 
   const SH_PARTS = [
@@ -117,14 +145,14 @@
   <!-- One placeholder instead of two empty sections until fundamentals are loaded. -->
   {#if fin.length || latestSh}
   <section class="card">
-    <div class="card-head"><h2>Quarterly results</h2><span class="sub">INR crore · consolidated where filed</span></div>
+    <div class="card-head"><h2>Quarterly results</h2><span class="sub">INR crore · {fromExt ? "source: Indian Stock API" : "consolidated where filed"}</span></div>
     {#if fin.length}
       <div class="table-scroll">
         <table>
           <thead><tr><th>Quarter ending</th>{#each fin as f}<th>{date(f.period_end)}</th>{/each}</tr></thead>
           <tbody>
-            {#each [["Revenue", "revenue"], ["Expenses", "expenses"], ["Operating profit", "operating_profit"], ["Other income", "other_income"], ["Depreciation", "depreciation"], ["Interest", "interest"], ["Profit before tax", "pbt"], ["Tax", "tax"], ["Net profit", "net_profit"]] as [label, key]}
-              <tr><td>{label}</td>{#each fin as f}<td>{num(f[key], 0)}</td>{/each}</tr>
+            {#each FIN_ROWS as [label, key, kind]}
+              <tr><td>{label}</td>{#each fin as f}<td>{kind === "pct" ? pct(f[key], false) : num(f[key], 0)}</td>{/each}</tr>
             {/each}
             <tr><td>EPS (₹)</td>{#each fin as f}<td>{num(f.eps)}</td>{/each}</tr>
           </tbody>
@@ -136,7 +164,7 @@
   </section>
 
   <section class="card">
-    <div class="card-head"><h2>Shareholding</h2>{#if latestSh}<span class="sub">as of {date(latestSh.quarter_end)}</span>{/if}</div>
+    <div class="card-head"><h2>Shareholding</h2>{#if latestSh}<span class="sub">as of {date(latestSh.quarter_end)}{fromExt ? " · source: Indian Stock API" : ""}</span>{/if}</div>
     {#if latestSh}
       <div class="card-body">
         <div class="stack" aria-hidden="true">
@@ -147,10 +175,10 @@
         <table>
           <thead><tr><th>Holder</th>{#each sh as q}<th>{date(q.quarter_end)}</th>{/each}</tr></thead>
           <tbody>
-            {#each SH_PARTS as p}
+            {#each SH_PARTS.filter((p) => sh.some((q: any) => q[p.key] != null)) as p}
               <tr><td><i class="dot" style="background: {p.color}"></i>{p.label}</td>{#each sh as q}<td>{pct(q[p.key], false)}</td>{/each}</tr>
             {/each}
-            <tr><td>Promoter shares pledged</td>{#each sh as q}<td>{pct(q.pledged_pct, false)}</td>{/each}</tr>
+            {#if hasPledge}<tr><td>Promoter shares pledged</td>{#each sh as q}<td>{pct(q.pledged_pct, false)}</td>{/each}</tr>{/if}
           </tbody>
         </table>
       </div>
@@ -162,7 +190,9 @@
   {:else}
     <section class="card card-body soon">
       <h2>Financials & shareholding</h2>
-      <p class="sub">Quarterly results, P/E and the shareholding pattern for {c.symbol} are coming in a later update.</p>
+      <p class="sub">
+        {#if extLoading}Loading quarterly results and shareholding for {c.symbol}…{:else}Quarterly results and the shareholding pattern for {c.symbol} aren't available right now.{/if}
+      </p>
     </section>
   {/if}
 

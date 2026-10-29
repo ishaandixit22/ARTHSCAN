@@ -58,6 +58,10 @@ export async function indianApi(
   } catch {
     throw new ToolError("E_UPSTREAM", "The data provider returned an unreadable response.", 502);
   }
+  // Some lookups answer 200 with {"error": "..."} when nothing matches; never cache those.
+  if (data && typeof data === "object" && !Array.isArray(data) && Object.keys(data).length === 1 && "error" in data) {
+    throw new ToolError("E_NOT_FOUND", "The data provider found nothing for those arguments. Check the name or try a shorter one.", 404);
+  }
 
   if (text.length <= MAX_CACHE_BYTES) {
     await env.DB.prepare("INSERT INTO external_cache (key, body, fetched_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET body = excluded.body, fetched_at = excluded.fetched_at")

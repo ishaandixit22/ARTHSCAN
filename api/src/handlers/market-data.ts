@@ -230,9 +230,18 @@ export const MARKET_DATA_TOOLS: Tool[] = [
     name: "get_mutual_fund",
     route: "/ext/mutual-funds/details",
     title: "Mutual fund details",
-    description: "One scheme's NAV, returns, expense ratio, AUM, risk and portfolio holdings. Use the scheme name from search_mutual_funds.",
+    description: "One scheme's NAV, returns, expense ratio, AUM, risk and portfolio holdings (the provider reports the Direct plan). Use the scheme name from search_mutual_funds.",
     inputSchema: { type: "object", properties: { name: { type: "string", description: "Scheme name" } }, required: ["name"] },
     metered: true,
-    handler: async (_db, { name }, env) => fetchFrom(env, "/mutual_funds_details", { stock_name: name }, 12 * HOUR),
+    handler: async (_db, { name }, env) => {
+      try {
+        return await fetchFrom(env, "/mutual_funds_details", { stock_name: name }, 12 * HOUR);
+      } catch (err) {
+        // list_mutual_funds names carry a plan suffix ("... Regular Growth") the details lookup doesn't match.
+        const base = String(name).replace(/\s+(regular|direct)(\s+plan)?(\s+(growth|idcw).*)?$/i, "").trim();
+        if (!(err instanceof ToolError) || err.code !== "E_NOT_FOUND" || base === name) throw err;
+        return fetchFrom(env, "/mutual_funds_details", { stock_name: base }, 12 * HOUR);
+      }
+    },
   },
 ];

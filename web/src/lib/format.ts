@@ -34,3 +34,17 @@ export function date(iso: string | null | undefined) {
 }
 
 export const slug = (s: string) => encodeURIComponent(s);
+
+/** Provider timestamps ("2026-10-29T06:47:04", already IST) → "29 Oct, 06:47". */
+export function dateTime(s: string | null | undefined) {
+  const m = s?.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (!m) return "—";
+  const month = new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString("en-IN", { month: "short", timeZone: "UTC" });
+  return `${+m[3]} ${month}, ${m[4]}:${m[5]}`;
+}
+
+/** When a third-party answer was fetched, as "29 Oct, 12:10 IST". */
+export function fetchedAt(iso: string | null | undefined) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" }) + " IST";
+}

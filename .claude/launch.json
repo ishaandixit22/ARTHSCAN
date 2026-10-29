@@ -2,6 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     { "name": "api", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev:api"], "port": 8787 },
+    { "name": "cf-dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "cf:dev"], "port": 8787 },
     { "name": "web", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev:web"], "port": 5173 }
   ]
 }

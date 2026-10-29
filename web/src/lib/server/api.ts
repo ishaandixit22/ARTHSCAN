@@ -37,3 +37,13 @@ export async function api<T = any>(
   if (!res.ok && !opts.allowError) error(res.status, json?.error?.message ?? `API error ${res.status}`);
   return (json.data ?? json) as T;
 }
+
+/**
+ * A /v1/ext tool (Indian Stock API). Never throws: a provider outage or a
+ * used-up plan shows as a notice on the page instead of an error page.
+ */
+export async function ext<T = any>(path: string): Promise<{ data: T | null; fetched_at: string | null; error: string | null }> {
+  const r = await api(`/v1/ext${path}`, { allowError: true }).catch(() => null);
+  if (r?.data !== undefined && r?.source) return { data: r.data as T, fetched_at: r.fetched_at, error: null };
+  return { data: null, fetched_at: null, error: r?.error?.message ?? "This data is not available right now." };
+}

@@ -44,3 +44,22 @@ describe("Indian Stock API tools", () => {
     expect((await call("/v1/ext/trending")).status).toBe(502);
   });
 });
+
+describe("Indian Stock API error bodies", () => {
+  it("treats a 200 {error} body as not found, doesn't cache it, and retries funds without the plan suffix", async () => {
+    const fetchMock = vi.fn(async (url: string) =>
+      url.includes("Regular")
+        ? new Response(JSON.stringify({ error: "An error occurred" }), { status: 200 })
+        : new Response(JSON.stringify({ basic_info: { fund_name: "Some Focused Fund" } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const r = await call("/v1/ext/mutual-funds/details?name=Some%20Focused%20Fund%20Regular%20Growth");
+    expect(r.status).toBe(200);
+    expect(r.body.data.data.basic_info.fund_name).toBe("Some Focused Fund");
+    expect(fetchMock.mock.calls.map((c) => String(c[0]))).toEqual([
+      "https://stock.indianapi.in/mutual_funds_details?stock_name=Some+Focused+Fund+Regular+Growth",
+      "https://stock.indianapi.in/mutual_funds_details?stock_name=Some+Focused+Fund",
+    ]);
+    const cached = await db.prepare("SELECT key FROM external_cache WHERE key LIKE '%Regular%'").all();
+    expect(cached.results).toEqual([]);
+  });
+});

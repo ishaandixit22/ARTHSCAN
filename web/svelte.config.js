@@ -25,7 +25,8 @@ export default {
         "script-src": ["self"],
         "style-src": ["self", "unsafe-inline", "https://fonts.googleapis.com"],
         "font-src": ["self", "https://fonts.gstatic.com"],
-        "img-src": ["self", "data:", "https://lh3.googleusercontent.com"],
+        // News thumbnails come from many publishers' image hosts; images can't run code.
+        "img-src": ["self", "data:", "https:"],
         "connect-src": ["self"],
         "object-src": ["none"],
         "base-uri": ["self"],
