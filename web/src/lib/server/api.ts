@@ -24,6 +24,7 @@ export async function api<T = any>(
   if (opts.cookie) headers.cookie = opts.cookie;
   if (opts.body !== undefined) headers["content-type"] = "application/json";
   let res: Response;
+  const started = Date.now();
   try {
     res = await apiFetch(path, {
       method: opts.method ?? (opts.body !== undefined ? "POST" : "GET"),
@@ -34,6 +35,9 @@ export async function api<T = any>(
     error(503, "The data API is not reachable right now.");
   }
   const json = (await res.json().catch(() => ({}))) as any;
+  try {
+    (getRequestEvent().locals.timings ??= []).push({ path: path.split("?")[0], ms: Date.now() - started });
+  } catch { /* outside a request */ }
   if (!res.ok && !opts.allowError) error(res.status, json?.error?.message ?? `API error ${res.status}`);
   return (json.data ?? json) as T;
 }

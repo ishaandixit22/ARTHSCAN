@@ -18,7 +18,10 @@
   "vars": {
     "PUBLIC_SITE_ORIGIN": "https://arthscan.me",
     // Must match the API Worker. "true" = pages need sign-in and crawlers are kept out.
-    "INVITE_ONLY": "false"
+    "INVITE_ONLY": "false",
+    // Must match the API Worker's LIVE_ACCESS being "public". Lets signed-out pages show live prices
+    // without a call to the API before every page view. Set to "false" together with LIVE_ACCESS.
+    "LIVE_PUBLIC": "true"
   },
   // Secret (wrangler secret put): INTERNAL_API_KEY — must match the API Worker's.
   "observability": { "enabled": true }

@@ -20,10 +20,12 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
 };
 
-// Whether live prices are public (the API's LIVE_ACCESS = "public"), cached for a
-// minute so signed-out page views don't each ask the API.
+// Whether live prices are public: the API's LIVE_ACCESS = "public", mirrored here as
+// LIVE_PUBLIC so a signed-out page view doesn't wait on a call to the API first. Without
+// the variable (local dev), ask the API once a minute.
 let livePublic: { value: boolean; at: number } | null = null;
 async function liveIsPublic(): Promise<boolean> {
+  if (env.LIVE_PUBLIC !== undefined) return env.LIVE_PUBLIC === "true";
   if (livePublic && Date.now() - livePublic.at < 60_000) return livePublic.value;
   const cfg = await api("/api/auth/config", { allowError: true }).catch(() => null);
   livePublic = { value: cfg?.live_public === true, at: Date.now() };
@@ -59,8 +61,12 @@ export const handle: Handle = async ({ event, resolve }) => {
     redirect(303, path === "/" ? "/login" : `/login?return_to=${encodeURIComponent(path)}`);
   }
 
+  const t0 = Date.now();
   const response = await resolve(event);
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) response.headers.set(k, v);
+  // Where a page's time went, visible in the browser's network panel: each API call, and the page in all.
+  const calls = (event.locals.timings ?? []).map((t, i) => `api${i};desc="${t.path.slice(0, 40)}";dur=${t.ms}`);
+  response.headers.set("Server-Timing", [`page;dur=${Date.now() - t0}`, ...calls].join(", "));
   if (inviteOnly) response.headers.set("X-Robots-Tag", "noindex, nofollow");
   return response;
 };

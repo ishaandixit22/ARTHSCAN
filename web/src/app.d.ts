@@ -6,6 +6,8 @@ declare global {
       /** This account may see Dhan live prices (LIVE_ACCESS on the API). */
       live: boolean;
       owner: boolean;
+      /** API calls made while rendering this request, for the Server-Timing header. */
+      timings?: { path: string; ms: number }[];
     }
     interface Platform {
       env?: {
