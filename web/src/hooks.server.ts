@@ -26,12 +26,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   event.locals.account = null;
   event.locals.usage = null;
+  event.locals.live = false;
+  event.locals.owner = false;
   const cookie = event.request.headers.get("cookie");
   if (cookie?.includes("al_session=")) {
     try {
       const me = await api("/api/me", { cookie, allowError: true });
       event.locals.account = me.account ?? null;
       event.locals.usage = me.usage ?? null;
+      event.locals.live = me.live === true;
+      event.locals.owner = me.owner === true;
     } catch {
       /* API down: render signed-out */
     }

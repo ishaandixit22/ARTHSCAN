@@ -28,12 +28,19 @@
     "FREE_DAILY_QUOTA": "50",
     "AUTH_DEV_LOGIN": "false",
     "GOOGLE_OAUTH_ENABLED": "true",
-    // Private beta until the NSE display licence question is settled (see README).
-    "INVITE_ONLY": "true",
+    // "true" = only emails in the invites table can sign in. Public since the open launch.
+    "INVITE_ONLY": "false",
+    // Dhan live prices: "invited" = every signed-in user; "owner" = OWNER_EMAILS only.
+    "LIVE_ACCESS": "invited",
+    "OWNER_EMAILS": "ishaandixit22@gmail.com,ylc27ishaan.dixit@mastersunion.org",
     // Public by design (it appears in every Google sign-in URL); only the secret is a secret.
     "GOOGLE_CLIENT_ID": "511904650558-4dt7sqlhv7hns55tkm2isc5frr645tv8.apps.googleusercontent.com"
   },
   // Secrets (wrangler secret put): TOKEN_PEPPER, INTERNAL_API_KEY,
-  // GOOGLE_CLIENT_SECRET, INDIANAPI_KEY, and AUTH_DEV_LOGIN_CODE if dev sign-in is ever enabled.
+  // GOOGLE_CLIENT_SECRET, DHAN_CLIENT_ID, DHAN_ACCESS_TOKEN, INDIANAPI_KEY, and AUTH_DEV_LOGIN_CODE if dev sign-in is ever enabled.
+  "durable_objects": {
+    "bindings": [{ "name": "LIVE_FEED", "class_name": "LiveFeed" }]
+  },
+  "migrations": [{ "tag": "v1-live-feed", "new_sqlite_classes": ["LiveFeed"] }],
   "observability": { "enabled": true }
 }

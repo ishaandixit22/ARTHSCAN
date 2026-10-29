@@ -1,6 +1,10 @@
 <script lang="ts">
   import { BRAND } from "$lib/brand";
-  import { crore, pct, tone } from "$lib/format";
+  import { crore, date, pct, tone } from "$lib/format";
+
+  // Cell shading for the rotation table: stronger colour for bigger moves.
+  const shade = (v: number | null, scale: number) =>
+    v == null ? "" : `background: ${v >= 0 ? "rgb(18 128 74" : "rgb(199 52 63"} / ${Math.min(0.55, (Math.abs(v) / scale) * 0.55)})`;
 
   let { data } = $props();
 </script>
@@ -14,6 +18,28 @@
       <p class="sub">Sector tags come from NSE's broad-market index lists; stocks outside those indices are unclassified.</p>
     </div>
   </div>
+
+  <section class="card">
+    <div class="card-head"><h2>Sector rotation</h2><span class="sub">Median return of liquid stocks · as of {date(data.rotation.as_of)}</span></div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Sector</th><th>1W</th><th>1M</th><th>3M</th><th class="wide-only">6M</th><th class="wide-only">1Y</th><th class="wide-only">Above 50D avg</th></tr></thead>
+        <tbody>
+          {#each data.rotation.sectors as s (s.sector)}
+            <tr>
+              <td><a href="/sectors/{encodeURIComponent(s.sector)}">{s.sector}</a> <span class="sub">({s.stocks})</span></td>
+              <td style={shade(s.ret_1w, 6)}>{pct(s.ret_1w)}</td>
+              <td style={shade(s.ret_1m, 12)}>{pct(s.ret_1m)}</td>
+              <td style={shade(s.ret_3m, 20)}>{pct(s.ret_3m)}</td>
+              <td class="wide-only" style={shade(s.ret_6m, 30)}>{pct(s.ret_6m)}</td>
+              <td class="wide-only" style={shade(s.ret_1y, 50)}>{pct(s.ret_1y)}</td>
+              <td class="wide-only">{s.pct_above_sma50}%</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  </section>
 
   <div class="grid grid-3">
     {#each data.sectors as s}
@@ -34,6 +60,7 @@
 <style>
   .tile { padding: 16px; display: grid; gap: 8px; color: inherit; }
   .tile:hover { border-color: var(--brand-2); color: inherit; }
+  @media (max-width: 640px) { .wide-only { display: none; } }
   .row { display: flex; justify-content: space-between; font-size: 14px; font-variant-numeric: tabular-nums; }
   b { font-weight: 600; }
 </style>

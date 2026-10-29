@@ -17,8 +17,8 @@
   "services": [{ "binding": "API", "service": "arthscan-api" }],
   "vars": {
     "PUBLIC_SITE_ORIGIN": "https://arthscan.me",
-    // Must match the API Worker: pages need sign-in, crawlers are told to stay out.
-    "INVITE_ONLY": "true"
+    // Must match the API Worker. "true" = pages need sign-in and crawlers are kept out.
+    "INVITE_ONLY": "false"
   },
   // Secret (wrangler secret put): INTERNAL_API_KEY — must match the API Worker's.
   "observability": { "enabled": true }

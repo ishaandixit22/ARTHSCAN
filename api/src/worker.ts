@@ -4,6 +4,8 @@
 import { app } from "./app.js";
 import type { Env } from "./env.js";
 
+export { LiveFeed } from "./live/feed.js";
+
 export default {
   fetch: (request: Request, env: Env, ctx: unknown) => app.fetch(request, env, ctx as never),
 };

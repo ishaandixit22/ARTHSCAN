@@ -3,11 +3,17 @@
   import StockTable from "$lib/components/StockTable.svelte";
   import { BRAND } from "$lib/brand";
   import { compact, cr, crore, date, num, pct, price, tone } from "$lib/format";
+  import LiveBadge from "$lib/components/LiveBadge.svelte";
+  import { live, tradeTime, watch } from "$lib/live.svelte";
 
   let { data } = $props();
   const c = $derived(data.company);
   const m = $derived(c.metrics ?? {});
   let mode = $state<"line" | "candles">("line");
+
+  // Live price from Dhan when this account has live access; end-of-day close otherwise.
+  $effect(() => (data.live ? watch([c.symbol]) : undefined));
+  const lq = $derived(data.live ? live.quotes[c.symbol] : undefined);
 
   const range = $derived(m.high_52w && m.low_52w ? (m.close - m.low_52w) / (m.high_52w - m.low_52w) : null);
   // Fundamentals not imported yet: fetch them from the Indian Stock API once the
@@ -64,8 +70,16 @@
       <h1>{c.name}</h1>
     </div>
     <div class="quote">
-      <div class="px">{price(m.close)}</div>
-      <div class="chg {tone(m.change_pct)}">{pct(m.change_pct)} <span class="sub">· close {date(m.as_of)}</span></div>
+      {#if lq}
+        <div class="px">{price(lq.ltp)}</div>
+        <div class="chg {tone(lq.change)}">{lq.change != null && lq.change > 0 ? "+" : ""}{num(lq.change)} ({pct(lq.changePct)}) <LiveBadge /></div>
+        <div class="sub dayline">
+          O {num(lq.open)} · H {num(lq.high)} · L {num(lq.low)} · Vol {compact(lq.volume)} · {tradeTime(lq.ltt)} IST
+        </div>
+      {:else}
+        <div class="px">{price(m.close)}</div>
+        <div class="chg {tone(m.change_pct)}">{pct(m.change_pct)} <span class="sub">· close {date(m.as_of)}</span>{#if data.live} <LiveBadge />{/if}</div>
+      {/if}
     </div>
   </div>
 
@@ -111,7 +125,7 @@
 
   <div class="grid grid-2">
     <section class="card">
-      <div class="card-head"><h2>Returns</h2></div>
+      <div class="card-head"><h2>Returns & technicals</h2></div>
       <div class="returns">
         {#each [["1W", m.ret_1w], ["1M", m.ret_1m], ["3M", m.ret_3m], ["6M", m.ret_6m], ["1Y", m.ret_1y]] as [label, v]}
           <div><span class="sub">{label}</span><b class={tone(v)}>{pct(v)}</b></div>
@@ -122,6 +136,16 @@
           <tr><td>50-day average</td><td>{price(m.sma_50)} {#if m.sma_50}<span class="chip {tone(m.close - m.sma_50)}">{m.close > m.sma_50 ? "above" : "below"}</span>{/if}</td></tr>
           <tr><td>200-day average</td><td>{price(m.sma_200)} {#if m.sma_200}<span class="chip {tone(m.close - m.sma_200)}">{m.close > m.sma_200 ? "above" : "below"}</span>{/if}</td></tr>
           <tr><td>Volatility (1Y, annualised)</td><td>{pct(m.volatility_1y, false)}</td></tr>
+          <tr><td>RSI (14)</td><td>{num(m.rsi_14, 1)} {#if m.rsi_14 != null && (m.rsi_14 < 30 || m.rsi_14 > 70)}<span class="chip {m.rsi_14 < 30 ? 'down' : 'up'}">{m.rsi_14 < 30 ? "oversold" : "overbought"}</span>{/if}</td></tr>
+          <tr><td>MACD histogram (12, 26, 9)</td><td class={tone(m.macd_hist)}>{num(m.macd_hist)}</td></tr>
+          <tr><td>Delivery · 20D avg</td><td>{pct(m.deliv_pct, false)} · {pct(m.deliv_pct_avg_20, false)}</td></tr>
+          {#if m.cross_signal || m.breakout || (m.vol_ratio ?? 0) >= 3}
+            <tr><td>Signals</td><td>
+              {#if m.cross_signal}<span class="chip {m.cross_signal === 'golden' ? 'up' : 'down'}">{m.cross_signal} cross · {date(m.cross_date)}</span>{/if}
+              {#if m.breakout}<span class="chip {m.breakout === 'high' ? 'up' : 'down'}">52W {m.breakout === "high" ? "breakout" : "breakdown"}</span>{/if}
+              {#if (m.vol_ratio ?? 0) >= 3}<span class="chip">volume {num(m.vol_ratio, 1)}x</span>{/if}
+            </td></tr>
+          {/if}
           <tr><td>Turnover (last day)</td><td>{crore(m.turnover)}</td></tr>
         </tbody>
       </table>
@@ -209,7 +233,9 @@
   .crumbs { color: var(--ink-3); font-size: 13px; margin-bottom: 4px; }
   .quote { text-align: right; }
   .px { font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-  .chg { font-weight: 500; }
+  .chg { font-weight: 500; display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+  .dayline { font-size: 12.5px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  @media (max-width: 640px) { .chg { justify-content: flex-start; } }
   .note { margin-top: 8px; font-size: 12.5px; }
   .value.small { font-size: 16px; }
   .range { position: relative; height: 4px; margin-top: 10px; border-radius: 2px; background: linear-gradient(90deg, var(--down-soft), var(--up-soft)); }

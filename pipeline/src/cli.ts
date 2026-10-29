@@ -6,14 +6,17 @@
 //   npm run data:import -- fii-dii <file>     import FII/DII flows (.json or .csv)
 //   npm run data:import -- financials <file>  import results (.csv or .json)
 //   npm run data:import -- shareholding <file>
+//   npm run data:reports [-- 365]             backfill deliveries, index valuations, F&O bans
 //
 // Every price-changing command rebuilds stock_metrics at the end.
 
 import { resolve } from "node:path";
 import { openDatabase } from "../../api/src/db/sqlite.js";
 import { syncStocks } from "./jobs/stocks.js";
+import { syncDhanIds } from "./jobs/dhan.js";
 import { backfill, loadBhavcopy, loadLatest } from "./jobs/bhavcopy.js";
 import { rebuildMetrics } from "./jobs/metrics.js";
+import { backfillReports, loadReports } from "./jobs/reports.js";
 import { importFiiDii, importFinancials, importShareholding } from "./jobs/imports.js";
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -29,16 +32,27 @@ async function main() {
   switch (cmd) {
     case "stocks": {
       console.log(`Stock master: ${await syncStocks(db)} rows.`);
+      console.log(`Dhan live-feed ids: ${await syncDhanIds(db)} stocks mapped.`);
       break;
     }
     case "daily": {
       const r = args[0] ? await loadBhavcopy(db, args[0], { force: true }) : await loadLatest(db);
       console.log(r ? `Bhavcopy ${r.date}: ${r.status} (${r.rows} rows)` : "No bhavcopy found in the last week.");
+      if (r && r.status !== "holiday") {
+        const rep = await loadReports(db, r.date);
+        console.log(`Reports ${rep.date}: ${rep.deliveries} deliveries, ${rep.indices} indices, ${rep.foBan} in F&O ban.`);
+      }
       metrics();
       break;
     }
     case "backfill": {
       await backfill(db, Number(args[0] ?? 365));
+      metrics();
+      break;
+    }
+    case "reports": {
+      // Deliveries for the last 90 days, index valuations and ban lists for the whole window.
+      await backfillReports(db, Number(args[0] ?? 365));
       metrics();
       break;
     }

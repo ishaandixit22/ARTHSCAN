@@ -52,9 +52,18 @@ export const SCREENER_FIELDS: Record<string, { label: string; unit: string; desc
   pe:             { label: "P/E (TTM)",          unit: "x",   description: "Price / trailing four-quarter EPS (needs imported results)" },
   eps_ttm:        { label: "EPS (TTM)",          unit: "INR", description: "Sum of the last four quarterly EPS" },
   promoter_pct:   { label: "Promoter holding",   unit: "%",   description: "Latest promoter shareholding (needs imported data)" },
+  sma_20:         { label: "SMA 20",             unit: "INR", description: "20-session simple moving average" },
+  rsi_14:         { label: "RSI 14",             unit: "",    description: "14-session relative strength index (below 30 oversold, above 70 overbought)" },
+  macd_hist:      { label: "MACD histogram",     unit: "",    description: "MACD(12,26,9) line minus its signal line; positive = bullish momentum" },
+  vol_ratio:      { label: "Volume vs 20D avg",  unit: "x",   description: "Last session's volume divided by the prior 20-session average" },
+  deliv_pct:      { label: "Delivery",           unit: "%",   description: "Share of traded quantity taken for delivery, last session" },
+  deliv_pct_avg_20: { label: "Delivery avg 20D", unit: "%",   description: "Average delivery % over the last 20 sessions" },
 };
 
 const OPS: Record<string, string> = { gt: ">", gte: ">=", lt: "<", lte: "<=", eq: "=" };
+
+/** Ordinary shares only: keeps ETFs, liquid funds and exchange test symbols out of market-wide lists. */
+const SHARES_ONLY = "COALESCE(s.instrument_type, 'ES') = 'ES'";
 
 const LIST_COLUMNS = `s.symbol, s.name, s.sector, s.series, m.close, m.change_pct, m.volume, m.turnover,
   m.ret_1m, m.ret_1y, m.high_52w, m.low_52w, m.pct_from_high, m.pe, m.as_of,
@@ -401,7 +410,7 @@ export const TOOLS: Tool[] = [
     name: "get_market_movers",
     route: "/market/movers",
     title: "Market movers",
-    description: "Top gainers, top losers or most active stocks (by turnover) for the latest trading day. Ignores illiquid stocks; gainers and losers also leave out stocks on their listing day, whose change is measured against the issue price.",
+    description: "Top gainers, top losers or most active stocks (by turnover) for the latest trading day. Ordinary shares only (no ETFs); ignores illiquid stocks; gainers and losers also leave out stocks on their listing day, whose change is measured against the issue price.",
     inputSchema: {
       type: "object",
       properties: {
@@ -417,7 +426,7 @@ export const TOOLS: Tool[] = [
       const listing = k === "active" ? "" : "AND (m.first_date IS NULL OR m.first_date < m.as_of)";
       // ₹1 crore of turnover keeps penny-stock noise out of the lists.
       const { results } = await db.prepare(`SELECT ${LIST_COLUMNS} FROM stocks s JOIN stock_metrics m ON m.symbol = s.symbol
-        WHERE m.turnover >= 1e7 AND m.change_pct IS NOT NULL ${listing}
+        WHERE m.turnover >= 1e7 AND m.change_pct IS NOT NULL AND ${SHARES_ONLY} ${listing}
           AND m.as_of = (SELECT MAX(as_of) FROM stock_metrics)
         ORDER BY ${order} LIMIT ?`).bind(clampLimit(limit, 10, 50)).all();
       return { kind: k, results };
@@ -466,6 +475,179 @@ export const TOOLS: Tool[] = [
           COUNT(DISTINCT date) AS days
         FROM fii_dii GROUP BY month ORDER BY month DESC LIMIT 24`).all();
       return { unit: "INR crore", daily, monthly };
+    },
+  },
+
+  // ── Phase 1 market insights ──────────────────────────────────────
+  {
+    name: "get_heatmap",
+    route: "/market/heatmap",
+    title: "Market heatmap",
+    description: "Most traded stocks grouped by sector with their latest change and turnover, for a heatmap. Tile size = turnover (market cap isn't available yet).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        period: { type: "string", enum: ["1d", "1w", "1m", "3m", "1y"], description: "Return period to colour by (default 1d)" },
+        limit: { type: "integer", description: "Stocks to include, most traded first (default 200, max 500)" },
+      },
+    },
+    metered: true,
+    handler: async (db, { period, limit }) => {
+      const col = ({ "1w": "ret_1w", "1m": "ret_1m", "3m": "ret_3m", "1y": "ret_1y" } as Record<string, string>)[period ?? "1d"] ?? "change_pct";
+      const { results } = await db.prepare(`SELECT s.symbol, s.name, COALESCE(s.sector, 'Other') AS sector, m.${col} AS change, m.turnover, m.close
+        FROM stocks s JOIN stock_metrics m ON m.symbol = s.symbol
+        WHERE ${SHARES_ONLY} AND m.as_of = (SELECT MAX(as_of) FROM stock_metrics) AND m.turnover > 0 AND m.${col} IS NOT NULL
+        ORDER BY m.turnover DESC LIMIT ?`).bind(clampLimit(limit, 200, 500)).all<{ sector: string; turnover: number; change: number }>();
+      const bySector = new Map<string, { sector: string; turnover: number; change: number; stocks: unknown[] }>();
+      for (const r of results) {
+        const g = bySector.get(r.sector) ?? { sector: r.sector, turnover: 0, change: 0, stocks: [] };
+        g.turnover += r.turnover;
+        g.change += r.change * r.turnover; // turnover-weighted
+        g.stocks.push(r);
+        bySector.set(r.sector, g);
+      }
+      const sectors = [...bySector.values()]
+        .map((g) => ({ ...g, change: Math.round((g.change / g.turnover) * 100) / 100 }))
+        .sort((a, b) => b.turnover - a.turnover);
+      const asOf = await db.prepare("SELECT MAX(as_of) AS d FROM stock_metrics").first<{ d: string }>();
+      return { as_of: asOf?.d, period: period ?? "1d", sizing: "turnover", sectors };
+    },
+  },
+  {
+    name: "get_index_valuations",
+    route: "/market/valuations",
+    title: "Index valuations",
+    description: "P/E, P/B and dividend yield for NSE indices. Without an index: the latest values for every index. With an index (e.g. 'Nifty 50'): its daily history.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        index: { type: "string", description: "Exact index name, e.g. 'Nifty 50', 'Nifty Bank', 'Nifty Midcap 100'" },
+        days: { type: "integer", description: "History length in trading days when an index is given (default 250, max 1000)" },
+      },
+    },
+    metered: true,
+    handler: async (db, { index, days }) => {
+      if (index) {
+        const { results } = await db.prepare(`SELECT date, close, change_pct, pe, pb, div_yield FROM index_daily
+          WHERE index_name = ? ORDER BY date DESC LIMIT ?`).bind(String(index), clampLimit(days, 250, 1000)).all<{ pe: number | null }>();
+        if (!results.length) throw new ToolError("E_NOT_FOUND", `No index called '${index}'. Call get_index_valuations without an index to list them.`, 404);
+        const pes = results.map((r) => r.pe).filter((v): v is number => v !== null).sort((a, b) => a - b);
+        const pct = (v: number | null) => (v === null || !pes.length ? null : Math.round((pes.filter((p) => p <= v).length / pes.length) * 100));
+        return {
+          index, history: results.reverse(),
+          pe_range: pes.length ? { min: pes[0], median: pes[Math.floor(pes.length / 2)], max: pes[pes.length - 1], current_percentile: pct(results[results.length - 1]?.pe ?? null) } : null,
+        };
+      }
+      const { results } = await db.prepare(`SELECT index_name, date, close, change_pct, pe, pb, div_yield FROM index_daily
+        WHERE date = (SELECT MAX(date) FROM index_daily) ORDER BY turnover_cr DESC`).all();
+      return { as_of: (results[0] as { date?: string } | undefined)?.date ?? null, indices: results };
+    },
+  },
+  {
+    name: "get_sector_rotation",
+    route: "/market/sector-rotation",
+    title: "Sector rotation",
+    description: "Median return of each sector over 1 week, 1 month, 3 months, 6 months and 1 year, plus the share of its stocks above their 50-day average. Shows which sectors are gaining or losing leadership.",
+    inputSchema: { type: "object", properties: {} },
+    metered: true,
+    handler: async (db) => {
+      const { results } = await db.prepare(`SELECT s.sector, m.ret_1w, m.ret_1m, m.ret_3m, m.ret_6m, m.ret_1y, m.close, m.sma_50
+        FROM stocks s JOIN stock_metrics m ON m.symbol = s.symbol
+        WHERE s.sector IS NOT NULL AND ${SHARES_ONLY} AND m.turnover >= 1e6`).all<Record<string, number | null> & { sector: string }>();
+      const median = (xs: (number | null)[]) => {
+        const v = xs.filter((x): x is number => x !== null).sort((a, b) => a - b);
+        return v.length ? Math.round(v[Math.floor(v.length / 2)] * 100) / 100 : null;
+      };
+      const groups = new Map<string, typeof results>();
+      for (const r of results) groups.set(r.sector, [...(groups.get(r.sector) ?? []), r]);
+      const sectors = [...groups].map(([sector, rows]) => ({
+        sector, stocks: rows.length,
+        ret_1w: median(rows.map((r) => r.ret_1w)), ret_1m: median(rows.map((r) => r.ret_1m)), ret_3m: median(rows.map((r) => r.ret_3m)),
+        ret_6m: median(rows.map((r) => r.ret_6m)), ret_1y: median(rows.map((r) => r.ret_1y)),
+        pct_above_sma50: Math.round((rows.filter((r) => r.sma_50 && r.close! > r.sma_50).length / rows.length) * 100),
+      })).sort((a, b) => (b.ret_1m ?? -999) - (a.ret_1m ?? -999));
+      const asOf = await db.prepare("SELECT MAX(as_of) AS d FROM stock_metrics").first<{ d: string }>();
+      return { as_of: asOf?.d, method: "median of stocks with ≥ ₹10 lakh turnover", sectors };
+    },
+  },
+  {
+    name: "get_technical_signals",
+    route: "/market/signals",
+    title: "Technical signals",
+    description: "Stocks currently showing a technical signal: RSI oversold/overbought, 50/200-day golden or death cross (last 5 sessions), 52-week breakout or breakdown, volume spike, or MACD bullish/bearish. Liquid stocks only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        signal: {
+          type: "string",
+          enum: ["rsi_oversold", "rsi_overbought", "golden_cross", "death_cross", "breakout_high", "breakout_low", "volume_spike", "macd_bullish", "macd_bearish"],
+          description: "Which signal (default volume_spike)",
+        },
+        limit: { type: "integer", description: "Default 50, max 200" },
+      },
+    },
+    metered: true,
+    handler: async (db, { signal, limit }) => {
+      const SIGNALS: Record<string, { where: string; order: string; about: string }> = {
+        rsi_oversold: { where: "m.rsi_14 < 30", order: "m.rsi_14 ASC", about: "RSI(14) below 30" },
+        rsi_overbought: { where: "m.rsi_14 > 70", order: "m.rsi_14 DESC", about: "RSI(14) above 70" },
+        golden_cross: { where: "m.cross_signal = 'golden'", order: "m.cross_date DESC, m.turnover DESC", about: "50-day average crossed above the 200-day in the last 5 sessions" },
+        death_cross: { where: "m.cross_signal = 'death'", order: "m.cross_date DESC, m.turnover DESC", about: "50-day average crossed below the 200-day in the last 5 sessions" },
+        breakout_high: { where: "m.breakout = 'high'", order: "m.turnover DESC", about: "Closed above its prior 52-week high" },
+        breakout_low: { where: "m.breakout = 'low'", order: "m.turnover DESC", about: "Closed below its prior 52-week low" },
+        volume_spike: { where: "m.vol_ratio >= 3", order: "m.vol_ratio DESC", about: "Volume at least 3x the prior 20-session average" },
+        macd_bullish: { where: "m.macd_hist > 0 AND m.macd > 0", order: "m.macd_hist DESC", about: "MACD above its signal line and above zero" },
+        macd_bearish: { where: "m.macd_hist < 0 AND m.macd < 0", order: "m.macd_hist ASC", about: "MACD below its signal line and below zero" },
+      };
+      const key = signal && signal in SIGNALS ? signal : "volume_spike";
+      const sig = SIGNALS[key];
+      const { results } = await db.prepare(`SELECT ${LIST_COLUMNS}, m.rsi_14, m.macd_hist, m.vol_ratio, m.cross_date, m.breakout, m.deliv_pct
+        FROM stocks s JOIN stock_metrics m ON m.symbol = s.symbol
+        WHERE ${sig.where} AND ${SHARES_ONLY} AND m.turnover >= 1e7 AND m.as_of = (SELECT MAX(as_of) FROM stock_metrics)
+        ORDER BY ${sig.order} LIMIT ?`).bind(clampLimit(limit, 50, 200)).all();
+      const asOf = await db.prepare("SELECT MAX(as_of) AS d FROM stock_metrics").first<{ d: string }>();
+      return { as_of: asOf?.d, signal: key, definition: sig.about, results };
+    },
+  },
+  {
+    name: "get_top_deliveries",
+    route: "/market/deliveries",
+    title: "Top deliveries",
+    description: "Stocks with the highest share of traded quantity taken for delivery in the last session — often read as conviction buying or selling rather than intraday trading. Includes the 20-day average for comparison.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sort: { type: "string", enum: ["deliv_pct", "deliv_jump"], description: "deliv_pct (highest %) or deliv_jump (biggest rise vs 20-day average). Default deliv_pct" },
+        min_turnover_cr: { type: "number", description: "Minimum turnover in ₹ crore (default 5)" },
+        limit: { type: "integer", description: "Default 50, max 200" },
+      },
+    },
+    metered: true,
+    handler: async (db, { sort, min_turnover_cr, limit }) => {
+      const order = sort === "deliv_jump" ? "(m.deliv_pct - m.deliv_pct_avg_20) DESC" : "m.deliv_pct DESC";
+      const { results } = await db.prepare(`SELECT ${LIST_COLUMNS}, m.deliv_pct, m.deliv_pct_avg_20, m.vol_ratio
+        FROM stocks s JOIN stock_metrics m ON m.symbol = s.symbol
+        WHERE m.deliv_pct IS NOT NULL AND ${SHARES_ONLY} AND m.turnover >= ? AND m.as_of = (SELECT MAX(as_of) FROM stock_metrics)
+          ${sort === "deliv_jump" ? "AND m.deliv_pct_avg_20 IS NOT NULL" : ""}
+        ORDER BY ${order} LIMIT ?`).bind((Number(min_turnover_cr) || 5) * 1e7, clampLimit(limit, 50, 200)).all();
+      const asOf = await db.prepare("SELECT MAX(as_of) AS d FROM stock_metrics").first<{ d: string }>();
+      return { as_of: asOf?.d, sort: sort === "deliv_jump" ? "deliv_jump" : "deliv_pct", results };
+    },
+  },
+  {
+    name: "get_fo_ban",
+    route: "/market/fo-ban",
+    title: "F&O ban list",
+    description: "Securities in the F&O ban period (market-wide open interest above 95% of the limit, so no new positions), for the latest trade date and recent days.",
+    inputSchema: { type: "object", properties: { days: { type: "integer", description: "Trade dates of history (default 10, max 60)" } } },
+    metered: true,
+    handler: async (db, { days }) => {
+      const { results: dates } = await db.prepare("SELECT DISTINCT date FROM index_daily ORDER BY date DESC LIMIT ?").bind(clampLimit(days, 10, 60)).all<{ date: string }>();
+      const { results } = dates.length
+        ? await db.prepare(`SELECT date, symbol FROM fo_ban WHERE date >= ? ORDER BY date DESC, symbol`).bind(dates[dates.length - 1].date).all<{ date: string; symbol: string }>()
+        : { results: [] as { date: string; symbol: string }[] };
+      const byDate = dates.map(({ date }) => ({ date, symbols: results.filter((r) => r.date === date).map((r) => r.symbol) }));
+      return { latest: byDate[0] ?? null, history: byDate };
     },
   },
   ...MARKET_DATA_TOOLS,

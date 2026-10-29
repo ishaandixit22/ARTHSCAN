@@ -16,6 +16,7 @@ import { sessionCookie } from "../lib/cookie.js";
 import { jsonError } from "../lib/http.js";
 import { requireSession } from "../middleware/auth.js";
 import { inviteOnly, isInvited } from "../lib/access.js";
+import { canSeeLive, isOwner } from "./live.js";
 
 const SESSION_TTL_SEC = 30 * 24 * 3600;
 const MAX_TOKENS = 10;
@@ -112,6 +113,8 @@ account.get("/me", async (c) => {
     ok: true,
     account: acct,
     usage: { today: await usageToday(c.env, acct.id), limit: dailyLimit(c.env, acct.plan), resets: "midnight IST" },
+    live: canSeeLive(c.env, p) && !!c.env.LIVE_FEED,
+    owner: isOwner(c.env, p),
   });
 });
 

@@ -3,6 +3,9 @@ declare global {
     interface Locals {
       account: { id: string; name: string; email: string | null; avatar_url: string | null; plan: string } | null;
       usage: { today: number; limit: number } | null;
+      /** This account may see Dhan live prices (LIVE_ACCESS on the API). */
+      live: boolean;
+      owner: boolean;
     }
     interface Platform {
       env?: {

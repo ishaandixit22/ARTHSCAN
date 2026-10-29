@@ -20,6 +20,7 @@
     "d1:push": "npm run d1 -w pipeline --",
     "cf:dev": "npm run cf:build -w web && wrangler dev -c web/wrangler.jsonc -c api/wrangler.jsonc --persist-to api/.wrangler/state",
     "cf:deploy": "npm run cf:deploy -w api && npm run cf:deploy -w web",
-    "invite": "node scripts/invite.mjs"
+    "invite": "node scripts/invite.mjs",
+    "data:reports": "npm run reports -w pipeline --"
   }
 }

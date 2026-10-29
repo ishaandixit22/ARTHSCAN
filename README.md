@@ -127,6 +127,30 @@ Answers are cached in `external_cache` (migration 0009) for 5 minutes to 24 hour
 repeat calls don't spend the vendor plan. Set `INDIANAPI_KEY` in `.env` locally and
 `wrangler secret put INDIANAPI_KEY` in `api/` for production; until then these tools answer 503.
 
+## Live prices (Dhan)
+
+During market hours, accounts with live access see prices update as trades happen: on stock pages
+and on `/live` (the 50 most traded stocks). Source: Dhan's live market feed v2, through the owner's
+Dhan Data API subscription (₹499/month).
+
+```
+ Dhan feed ──binary ticks──▶ LiveFeed Durable Object (api/src/live/feed.ts)
+                                  │ once a second, only the symbols each viewer shows
+                                  ▼
+                    browsers on /api/live/stream (WebSocket)
+```
+
+- `LIVE_ACCESS` in `api/wrangler.jsonc`: `"invited"` (every signed-in user, the current setting) or
+  `"owner"` (only `OWNER_EMAILS`). Showing Dhan's feed to users depends on the data arrangement with
+  Dhan; switch back to `"owner"` if that ever lapses.
+- Secrets: `wrangler secret put DHAN_CLIENT_ID` and `DHAN_ACCESS_TOKEN` in `api/`. Tokens last 24
+  hours; the Durable Object renews them about every 20 hours. If one lapses, the owner pastes a fresh
+  one under **API tokens → Dhan live feed** on the website.
+- Stocks are subscribed by Dhan security id, mapped from Dhan's public instrument list by
+  `npm run data:stocks` (column `stocks.dhan_security_id`).
+- The feed connects when someone is watching and disconnects ten minutes after the last viewer leaves.
+- Local testing: set `DHAN_FEED_URL` in `api/.dev.vars` to a stand-in server speaking Dhan's protocol.
+
 ## Security notes
 
 - Every issued secret (API tokens, OAuth codes, access/refresh tokens, client secrets) is stored only

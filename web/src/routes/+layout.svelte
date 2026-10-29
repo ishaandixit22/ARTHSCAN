@@ -18,17 +18,23 @@
     updateFade();
   });
 
-  const nav = [
+  // Derived so the Live tab appears or disappears on sign-in/out without a reload.
+  const nav = $derived([
     { href: "/", label: "Markets" },
-    { href: "/stocks", label: "Stocks" },
-    { href: "/sectors", label: "Sectors" },
+    ...(data.live ? [{ href: "/live", label: "Live" }] : []),
+    { href: "/heatmap", label: "Heatmap" },
+    { href: "/signals", label: "Signals" },
     { href: "/screener", label: "Screener" },
+    { href: "/sectors", label: "Sectors" },
+    { href: "/stocks", label: "Stocks" },
+    { href: "/valuations", label: "Valuations" },
+    { href: "/deliveries", label: "Deliveries" },
     { href: "/fii-dii", label: "FII / DII" },
     { href: "/news", label: "News" },
     { href: "/ipos", label: "IPOs" },
     { href: "/mutual-funds", label: "Mutual Funds" },
     { href: "/developers", label: "API & MCP" },
-  ];
+  ]);
   const isActive = (href: string) => (href === "/" ? page.url.pathname === "/" : page.url.pathname.startsWith(href));
 </script>
 
@@ -63,7 +69,7 @@
 <footer>
   <div class="wrap">
     <p>
-      Private beta for invited testers. End-of-day prices, not real-time. {BRAND} is not a SEBI-registered research analyst or
+      Prices are end-of-day from NSE unless marked Live. {BRAND} is not a SEBI-registered research analyst or
       investment adviser; nothing here is investment advice.
     </p>
   </div>

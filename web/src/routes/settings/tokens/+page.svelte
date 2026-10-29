@@ -79,6 +79,33 @@
     </div>
   </section>
 
+  {#if data.owner}
+    <section class="card">
+      <div class="card-head"><h2>Dhan live feed</h2><span class="sub">Owner only</span></div>
+      <div class="card-body dhan">
+        {#if data.liveStatus?.status}
+          <p>
+            Status: <b>{data.liveStatus.status.state}</b> — {data.liveStatus.status.message}
+            {#if data.liveStatus.status.instruments} · {data.liveStatus.status.instruments} stocks subscribed{/if}
+            · {data.liveStatus.viewers ?? 0} viewer(s)
+          </p>
+          <p class="sub">
+            Token {data.liveStatus.tokenSetAt ? `saved ${when(new Date(data.liveStatus.tokenSetAt).toISOString().replace("T", " ").slice(0, 19))}; renewed automatically every ~20 hours` : "not set here yet (using the deployment secret, if any)"}.
+          </p>
+        {:else}
+          <p class="sub">{data.liveStatus?.error?.message ?? "Live feed status unavailable."}</p>
+        {/if}
+        <form method="POST" action="?/dhanToken" use:enhance class="create">
+          <input name="token" type="password" placeholder="Paste a Dhan access token from web.dhan.co" autocomplete="off" aria-label="Dhan access token" />
+          <button class="btn">Save token</button>
+        </form>
+        {#if form?.dhanError}<p class="err">{form.dhanError}</p>{/if}
+        {#if form?.dhanSaved}<p class="up">Saved. Reconnecting to Dhan.</p>{/if}
+        <p class="sub">Generate one at web.dhan.co → My Profile → Access DhanHQ APIs. It's stored only in Cloudflare and never shown again.</p>
+      </div>
+    </section>
+  {/if}
+
   <section class="card">
     <div class="card-head"><h2>Connected apps</h2><span class="sub">Signed in with OAuth — no token to copy</span></div>
     <div class="table-scroll">
@@ -149,4 +176,5 @@
   .connect { display: grid; gap: 10px; }
   .connect h3 { margin-top: 6px; }
   .err { color: var(--down); margin-top: 8px; }
+  .dhan { display: grid; gap: 10px; }
 </style>

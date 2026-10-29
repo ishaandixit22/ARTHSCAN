@@ -5,7 +5,7 @@
 import type { SqliteDatabase } from "../../../api/src/db/sqlite.js";
 import { rebuildAdjustments } from "./adjustments.js";
 
-type Bar = { symbol: string; date: string; close: number; prev_close: number | null; volume: number | null; turnover: number | null };
+type Bar = { symbol: string; date: string; close: number; prev_close: number | null; volume: number | null; turnover: number | null; deliv_pct: number | null };
 
 const round = (v: number | null, dp = 2) => (v === null || !Number.isFinite(v) ? null : Math.round(v * 10 ** dp) / 10 ** dp);
 
@@ -32,6 +32,63 @@ function volatility(closes: number[]): number | null {
   return Math.sqrt(variance) * Math.sqrt(252) * 100;
 }
 
+// ── Technical indicators (all on split-adjusted closes) ────────────
+
+/** Exponential moving average series; NaN until `n` values have been seen. */
+function emaSeries(values: number[], n: number): number[] {
+  const k = 2 / (n + 1);
+  const out: number[] = [];
+  let prev = NaN;
+  values.forEach((v, i) => {
+    if (i < n - 1) out.push(NaN);
+    else if (i === n - 1) out.push((prev = values.slice(0, n).reduce((a, b) => a + b, 0) / n));
+    else out.push((prev = v * k + prev * (1 - k)));
+  });
+  return out;
+}
+
+/** Wilder's 14-period RSI of the latest close. */
+function rsi(closes: number[], n = 14): number | null {
+  if (closes.length <= n) return null;
+  let gain = 0, loss = 0;
+  for (let i = 1; i <= n; i++) {
+    const d = closes[i] - closes[i - 1];
+    if (d > 0) gain += d; else loss -= d;
+  }
+  gain /= n; loss /= n;
+  for (let i = n + 1; i < closes.length; i++) {
+    const d = closes[i] - closes[i - 1];
+    gain = (gain * (n - 1) + Math.max(d, 0)) / n;
+    loss = (loss * (n - 1) + Math.max(-d, 0)) / n;
+  }
+  return loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
+}
+
+/** MACD(12, 26, 9) at the latest close. */
+function macd(closes: number[]) {
+  if (closes.length < 35) return { macd: null, signal: null, hist: null };
+  const fast = emaSeries(closes, 12), slow = emaSeries(closes, 26);
+  const line = closes.map((_, i) => fast[i] - slow[i]).filter((v) => Number.isFinite(v));
+  const signal = emaSeries(line, 9);
+  const m = line[line.length - 1], s = signal[signal.length - 1];
+  return { macd: m, signal: s, hist: m - s };
+}
+
+/** A 50/200-day moving-average cross within the last `within` sessions (golden = 50 crossed above 200). */
+function recentCross(series: Bar[], within = 5): { kind: "golden" | "death"; date: string } | null {
+  const closes = series.map((b) => b.close);
+  if (closes.length < 200 + within) return null;
+  const avg = (end: number, n: number) => closes.slice(end - n, end).reduce((a, b) => a + b, 0) / n;
+  for (let back = 0; back < within; back++) {
+    const end = closes.length - back;
+    const diffNow = avg(end, 50) - avg(end, 200);
+    const diffBefore = avg(end - 1, 50) - avg(end - 1, 200);
+    if (diffNow > 0 && diffBefore <= 0) return { kind: "golden", date: series[end - 1].date };
+    if (diffNow < 0 && diffBefore >= 0) return { kind: "death", date: series[end - 1].date };
+  }
+  return null;
+}
+
 /** Return vs the last close on or before `days` calendar days ago. */
 function calendarReturn(series: Bar[], days: number): number | null {
   const last = series[series.length - 1];
@@ -54,7 +111,7 @@ export function rebuildMetrics(db: SqliteDatabase): number {
 
   // ~13 months of history covers every lookback below (252 trading days).
   const bars = db.raw.prepare(`
-    SELECT symbol, date, close * adj AS close, prev_close * adj AS prev_close, volume, turnover FROM daily_prices
+    SELECT symbol, date, close * adj AS close, prev_close * adj AS prev_close, volume / adj AS volume, turnover, deliv_pct FROM daily_prices
     WHERE date >= date(?, '-400 days') ORDER BY symbol, date`).all(latest.d) as Bar[];
 
   // TTM EPS = last four quarters, consolidated preferred over standalone.
@@ -82,8 +139,9 @@ export function rebuildMetrics(db: SqliteDatabase): number {
   const ins = db.raw.prepare(`
     INSERT INTO stock_metrics (symbol, as_of, close, change_pct, volume, turnover, avg_volume_20d,
       high_52w, low_52w, pct_from_high, ret_1w, ret_1m, ret_3m, ret_6m, ret_1y, volatility_1y,
-      sma_50, sma_200, pe, eps_ttm, promoter_pct, first_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      sma_50, sma_200, pe, eps_ttm, promoter_pct, first_date,
+      sma_20, rsi_14, macd, macd_signal, macd_hist, cross_signal, cross_date, breakout, vol_ratio, deliv_pct, deliv_pct_avg_20)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
   let n = 0;
   db.raw.exec("BEGIN");
@@ -110,6 +168,17 @@ export function rebuildMetrics(db: SqliteDatabase): number {
       const prev = closes.length > 1 ? closes[closes.length - 2] : last.prev_close;
       const eps = epsTtm.get(sym) ?? null;
 
+      // Signals compare today against the sessions before it.
+      const priorYear = closes.slice(-253, -1);
+      const breakout = priorYear.length >= 200
+        ? last.close > Math.max(...priorYear) ? "high" : last.close < Math.min(...priorYear) ? "low" : null
+        : null;
+      const priorVols = series.slice(-21, -1).map((b) => b.volume ?? 0);
+      const avgPriorVol = priorVols.length ? priorVols.reduce((a, b) => a + b, 0) / priorVols.length : 0;
+      const delivs = series.slice(-20).map((b) => b.deliv_pct).filter((d): d is number => d !== null);
+      const m = macd(closes);
+      const cross = recentCross(series);
+
       ins.run(
         sym, last.date, last.close,
         round(prev ? (last.close / prev - 1) * 100 : null),
@@ -124,6 +193,11 @@ export function rebuildMetrics(db: SqliteDatabase): number {
         round(eps),
         promoter.get(sym) ?? null,
         series[0].date,
+        round(sma(closes, 20)), round(rsi(closes), 1),
+        round(m.macd, 3), round(m.signal, 3), round(m.hist, 3),
+        cross?.kind ?? null, cross?.date ?? null, breakout,
+        avgPriorVol > 0 && last.volume ? round(last.volume / avgPriorVol) : null,
+        last.deliv_pct, delivs.length >= 10 ? round(delivs.reduce((a, b) => a + b, 0) / delivs.length) : null,
       );
       n++;
     }

@@ -11,14 +11,24 @@ export interface Env {
   AUTH_DEV_LOGIN?: string;
   /** "true" = private beta: only emails in the invites table can sign in or use tokens. */
   INVITE_ONLY?: string;
+  /** Who sees Dhan live prices: "off", "owner" (OWNER_EMAILS only) or "invited" (every signed-in user). */
+  LIVE_ACCESS?: string;
+  /** Comma-separated owner emails, for LIVE_ACCESS="owner" and owner-only settings. */
+  OWNER_EMAILS?: string;
+  /** Dhan live feed. Client id and token are secrets; the URL can point at a test server. */
+  DHAN_CLIENT_ID?: string;
+  DHAN_ACCESS_TOKEN?: string;
+  DHAN_FEED_URL?: string;
+  /** Indian Stock API (indianapi.in) key, a secret. Its tools answer 503 until it is set. */
+  INDIANAPI_KEY?: string;
+  INDIANAPI_BASE_URL?: string;
+  /** Durable Object namespace for the live feed (Cloudflare only; absent on the Node server). */
+  LIVE_FEED?: { idFromName(name: string): unknown; get(id: unknown): { fetch(req: Request): Promise<Response> } };
   /** When set, dev sign-in also needs this code — required before exposing the site publicly. */
   AUTH_DEV_LOGIN_CODE?: string;
   GOOGLE_OAUTH_ENABLED?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
-  /** Indian Stock API (indianapi.in) key, a secret. Its tools answer 503 until it is set. */
-  INDIANAPI_KEY?: string;
-  INDIANAPI_BASE_URL?: string;
 }
 
 export interface Account {

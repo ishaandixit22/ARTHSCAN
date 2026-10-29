@@ -9,6 +9,7 @@
 //   npm run d1:push -- sync  [--local]   last 3 days of prices + derived tables
 //   npm run d1:push -- sync 10 [--local] last 10 days
 //   add --fundamentals to also send financials + shareholding
+//   add --insights-history to send all index valuations and F&O bans (first publish)
 //
 // --local targets wrangler's local D1 (for `wrangler dev`); default is remote.
 //
@@ -29,6 +30,7 @@ const mode = args[0];
 const local = args.includes("--local");
 const days = Number(args.find((a, i) => i > 0 && /^\d+$/.test(a)) ?? 3);
 const fundamentals = mode === "seed" || args.includes("--fundamentals");
+const insightsHistory = mode === "seed" || args.includes("--insights-history");
 if (mode !== "seed" && mode !== "sync") {
   console.error("usage: d1:push -- <seed|sync> [days] [--local]");
   process.exit(1);
@@ -115,6 +117,10 @@ copy("stock_metrics", "SELECT * FROM stock_metrics", [],
   // Drop stocks that stopped trading (the local rebuild already left them out).
   [`DELETE FROM stock_metrics WHERE as_of < date(${sqlValue(latest)}, '-14 days');`]);
 copy("fii_dii", "SELECT * FROM fii_dii WHERE date >= ?", [mode === "seed" ? "0000-00-00" : windowStart]);
+// Index valuations and F&O ban lists: small tables, one row per index or banned stock per day.
+const since = insightsHistory ? "0000-00-00" : windowStart;
+copy("index_daily", "SELECT * FROM index_daily WHERE date >= ?", [since]);
+copy("fo_ban", "SELECT * FROM fo_ban WHERE date >= ?", [since], [`DELETE FROM fo_ban WHERE date >= ${sqlValue(since)};`]);
 if (fundamentals) {
   copy("financials", "SELECT * FROM financials");
   copy("shareholding", "SELECT * FROM shareholding");
@@ -122,11 +128,18 @@ if (fundamentals) {
 
 console.log(`Wrote ${files.length} SQL file(s) to data/d1/. Uploading…`);
 for (const file of files) {
-  const r = spawnSync(
-    "npx",
-    ["wrangler", "d1", "execute", "arthscan", local ? "--local" : "--remote", "--file", file, "--yes"],
-    { cwd: resolve(ROOT, "api"), stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" },
-  );
+  // D1's import API occasionally fails transiently; every file is idempotent, so retry.
+  let r = spawnSync("true");
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    r = spawnSync(
+      "npx",
+      ["wrangler", "d1", "execute", "arthscan", local ? "--local" : "--remote", "--file", file, "--yes"],
+      { cwd: resolve(ROOT, "api"), stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" },
+    );
+    if (r.status === 0) break;
+    console.log(`  ${file.split("/").pop()} failed (attempt ${attempt}); retrying`);
+    spawnSync("sleep", [String(5 * attempt)]);
+  }
   if (r.status !== 0) {
     console.error(r.stdout, r.stderr);
     console.error(`Upload failed at ${file}. Re-running is safe (rows are replaced, not duplicated).`);
