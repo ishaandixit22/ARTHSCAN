@@ -1,12 +1,17 @@
 <script lang="ts">
   import { BRAND } from "$lib/brand";
+  import LiveStamp from "$lib/components/LiveStamp.svelte";
   import { crore, date, pct, tone } from "$lib/format";
+  import { market, useLiveMarket } from "$lib/liveMarket.svelte";
 
   // Cell shading for the rotation table: stronger colour for bigger moves.
   const shade = (v: number | null, scale: number) =>
     v == null ? "" : `background: ${v >= 0 ? "rgb(18 128 74" : "rgb(199 52 63"} / ${Math.min(0.55, (Math.abs(v) / scale) * 0.55)})`;
 
   let { data } = $props();
+  // Live accounts get a "Today" column: each sector's median move from live prices.
+  $effect(() => (data.live ? useLiveMarket() : undefined));
+  const today = $derived(new Map((data.live ? (market.data?.sectors ?? []) : []).map((s) => [s.sector, s.median_change])));
 </script>
 
 <svelte:head><title>Stocks by sector — {BRAND}</title></svelte:head>
@@ -20,14 +25,15 @@
   </div>
 
   <section class="card">
-    <div class="card-head"><h2>Sector rotation</h2><span class="sub">Median return of liquid stocks · as of {date(data.rotation.as_of)}</span></div>
+    <div class="card-head"><h2>Sector rotation</h2><span class="sub">Median return of liquid stocks · {#if today.size}Today <LiveStamp close="" />; longer periods{/if} as of {date(data.rotation.as_of)}</span></div>
     <div class="table-scroll">
       <table>
-        <thead><tr><th>Sector</th><th>1W</th><th>1M</th><th>3M</th><th class="wide-only">6M</th><th class="wide-only">1Y</th><th class="wide-only">Above 50D avg</th></tr></thead>
+        <thead><tr><th>Sector</th>{#if today.size}<th>Today</th>{/if}<th>1W</th><th>1M</th><th>3M</th><th class="wide-only">6M</th><th class="wide-only">1Y</th><th class="wide-only">Above 50D avg</th></tr></thead>
         <tbody>
           {#each data.rotation.sectors as s (s.sector)}
             <tr>
               <td><a href="/sectors/{encodeURIComponent(s.sector)}">{s.sector}</a> <span class="sub">({s.stocks})</span></td>
+              {#if today.size}<td style={shade(today.get(s.sector) ?? null, 3)}>{pct(today.get(s.sector) ?? null)}</td>{/if}
               <td style={shade(s.ret_1w, 6)}>{pct(s.ret_1w)}</td>
               <td style={shade(s.ret_1m, 12)}>{pct(s.ret_1m)}</td>
               <td style={shade(s.ret_3m, 20)}>{pct(s.ret_3m)}</td>

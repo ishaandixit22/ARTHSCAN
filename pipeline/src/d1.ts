@@ -117,6 +117,9 @@ copy("stock_metrics", "SELECT * FROM stock_metrics", [],
   // Drop stocks that stopped trading (the local rebuild already left them out).
   [`DELETE FROM stock_metrics WHERE as_of < date(${sqlValue(latest)}, '-14 days');`]);
 copy("fii_dii", "SELECT * FROM fii_dii WHERE date >= ?", [mode === "seed" ? "0000-00-00" : windowStart]);
+// NSDL FPI flows: a few hundred rows in all, so always sent whole.
+copy("fpi_daily", "SELECT * FROM fpi_daily");
+copy("fpi_sector", "SELECT * FROM fpi_sector");
 // Index valuations and F&O ban lists: small tables, one row per index or banned stock per day.
 const since = insightsHistory ? "0000-00-00" : windowStart;
 copy("index_daily", "SELECT * FROM index_daily WHERE date >= ?", [since]);

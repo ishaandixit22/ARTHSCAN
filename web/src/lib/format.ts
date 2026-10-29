@@ -18,6 +18,9 @@ export function crore(v: number | null | undefined) {
 
 /** Already-in-crore values (financials, FII/DII). */
 export const cr = (v: number | null | undefined) => (v == null ? "—" : `₹${inr0.format(v)} Cr`);
+/** Flows in crore with the sign in front: "+₹1,234 Cr" / "−₹567 Cr". */
+export const crSigned = (v: number | null | undefined) =>
+  v == null ? "—" : `${v > 0 ? "+" : v < 0 ? "−" : ""}₹${inr0.format(Math.abs(v))} Cr`;
 
 export function compact(v: number | null | undefined) {
   if (v == null) return "—";

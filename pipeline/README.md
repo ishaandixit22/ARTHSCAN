@@ -34,6 +34,21 @@ NSE's "FII/DII trading activity" JSON works as-is:
 CSV with the same columns also works: `date,category,buyValue,sellValue,netValue` (INR crore;
 `category` starting with FII/FPI or DII). Re-importing a date replaces it.
 
+### `fpi-daily` and `fpi-sectors` (NSDL FPI flows)
+
+The FII / DII page's whole-market and sector charts come from NSDL's FPI Monitor
+(fpi.nsdl.co.in → Reports). NSDL refuses non-browser downloads, so save the pages
+from a browser and import the files:
+
+| Import | Save this page | How often |
+|---|---|---|
+| `npm run data:import -- fpi-daily <file.html>` | FPI Investments → Current Month (or an Archive month) | Daily or weekly; re-importing a date replaces it |
+| `npm run data:import -- fpi-sectors <file.html> [more.html …]` | Fortnightly Sector-wise FPI Investment Data → pick the fortnight → the report page | Twice a month (after the 15th and month-end) |
+
+CSV also works: `date,equity_buy,equity_sell,equity_net` and
+`period_end,sector,equity_net,equity_auc` (INR crore). The October 2024 – October 2026
+backfill lives in `data/imports/`. Then `npm run d1:push -- sync` publishes both tables.
+
 ### `financials`
 
 ```

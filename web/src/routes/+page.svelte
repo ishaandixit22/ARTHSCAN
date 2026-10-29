@@ -1,15 +1,22 @@
 <script lang="ts">
   import StockTable from "$lib/components/StockTable.svelte";
   import { BRAND, TAGLINE } from "$lib/brand";
+  import LiveStamp from "$lib/components/LiveStamp.svelte";
   import { cr, crore, date, int, pct, tone } from "$lib/format";
+  import { market, useLiveMarket, type LiveStock } from "$lib/liveMarket.svelte";
 
   let { data } = $props();
-  const b = $derived(data.summary.breadth ?? {});
+  // Accounts with live access see breadth and movers from live prices; everyone else the last close.
+  $effect(() => (data.live ? useLiveMarket() : undefined));
+  const lm = $derived(data.live ? market.data : null);
+  const asRows = (xs: LiveStock[]) =>
+    xs.slice(0, 8).map((s) => ({ symbol: s.symbol, name: s.name, close: s.ltp, change_pct: s.change_pct, turnover: s.turnover }));
+  const b = $derived(lm ? lm.breadth : (data.summary.breadth ?? {}));
   const fii = $derived(data.summary.fii_dii.find((f: any) => f.category === "FII"));
   const dii = $derived(data.summary.fii_dii.find((f: any) => f.category === "DII"));
   const adv = $derived((b.advances ?? 0) / Math.max(1, (b.advances ?? 0) + (b.declines ?? 0)));
   let tab = $state<"gainers" | "losers" | "active">("gainers");
-  const movers = $derived(tab === "gainers" ? data.gainers : tab === "losers" ? data.losers : data.active);
+  const movers = $derived(lm ? asRows(lm.movers[tab]) : tab === "gainers" ? data.gainers : tab === "losers" ? data.losers : data.active);
 </script>
 
 <svelte:head><title>{BRAND} — Indian stock research</title></svelte:head>
@@ -18,7 +25,7 @@
   <div class="page-head">
     <div>
       <h1>Markets</h1>
-      <p class="sub">NSE close for {date(b.as_of)} · {TAGLINE}</p>
+      <p class="sub"><LiveStamp close="NSE close for {date(data.summary.breadth?.as_of)}" /> · {TAGLINE}</p>
     </div>
   </div>
 

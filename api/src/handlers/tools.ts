@@ -102,6 +102,7 @@ export const TOOLS: Tool[] = [
       const cov = await db.prepare(`SELECT (SELECT COUNT(*) FROM stocks) AS stocks,
         (SELECT MIN(date) FROM daily_prices) AS price_from, (SELECT MAX(date) FROM daily_prices) AS price_to,
         (SELECT MAX(date) FROM fii_dii) AS fii_dii_to,
+        (SELECT MAX(date) FROM fpi_daily) AS fpi_daily_to, (SELECT MAX(period_end) FROM fpi_sector) AS fpi_sector_to,
         (SELECT COUNT(DISTINCT symbol) FROM financials) AS with_financials,
         (SELECT COUNT(DISTINCT symbol) FROM shareholding) AS with_shareholding`).first();
       return {
@@ -475,6 +476,54 @@ export const TOOLS: Tool[] = [
           COUNT(DISTINCT date) AS days
         FROM fii_dii GROUP BY month ORDER BY month DESC LIMIT 24`).all();
       return { unit: "INR crore", daily, monthly };
+    },
+  },
+
+  {
+    name: "get_fpi_flows",
+    route: "/market/fpi",
+    title: "FPI flows by sector",
+    description: "Foreign portfolio (FPI/FII) equity flows from NSDL, INR crore: daily net buying for the whole market, and net investment per sector for each fortnight with each sector's equity holdings (assets under custody). NSDL publishes sector figures every fortnight only, never daily.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        days: { type: "integer", description: "Daily history in trading days (default 260, max 600)" },
+        fortnights: { type: "integer", description: "Sector history in fortnights (default 24 ≈ one year, max 60)" },
+        sector: { type: "string", description: "Only this sector, e.g. 'Financial Services', 'Information Technology'" },
+      },
+    },
+    metered: true,
+    handler: async (db, { days, fortnights, sector }) => {
+      const { results: daily } = await db.prepare(`SELECT date, equity_buy AS buy, equity_sell AS sell, equity_net AS net
+        FROM fpi_daily ORDER BY date DESC LIMIT ?`).bind(clampLimit(days, 260, 600)).all();
+      const { results: periods } = await db.prepare("SELECT DISTINCT period_end FROM fpi_sector ORDER BY period_end DESC LIMIT ?")
+        .bind(clampLimit(fortnights, 24, 60)).all<{ period_end: string }>();
+      const ends = periods.map((p) => p.period_end).reverse();
+      const { results: rows } = ends.length
+        ? await db.prepare(`SELECT period_end, sector, equity_net, equity_auc FROM fpi_sector WHERE period_end >= ?
+            ${sector ? "AND sector = ?" : ""}`).bind(...(sector ? [ends[0], String(sector)] : [ends[0]]))
+            .all<{ period_end: string; sector: string; equity_net: number | null; equity_auc: number | null }>()
+        : { results: [] };
+      if (sector && !rows.length) throw new ToolError("E_NOT_FOUND", `No sector called '${sector}'. Call get_fpi_flows without a sector to list them.`, 404);
+      const idx = new Map(ends.map((e, i) => [e, i]));
+      const bySector = new Map<string, { sector: string; auc: number | null; flows: (number | null)[] }>();
+      for (const r of rows) {
+        const s = bySector.get(r.sector) ?? { sector: r.sector, auc: null, flows: ends.map(() => null) };
+        s.flows[idx.get(r.period_end)!] = r.equity_net;
+        if (r.period_end === ends[ends.length - 1]) s.auc = r.equity_auc;
+        bySector.set(r.sector, s);
+      }
+      const total = bySector.get("Grand Total") ?? null;
+      bySector.delete("Grand Total");
+      bySector.delete("Sovereign"); // government debt only; always zero equity
+      return {
+        unit: "INR crore",
+        source: "NSDL (custodian-confirmed). Daily date = reporting date, covering the previous session's trades.",
+        daily: daily.reverse(),
+        fortnights: ends,
+        total,
+        sectors: [...bySector.values()].sort((a, b) => (b.auc ?? 0) - (a.auc ?? 0)),
+      };
     },
   },
 

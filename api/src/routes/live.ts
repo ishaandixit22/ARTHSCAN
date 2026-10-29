@@ -9,6 +9,7 @@
 import { Hono, type Context } from "hono";
 import type { Account, AppEnv, Env, Principal } from "../env.js";
 import { jsonError } from "../lib/http.js";
+import { liveMarket } from "../live/market.js";
 
 export const live = new Hono<AppEnv>();
 
@@ -45,6 +46,9 @@ live.use("*", async (c, next) => {
 live.get("/stream", (c) => forward(c, "/stream"));
 live.get("/quotes", (c) => forward(c, "/snapshot"));
 live.get("/status", (c) => forward(c, "/status"));
+// Movers, breadth, sector moves and intraday signals over every live stock.
+live.get("/market", async (c) =>
+  c.json(await liveMarket(c.env, () => feed(c.env).fetch(new Request("https://live/all")).then((r) => r.json()))));
 
 // The owner pastes a fresh Dhan access token here when the old one lapses.
 live.post("/token", async (c) => {

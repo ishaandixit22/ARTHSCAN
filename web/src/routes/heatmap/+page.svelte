@@ -1,9 +1,26 @@
 <script lang="ts">
   import { BRAND } from "$lib/brand";
+  import LiveStamp from "$lib/components/LiveStamp.svelte";
   import { crore, date, pct } from "$lib/format";
+  import { live, watch } from "$lib/live.svelte";
+  import { useLiveMarket } from "$lib/liveMarket.svelte";
 
   let { data } = $props();
-  const h = $derived(data.heatmap);
+  // The 1D view recolours from live prices for accounts with live access. Tile sizes
+  // stay on the last session's turnover so the layout doesn't reshuffle while you look.
+  const liveDay = $derived(!!data.live && data.period === "1d");
+  const symbols = $derived(data.heatmap.sectors.flatMap((g: any) => g.stocks.map((s: any) => s.symbol)));
+  $effect(() => (liveDay ? watch(symbols) : undefined));
+  $effect(() => (liveDay ? useLiveMarket() : undefined)); // drives the "Live" stamp
+  const h = $derived.by(() => {
+    if (!liveDay) return data.heatmap;
+    const sectors = data.heatmap.sectors.map((g: any) => {
+      const stocks = g.stocks.map((s: any) => ({ ...s, change: live.quotes[s.symbol]?.changePct ?? s.change }));
+      const w = stocks.reduce((a: number, s: any) => a + s.change * s.turnover, 0);
+      return { ...g, stocks, change: Math.round((w / g.turnover) * 100) / 100 };
+    });
+    return { ...data.heatmap, sectors };
+  });
   // Colour saturates at a move that's large for the period.
   const scale = $derived(({ "1d": 3, "1w": 6, "1m": 10, "3m": 20, "1y": 40 } as Record<string, number>)[data.period] ?? 3);
   function colour(change: number) {
@@ -20,7 +37,7 @@
   <div class="page-head">
     <div>
       <h1>Heatmap</h1>
-      <p class="sub">The 250 most traded stocks, grouped by sector. Tile size is turnover; colour is the {data.period.toUpperCase()} return. As of {date(h.as_of)}.</p>
+      <p class="sub">The 250 most traded stocks, grouped by sector. Tile size is turnover; colour is the {data.period.toUpperCase()} return. {#if liveDay}<LiveStamp close="As of {date(h.as_of)}." />{:else}As of {date(h.as_of)}.{/if}</p>
     </div>
     <div class="tabs">
       {#each data.periods as p}<a href="?period={p}" class:active={p === data.period} data-sveltekit-noscroll>{p.toUpperCase()}</a>{/each}

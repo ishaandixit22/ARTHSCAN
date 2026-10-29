@@ -21,7 +21,7 @@ const FLUSH_MS = 1_000;
 const IDLE_DISCONNECT_MS = 10 * 60_000;
 const ALARM_MS = 60_000;
 const RENEW_AFTER_MS = 20 * 3600_000;
-const MAX_SYMBOLS_PER_VIEWER = 300;
+const MAX_SYMBOLS_PER_VIEWER = 400; // the 250-stock heatmap plus the Nifty 50 ticker
 // Dhan says these won't fix themselves by retrying; wait for a new token or plan.
 const FATAL_CODES = new Set([806, 807, 808, 809, 810]);
 
@@ -82,6 +82,19 @@ export class LiveFeed {
       // Give a fresh connection a moment to receive its first ticks.
       if (this.status.state === "live" && !this.status.lastTickAt) await new Promise((r) => setTimeout(r, 1500));
       return Response.json({ status: this.status, quotes: Object.fromEntries(symbols.map((s) => [s, this.quote(s)]).filter(([, q]) => q)) });
+    }
+
+    // Every stock's latest price in one compact list, for market-wide views
+    // (movers, heatmap, breadth). Rows: [symbol, ltp, changePct, volume, atp].
+    if (url.pathname.endsWith("/all")) {
+      await this.connect();
+      if (this.status.state === "live" && !this.status.lastTickAt) await new Promise((r) => setTimeout(r, 1500));
+      const rows: [string, number, number | null, number | null, number | null][] = [];
+      for (const symbol of this.raw.keys()) {
+        const q = this.quote(symbol);
+        if (q) rows.push([symbol, q.ltp, q.changePct, q.volume, q.atp]);
+      }
+      return Response.json({ status: this.status, rows });
     }
 
     if (url.pathname.endsWith("/status")) {
