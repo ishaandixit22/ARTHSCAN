@@ -17,19 +17,15 @@ export const NSE_HEADERS = {
   "accept-language": "en-IN,en;q=0.9",
 };
 
-/** Fetch an NSE URL, map the body, cache the mapped result for `ttlSeconds`. */
-export async function nseFetch<T>(
-  env: Env,
-  url: string,
-  ttlSeconds: number,
-  map: (body: string) => T,
-): Promise<{ fetched_at: string; data: T }> {
-  const cacheKey = `nse:${url.replace(/^https:\/\//, "")}`;
-  const now = Math.floor(Date.now() / 1000);
-  const hit = await env.DB.prepare("SELECT body, fetched_at FROM external_cache WHERE key = ? AND fetched_at > ?")
-    .bind(cacheKey, now - ttlSeconds).first<{ body: string; fetched_at: number }>();
-  if (hit) return { fetched_at: new Date(hit.fetched_at * 1000).toISOString(), data: JSON.parse(hit.body) as T };
+// Background work after the response is sent (Workers' ctx.waitUntil); the Worker entry sets it per request.
+const background: { run: ((p: Promise<unknown>) => void) | null } = { run: null };
+export const setBackground = (run: ((p: Promise<unknown>) => void) | null) => { background.run = run; };
+const refreshing = new Set<string>();
+/** A stored copy this old is still served (while a fresh one is fetched) rather than making a visitor wait on NSE. */
+const MAX_STALE_SECONDS = 7 * 24 * 3600;
 
+async function fetchAndStore<T>(env: Env, url: string, cacheKey: string, map: (body: string) => T): Promise<{ fetched_at: string; data: T }> {
+  const now = Math.floor(Date.now() / 1000);
   let res: Response;
   try {
     res = await fetch(url, { headers: NSE_HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) });
@@ -56,6 +52,37 @@ export async function nseFetch<T>(
       .bind(cacheKey, body, now).run();
   }
   return { fetched_at: new Date(now * 1000).toISOString(), data };
+}
+
+/**
+ * Fetch an NSE URL, map the body, cache the mapped result. A copy within `ttlSeconds`
+ * is returned as is. An older one (up to a week) is returned immediately while a fresh
+ * copy loads in the background, so a visitor never waits on NSE once anything is stored;
+ * and if NSE fails, the stored copy is served rather than an error. `variant` keeps
+ * different mappings of the same URL apart.
+ */
+export async function nseFetch<T>(
+  env: Env,
+  url: string,
+  ttlSeconds: number,
+  map: (body: string) => T,
+  variant = "",
+): Promise<{ fetched_at: string; data: T }> {
+  const cacheKey = `nse:${url.replace(/^https:\/\//, "")}${variant ? `#${variant}` : ""}`;
+  const now = Math.floor(Date.now() / 1000);
+  const row = await env.DB.prepare("SELECT body, fetched_at FROM external_cache WHERE key = ?").bind(cacheKey).first<{ body: string; fetched_at: number }>();
+  const stored = row && now - row.fetched_at <= MAX_STALE_SECONDS ? { fetched_at: new Date(row.fetched_at * 1000).toISOString(), data: JSON.parse(row.body) as T } : null;
+  if (stored && now - row!.fetched_at <= ttlSeconds) return stored;
+
+  if (stored) {
+    if (!refreshing.has(cacheKey)) {
+      refreshing.add(cacheKey);
+      const job = fetchAndStore(env, url, cacheKey, map).catch(() => null).finally(() => refreshing.delete(cacheKey));
+      (background.run ?? ((p) => void p))(job);
+    }
+    return stored;
+  }
+  return fetchAndStore(env, url, cacheKey, map);
 }
 
 const MONTHS: Record<string, string> = { JAN: "01", FEB: "02", MAR: "03", APR: "04", MAY: "05", JUN: "06", JUL: "07", AUG: "08", SEP: "09", OCT: "10", NOV: "11", DEC: "12" };

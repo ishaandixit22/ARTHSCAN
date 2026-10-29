@@ -48,6 +48,12 @@ const median = (xs: number[]) => {
   return Math.round((v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2) * 10) / 10;
 };
 
+type Row = ReturnType<typeof rowOf>;
+type Base = { prevQ: string; prevY: string; rows: Row[]; sectors: unknown[]; summary: Record<string, unknown> };
+// (Typing helper only: the shape of one company's row, built inside the handler.)
+declare function rowOf(): { symbol: string; name: string; sector: string; revenue: number | null; sales_yoy: number | null; sales_qoq: number | null; net_profit: number | null;
+  profit_yoy: number | null; profit_qoq: number | null; eps: number | null; opm: number | null; opm_change: number | null; verdict: Verdict; trend: { quarter: string; net_profit: number | null }[] };
+
 export const EARNINGS_TOOLS: Tool[] = [
   {
     name: "get_earnings_season",
@@ -71,6 +77,7 @@ export const EARNINGS_TOOLS: Tool[] = [
         GROUP BY period_end HAVING n >= 10 ORDER BY period_end DESC LIMIT 4`).all<{ period_end: string; n: number }>();
       if (!quarters.length) return { quarter: null, quarters: [], summary: null, sectors: [], total: 0, companies: [] };
       const q = quarters.find((x) => x.period_end === quarter)?.period_end ?? quarters[0].period_end;
+      const build = async () => {
       const prevQ = shiftQuarter(q, 3), prevY = shiftQuarter(q, 12), from = shiftQuarter(q, 21);
 
       const { results: now } = await db.prepare(`SELECT f.symbol, s.name, COALESCE(s.sector, 'Other') AS sector, f.revenue, f.operating_profit, f.net_profit, f.eps
@@ -119,22 +126,51 @@ export const EARNINGS_TOOLS: Tool[] = [
       }).sort((a, b) => b.revenue - a.revenue);
       const ranked = sectors.filter((s) => s.companies >= 5 && s.median_profit_yoy != null).sort((a, b) => b.median_profit_yoy! - a.median_profit_yoy!);
 
-      // Companies with a results board meeting still ahead this season (NSE calendar; skipped if NSE is down).
+      // Companies with a results board meeting still ahead this season (NSE calendar, stored in a small
+      // dedicated entry; skipped if NSE is down and nothing is stored).
       let pending: number | null = null;
       try {
-        const ev = await nseFetch(env, "https://www.nseindia.com/api/event-calendar", 3600, (body) =>
-          (JSON.parse(body) as { symbol: string; purpose: string; date: string }[]).map((e) => ({ symbol: e.symbol, date: nseDate(e.date), purpose: e.purpose })));
+        const today = todayIST();
+        const ev = await nseFetch(env, "https://www.nseindia.com/api/event-calendar", 6 * 3600, (body) =>
+          (JSON.parse(body) as { symbol: string; purpose: string; date: string }[])
+            .filter((e) => /financial result/i.test(e.purpose ?? "")).map((e) => ({ symbol: e.symbol, date: nseDate(e.date) })), "results-ahead");
         const reported = new Set(rows.map((r) => r.symbol));
-        pending = new Set(ev.data.filter((e) => e.date && e.date >= todayIST() && /financial result/i.test(e.purpose ?? "") && !reported.has(e.symbol)).map((e) => e.symbol)).size;
+        pending = new Set(ev.data.filter((e) => e.date && e.date >= today && !reported.has(e.symbol)).map((e) => e.symbol)).size;
       } catch { /* the summary shows declared only */ }
 
-      const SORTS: Record<string, (a: (typeof rows)[number], b: (typeof rows)[number]) => number> = {
+      const summary = {
+        declared: rows.length, pending, comparable: comparable.length, grew, declined: comparable.length - grew,
+        median_sales_yoy: median(rows.flatMap((r) => (r.sales_yoy == null ? [] : [r.sales_yoy]))),
+        median_profit_yoy: median(comparable.map((r) => r.profit_yoy!)),
+        margin_up: rows.filter((r) => (r.opm_change ?? 0) > 0).length,
+        margin_down: rows.filter((r) => (r.opm_change ?? 0) < 0).length,
+        verdicts: Object.fromEntries((["Growing", "Mixed", "Shrinking", "Loss", "Back to profit"] as Verdict[]).map((v) => [v, rows.filter((r) => r.verdict === v).length])),
+        strongest: ranked[0] ?? null, weakest: ranked.length > 1 ? ranked[ranked.length - 1] : null,
+      };
+      return { prevQ, prevY, rows, sectors, summary };
+      };
+      // The whole season is computed once and stored for ten minutes; each request then only
+      // filters, sorts and pages it (computing it takes seconds, on every visit).
+      const cacheKey = `earnings:${q}`;
+      const nowS = Math.floor(Date.now() / 1000);
+      const hit = await db.prepare("SELECT body FROM external_cache WHERE key = ? AND fetched_at > ?").bind(cacheKey, nowS - 600).first<{ body: string }>();
+      let base: Base;
+      if (hit) base = JSON.parse(hit.body) as Base;
+      else {
+        base = await build();
+        const body = JSON.stringify(base);
+        if (body.length <= 1_000_000) {
+          await db.prepare("INSERT INTO external_cache (key, body, fetched_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET body = excluded.body, fetched_at = excluded.fetched_at").bind(cacheKey, body, nowS).run();
+        }
+      }
+
+      const SORTS: Record<string, (a: Row, b: Row) => number> = {
         largest: (a, b) => (b.revenue ?? 0) - (a.revenue ?? 0),
         profit_growth: (a, b) => (b.profit_yoy ?? -Infinity) - (a.profit_yoy ?? -Infinity),
         sales_growth: (a, b) => (b.sales_yoy ?? -Infinity) - (a.sales_yoy ?? -Infinity),
         profit_fall: (a, b) => (a.profit_yoy ?? Infinity) - (b.profit_yoy ?? Infinity),
       };
-      const listed = rows
+      const listed = base.rows
         .filter((r) => (!sector || r.sector === sector) && (!result || r.verdict === result))
         .filter((r) => sort !== "profit_growth" && sort !== "profit_fall" ? true : r.profit_yoy != null)
         .sort(SORTS[String(sort)] ?? SORTS.largest);
@@ -142,18 +178,10 @@ export const EARNINGS_TOOLS: Tool[] = [
       const lim = Math.max(1, Math.min(1000, Math.floor(Number(limit) || 100)));
 
       return {
-        quarter: { end: q, ...quarterLabel(q), previous_quarter: prevQ, year_ago: prevY },
+        quarter: { end: q, ...quarterLabel(q), previous_quarter: base.prevQ, year_ago: base.prevY },
         quarters: quarters.map((x) => ({ end: x.period_end, companies: x.n, ...quarterLabel(x.period_end) })),
-        summary: {
-          declared: rows.length, pending, comparable: comparable.length, grew, declined: comparable.length - grew,
-          median_sales_yoy: median(rows.flatMap((r) => (r.sales_yoy == null ? [] : [r.sales_yoy]))),
-          median_profit_yoy: median(comparable.map((r) => r.profit_yoy!)),
-          margin_up: rows.filter((r) => (r.opm_change ?? 0) > 0).length,
-          margin_down: rows.filter((r) => (r.opm_change ?? 0) < 0).length,
-          verdicts: Object.fromEntries((["Growing", "Mixed", "Shrinking", "Loss", "Back to profit"] as Verdict[]).map((v) => [v, rows.filter((r) => r.verdict === v).length])),
-          strongest: ranked[0] ?? null, weakest: ranked.length > 1 ? ranked[ranked.length - 1] : null,
-        },
-        sectors,
+        summary: base.summary,
+        sectors: base.sectors,
         total: listed.length,
         companies: listed.slice(off, off + lim),
         note: "Figures are consolidated where the company files consolidated results. INR crore. Verdicts compare with the same quarter last year.",

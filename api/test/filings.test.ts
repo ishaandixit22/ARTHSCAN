@@ -125,3 +125,30 @@ describe("results documents and the events calendar", () => {
     expect(d.events.every((e: any) => e.date >= "2026-10-29")).toBe(true);
   });
 });
+
+describe("stored NSE answers", () => {
+  const cacheKey = "nse:www.nseindia.com/api/event-calendar";
+  const stale = JSON.stringify([{ date: "2026-11-02", symbol: "OLD", company: "Old Ltd", purpose: "Financial Results", results: true, details: "" }]);
+  const aged = (hours: number) => Math.floor(Date.now() / 1000) - hours * 3600;
+
+  it("serves an expired copy at once and refreshes it afterwards", async () => {
+    db.raw.exec("DELETE FROM external_cache");
+    db.raw.prepare("INSERT INTO external_cache (key, body, fetched_at) VALUES (?, ?, ?)").run(cacheKey, stale, aged(5));
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify([{ symbol: "NEW", company: "New Ltd", purpose: "Financial Results", bm_desc: "", date: "03-Nov-2026" }])));
+    vi.stubGlobal("fetch", fetchMock);
+    const first = (await get("/v1/market/events")).body.data;
+    expect(first.events[0].symbol).toBe("OLD"); // answered from the stored copy
+    await new Promise((r) => setTimeout(r, 20)); // the background refresh runs
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect((await get("/v1/market/events")).body.data.events[0].symbol).toBe("NEW");
+  });
+
+  it("keeps serving the stored copy when NSE fails", async () => {
+    db.raw.exec("DELETE FROM external_cache");
+    db.raw.prepare("INSERT INTO external_cache (key, body, fetched_at) VALUES (?, ?, ?)").run(cacheKey, stale, aged(30));
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>blocked</html>", { status: 403 })));
+    const r = await get("/v1/market/events");
+    expect(r.status).toBe(200);
+    expect(r.body.data.events[0].symbol).toBe("OLD");
+  });
+});
