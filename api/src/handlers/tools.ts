@@ -6,6 +6,7 @@
 import type { Database } from "../db/types.js";
 import type { Env } from "../env.js";
 import { ToolError } from "./errors.js";
+import { FILINGS_TOOLS } from "./filings.js";
 import { MARKET_DATA_TOOLS } from "./market-data.js";
 
 export type JsonSchema = {
@@ -710,6 +711,7 @@ export const TOOLS: Tool[] = [
     },
   },
   ...MARKET_DATA_TOOLS,
+  ...FILINGS_TOOLS,
 ];
 
 export const TOOLS_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));

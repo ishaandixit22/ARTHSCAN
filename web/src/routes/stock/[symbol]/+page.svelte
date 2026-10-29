@@ -4,6 +4,7 @@
   import PriceChart from "$lib/components/PriceChart.svelte";
   import StatementTable from "$lib/components/StatementTable.svelte";
   import StockTable from "$lib/components/StockTable.svelte";
+  import FilingList from "$lib/components/FilingList.svelte";
   import LiveBadge from "$lib/components/LiveBadge.svelte";
   import { BRAND } from "$lib/brand";
   import { compact, crore, date, num, pct, price, tone } from "$lib/format";
@@ -24,6 +25,7 @@
     { key: "technicals", label: "Technicals" },
     { key: "financials", label: "Financials" },
     { key: "shareholding", label: "Shareholding" },
+    { key: "filings", label: "Filings" },
     { key: "peers", label: "Peers" },
   ] as const;
   type Tab = (typeof TABS)[number]["key"];
@@ -88,6 +90,26 @@
       .then((d) => (statements[key] = d?.rows?.length ? d : null));
   });
   const current = $derived(statements[statementKey]);
+
+  // ── Filings, corporate actions and meetings, fetched when the Filings tab first opens ──
+  type FilingsData = { filings: any[] | null; kinds: Record<string, string>; counts: Record<string, number>; actions: any[] | null; events: any[] | null; fetched_at: string | null };
+  let filingsData = $state<FilingsData | "loading" | null | undefined>(undefined);
+  let filingKind = $state("");
+  $effect(() => {
+    void c.symbol;
+    filingsData = undefined;
+    filingKind = "";
+  });
+  $effect(() => {
+    if (tab !== "filings" || filingsData !== undefined) return;
+    filingsData = "loading";
+    fetch(`/stock/${encodeURIComponent(c.symbol)}/filings`)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null)
+      .then((d) => (filingsData = d));
+  });
+  const fd = $derived(filingsData && filingsData !== "loading" ? filingsData : null);
+  const shownFilings = $derived((fd?.filings ?? []).filter((f: any) => !filingKind || f.kind === filingKind));
   const spec = $derived(STATEMENTS.find((s) => s.key === statementKey)!);
 
   // ── Summary: plain facts from the figures on this page ──
@@ -289,6 +311,47 @@
         <div class="empty">{extLoading ? `Loading shareholding for ${c.symbol}…` : `Shareholding for ${c.symbol} isn't available right now.`}</div>
       {/if}
     </section>
+  {:else if tab === "filings"}
+    {#if filingsData === "loading" || filingsData === undefined}
+      <div class="card empty">Loading {c.symbol}'s filings from NSE…</div>
+    {:else if !fd}
+      <div class="card empty">{c.symbol}'s filings aren't available from NSE right now.</div>
+    {:else}
+      {#if fd.events?.length}
+        <div class="notice next">
+          Next board meeting: <b>{date(fd.events[0].date)}</b> · {fd.events[0].purpose}. <span class="sub">{fd.events[0].details}</span>
+        </div>
+      {/if}
+      <section class="card">
+        <div class="card-head">
+          <div class="tabs" role="tablist" aria-label="Kind of filing">
+            <button role="tab" aria-selected={!filingKind} class:active={!filingKind} onclick={() => (filingKind = "")}>All</button>
+            {#each Object.entries(fd.counts).filter(([, n]) => n) as [k]}
+              <button role="tab" aria-selected={filingKind === k} class:active={filingKind === k} onclick={() => (filingKind = k)}>{fd.kinds[k]}</button>
+            {/each}
+          </div>
+          <span class="sub">last 12 months · PDFs from NSE</span>
+        </div>
+        <FilingList filings={shownFilings} kinds={fd.kinds} showCompany={false} empty="No filings of this kind in the last year." />
+      </section>
+      <section class="card">
+        <div class="card-head"><h2>Corporate actions</h2><span class="sub">dividends, bonuses, splits</span></div>
+        {#if fd.actions?.length}
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>Ex-date</th><th class="left">Action</th><th>Record date</th></tr></thead>
+              <tbody>
+                {#each fd.actions as a, i (a.subject + i)}
+                  <tr><td>{date(a.ex_date)}</td><td class="left">{a.subject}</td><td>{date(a.record_date)}</td></tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {:else}
+          <div class="empty">No corporate actions on record for {c.symbol}.</div>
+        {/if}
+      </section>
+    {/if}
   {:else if tab === "peers"}
     <section class="card">
       <div class="card-head"><h2>Peers in {c.sector ?? "this sector"}</h2></div>
@@ -345,6 +408,8 @@
   .stack { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--panel-2); gap: 2px; }
   .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; }
   .small { font-size: 12.5px; }
+  .next { line-height: 1.6; }
+  .next .sub { display: block; font-size: 12.5px; }
   @media (max-width: 760px) {
     .head { grid-template-columns: 1fr; }
     .quote { text-align: left; }
