@@ -11,7 +11,7 @@ import { ToolError } from "../handlers/errors.js";
 
 const TIMEOUT_MS = 20_000;
 const MAX_CACHE_BYTES = 1_000_000;
-const HEADERS = {
+export const NSE_HEADERS = {
   "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
   accept: "application/json, text/plain, */*",
   "accept-language": "en-IN,en;q=0.9",
@@ -32,7 +32,7 @@ export async function nseFetch<T>(
 
   let res: Response;
   try {
-    res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    res = await fetch(url, { headers: NSE_HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) });
   } catch (err) {
     console.error(`nse ${url} unreachable:`, err);
     throw new ToolError("E_UPSTREAM", "NSE did not respond. Try again shortly.", 502);

@@ -10,20 +10,7 @@
 // overwritten and win over detection.
 
 import type { SqliteDatabase } from "../../../api/src/db/sqlite.js";
-
-// 1:1 bonus = 1/2, 2:1 bonus = 1/3, 1:2 bonus = 2/3, splits 1/2…1/10, consolidations 2…10.
-const STANDARD = [1 / 10, 1 / 5, 1 / 4, 1 / 3, 2 / 5, 1 / 2, 3 / 5, 2 / 3, 3 / 4, 4 / 5, 5 / 4, 3 / 2, 2, 5 / 2, 3, 4, 5, 10];
-
-function snap(ratio: number): number | null {
-  let best: number | null = null;
-  let err = Infinity;
-  for (const s of STANDARD) {
-    const e = Math.abs(Math.log(ratio / s));
-    if (e < err) { err = e; best = s; }
-  }
-  // Within ~12% of a standard ratio: room for a genuine move on the ex-date.
-  return err < 0.12 ? best : null;
-}
+import { snapRatio as snap } from "../../../api/src/lib/indicators.js";
 
 export function rebuildAdjustments(db: SqliteDatabase): number {
   const jumps = db.raw.prepare(`

@@ -10,6 +10,7 @@ import { rest } from "./routes/rest.js";
 import { mcp, SERVER_INFO } from "./mcp/server.js";
 import { oauth, oauthAccount } from "./routes/oauth.js";
 import { live } from "./routes/live.js";
+import { admin } from "./routes/admin.js";
 import { jsonError } from "./lib/http.js";
 
 export const app = new Hono<AppEnv>();
@@ -33,6 +34,7 @@ app.get("/health", async (c) => {
 app.route("/", oauth); // /.well-known/* and /oauth/*
 app.route("/api/oauth", oauthAccount);
 app.route("/api/live", live);
+app.route("/api/admin", admin);
 app.route("/api", account);
 app.route("/v1", rest);
 app.route("/mcp", mcp);

@@ -5,6 +5,7 @@
 // All are public NSE data; answers say so and when they were fetched.
 
 import { MACRO_EVENTS } from "../data/macro-events.js";
+import { csvRows } from "../lib/csv.js";
 import { indianApi } from "../lib/indianapi.js";
 import { addDaysISO, nseDate, nseFetch, nseQueryDate, todayIST } from "../lib/nse.js";
 import { ToolError } from "./errors.js";
@@ -83,29 +84,6 @@ export function actionType(subject: string): string {
 }
 
 // ── Bulk and block deals ────────────────────────────────────────────
-
-/** Small CSV reader for NSE's deal files (quoted fields allowed). */
-function csvRows(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [], field = "", quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (quoted) {
-      if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
-      else if (ch === '"') quoted = false;
-      else field += ch;
-    } else if (ch === '"') quoted = true;
-    else if (ch === ",") { row.push(field.trim()); field = ""; }
-    else if (ch === "\n" || ch === "\r") {
-      if (ch === "\r" && text[i + 1] === "\n") i++;
-      row.push(field.trim()); field = "";
-      if (row.some((f) => f)) rows.push(row);
-      row = [];
-    } else field += ch;
-  }
-  if (field || row.length) { row.push(field.trim()); rows.push(row); }
-  return rows;
-}
 
 function mapDeals(body: string) {
   const [, ...rows] = csvRows(body);

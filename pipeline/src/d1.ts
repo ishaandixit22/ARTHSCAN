@@ -93,6 +93,19 @@ function copy(table: string, query: string, params: unknown[] = [], prelude: str
 const latest = (db.raw.prepare("SELECT MAX(date) AS d FROM daily_prices").get() as { d: string }).d;
 console.log(`${mode} → ${local ? "local" : "remote"} D1 (latest price date ${latest})`);
 
+// Production now refreshes itself every evening (api/src/jobs/daily.ts). Pushing an
+// older local copy would overwrite newer prices and metrics, so refuse unless asked.
+if (!local && !args.includes("--allow-older")) {
+  const r = spawnSync("npx", ["wrangler", "d1", "execute", "arthscan", "--remote", "--json", "--command", "SELECT MAX(date) AS d FROM daily_prices"],
+    { cwd: resolve(ROOT, "api"), encoding: "utf8" });
+  const remote = /"d":\s*"(\d{4}-\d{2}-\d{2})"/.exec(r.stdout ?? "")?.[1];
+  if (remote && remote > latest) {
+    console.error(`Production already has prices to ${remote}, newer than this copy (${latest}). Nothing pushed.`);
+    console.error("Run `npm run data:daily` first, or pass --allow-older if you really mean to push older data.");
+    process.exit(1);
+  }
+}
+
 copy("stocks", "SELECT * FROM stocks");
 const windowStart = (db.raw.prepare("SELECT date(?, ?) AS d").get(latest, `-${days} days`) as { d: string }).d;
 
