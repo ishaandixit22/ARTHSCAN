@@ -12,6 +12,7 @@ import { oauth, oauthAccount } from "./routes/oauth.js";
 import { live } from "./routes/live.js";
 import { admin } from "./routes/admin.js";
 import { jsonError } from "./lib/http.js";
+import { edgeCache } from "./middleware/edge-cache.js";
 
 export const app = new Hono<AppEnv>();
 
@@ -24,6 +25,7 @@ app.use("*", async (c, next) => {
   c.header("Referrer-Policy", "strict-origin-when-cross-origin");
 });
 app.use("*", resolvePrincipal());
+app.use("/v1/*", edgeCache());
 
 app.get("/", (c) => c.json({ ok: true, service: SERVER_INFO.name, version: SERVER_INFO.version, rest: "/v1", mcp: "/mcp" }));
 app.get("/health", async (c) => {
