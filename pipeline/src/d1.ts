@@ -9,6 +9,7 @@
 //   npm run d1:push -- sync  [--local]   last 3 days of prices + derived tables
 //   npm run d1:push -- sync 10 [--local] last 10 days
 //   add --fundamentals to also send financials + shareholding
+//   add --results to send the quarterly results loaded this week
 //   add --insights-history to send all index valuations and F&O bans (first publish)
 //
 // --local targets wrangler's local D1 (for `wrangler dev`); default is remote.
@@ -124,6 +125,11 @@ copy("fpi_sector", "SELECT * FROM fpi_sector");
 const since = insightsHistory ? "0000-00-00" : windowStart;
 copy("index_daily", "SELECT * FROM index_daily WHERE date >= ?", [since]);
 copy("fo_ban", "SELECT * FROM fo_ban WHERE date >= ?", [since], [`DELETE FROM fo_ban WHERE date >= ${sqlValue(since)};`]);
+// Quarterly results the results job loaded this week (all quarters for those companies).
+if (args.includes("--results") && !fundamentals) {
+  copy("financials", "SELECT * FROM financials WHERE symbol IN (SELECT symbol FROM results_checks WHERE checked_at >= datetime('now', '-7 days') AND found = 1)");
+  copy("results_checks", "SELECT * FROM results_checks WHERE checked_at >= datetime('now', '-7 days')");
+}
 if (fundamentals) {
   copy("financials", "SELECT * FROM financials");
   copy("shareholding", "SELECT * FROM shareholding");

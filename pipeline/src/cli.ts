@@ -9,6 +9,7 @@
 //   npm run data:import -- fpi-daily <file>        NSDL daily FPI equity flows (.html or .csv)
 //   npm run data:import -- fpi-sectors <files…>    NSDL fortnightly sector reports (.html or .csv)
 //   npm run data:reports [-- 365]             backfill deliveries, index valuations, F&O bans
+//   npm run data:results [-- 250]             load this season's quarterly results (largest declared companies first)
 //   npm run data:fo-ban                       refresh today's and the next session's F&O ban + open interest
 //
 // Every price-changing command rebuilds stock_metrics at the end.
@@ -20,6 +21,7 @@ import { syncDhanIds } from "./jobs/dhan.js";
 import { backfill, loadBhavcopy, loadLatest } from "./jobs/bhavcopy.js";
 import { rebuildMetrics } from "./jobs/metrics.js";
 import { backfillReports, loadFoBan, loadOpenInterest, loadReports } from "./jobs/reports.js";
+import { loadResults } from "./jobs/results.js";
 import { addDays, isWeekday } from "./lib.js";
 import { importFiiDii, importFinancials, importFpiDaily, importFpiSectors, importShareholding } from "./jobs/imports.js";
 
@@ -53,6 +55,12 @@ async function main() {
     case "backfill": {
       await backfill(db, Number(args[0] ?? 365));
       metrics();
+      break;
+    }
+    case "results": {
+      const r = await loadResults(db, { max: Number(args[0] ?? 250) });
+      console.log(`Results ${r.quarter}: ${r.declared} companies have filed on NSE; asked the provider about ${r.asked}, ${r.found} had the quarter; ${r.remaining} left for the next run.`);
+      metrics(); // P/E needs four quarters of EPS
       break;
     }
     case "fo-ban": {
