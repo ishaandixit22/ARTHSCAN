@@ -559,18 +559,28 @@ export const TOOLS: Tool[] = [
     handler: async (db, { period, index, sector, level, limit }, env) => {
       const col = ({ "1w": "ret_1w", "1m": "ret_1m", "3m": "ret_3m", "1y": "ret_1y" } as Record<string, string>)[period ?? "1d"] ?? "change_pct";
       const idx = index && String(index) in HEATMAP_INDICES ? HEATMAP_INDICES[String(index)] : null;
-      const members = idx
-        ? (await nseFetch(env, `https://nsearchives.nseindia.com/content/indices/${idx.file}.csv`, 24 * 3600, (body) =>
-            body.split(/\r?\n/).slice(1).map((l) => l.split(",")[2]?.trim()).filter((x): x is string => !!x))).data
-        : null;
+      const constituents = async (file: string) =>
+        (await nseFetch(env, `https://nsearchives.nseindia.com/content/indices/${file}.csv`, 24 * 3600, (body) =>
+          body.split(/\r?\n/).slice(1).map((l) => l.split(",")[2]?.trim()).filter((x): x is string => !!x))).data;
+      // The Nifty Next 50 is by definition the Nifty 100 without the Nifty 50; NSE's own Next 50 file
+      // doesn't download from Cloudflare, so it's derived from the two that do.
+      let members: string[] | null = null;
+      if (idx && String(index) === "niftynext50") {
+        const [n100, n50] = await Promise.all([constituents(HEATMAP_INDICES.nifty100.file), constituents(HEATMAP_INDICES.nifty50.file)]);
+        const top = new Set(n50);
+        members = n100.filter((sym) => !top.has(sym));
+      } else if (idx) {
+        members = await constituents(idx.file);
+      }
       const wantSectors = level === "sectors" && !idx && !sector;
       // An index or a sector shows all its stocks; the market-wide views cap at the most traded.
       const cap = idx ? 600 : wantSectors ? 5000 : sector ? clampLimit(limit, 120, 500) : clampLimit(limit, 200, 500);
       const filters = [`${SHARES_ONLY}`, "m.as_of = (SELECT MAX(as_of) FROM stock_metrics)", `m.${col} IS NOT NULL`, idx ? "1 = 1" : "m.turnover > 0"];
       const binds: unknown[] = [];
       if (members) {
-        filters.push(`s.symbol IN (${members.map(() => "?").join(",")})`);
-        binds.push(...members);
+        // One JSON parameter, not one per symbol: D1 allows at most 100 bound parameters a query.
+        filters.push("s.symbol IN (SELECT value FROM json_each(?))");
+        binds.push(JSON.stringify(members));
       }
       if (sector) {
         filters.push("COALESCE(s.sector, 'Other') = ?");

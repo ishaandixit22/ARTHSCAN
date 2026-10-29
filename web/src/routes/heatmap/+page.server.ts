@@ -17,9 +17,9 @@ export async function load({ url }) {
   else q.set("index", view);
   // The sector list for the picker comes from the all-sectors view (one cheap query).
   const [map, all] = await Promise.all([
-    api(`/v1/market/heatmap?${q}`),
+    api(`/v1/market/heatmap?${q}`, { allowError: true }).catch(() => null),
     view === "sectors" ? null : api(`/v1/market/heatmap?period=${period}&level=sectors`, { allowError: true }).catch(() => null),
   ]);
   const sectorList = ((view === "sectors" ? map : all)?.sectors ?? []).map((s: { sector: string }) => s.sector).sort();
-  return { map, view, sector, period, size, periods: PERIODS, sectorList };
+  return { map: map?.sectors ? map : { sectors: [], stocks: 0, as_of: null, error: map?.error?.message ?? "This heatmap isn't available right now." }, view, sector, period, size, periods: PERIODS, sectorList };
 }

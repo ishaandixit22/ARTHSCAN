@@ -130,7 +130,7 @@
     {#if groups.length}
       <Treemap {groups} {height} scale={SCALE[data.period]} label="{title} heatmap" />
     {:else}
-      <div class="empty">No stocks to show for this view.</div>
+      <div class="empty">{data.map.error ?? "No stocks to show for this view."}</div>
     {/if}
     <div class="legend" aria-hidden="true">
       <span class="down">−{SCALE[data.period]}%</span>

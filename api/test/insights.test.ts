@@ -55,6 +55,15 @@ describe("market insights", () => {
     expect(fin.stocks).toBeUndefined();
   });
 
+  it("derives the Nifty Next 50 as the Nifty 100 without the Nifty 50", async () => {
+    const csv = (...syms: string[]) => `Company Name,Industry,Symbol,Series,ISIN Code\n${syms.map((x) => `${x} Ltd,Financial Services,${x},EQ,INE0`).join("\n")}\n`;
+    db.raw.exec("DELETE FROM external_cache"); // an earlier test cached a different Nifty 50 list
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(url.includes("nifty100") ? csv("BANKA", "BANKB") : csv("BANKA"))));
+    const d = await get("/v1/market/heatmap?index=niftynext50");
+    expect(d.view.name).toBe("Nifty Next 50");
+    expect(d.sectors.flatMap((s: any) => s.stocks.map((x: any) => x.symbol))).toEqual(["BANKB"]);
+  });
+
   it("returns signals by definition", async () => {
     expect((await get("/v1/market/signals?signal=rsi_oversold")).results.map((r: any) => r.symbol)).toEqual(["BANKA"]);
     expect((await get("/v1/market/signals?signal=death_cross")).results.map((r: any) => r.symbol)).toEqual(["ITA"]);
