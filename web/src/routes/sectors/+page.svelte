@@ -1,6 +1,7 @@
 <script lang="ts">
   import { BRAND } from "$lib/brand";
   import LiveStamp from "$lib/components/LiveStamp.svelte";
+  import RotationMap from "$lib/components/RotationMap.svelte";
   import { crore, date, pct, tone } from "$lib/format";
   import { market, useLiveMarket } from "$lib/liveMarket.svelte";
 
@@ -20,12 +21,18 @@
   <div class="page-head">
     <div>
       <h1>Sectors</h1>
-      <p class="sub">Sector tags come from NSE's broad-market index lists; stocks outside those indices are unclassified.</p>
+      <p class="sub">Where money is rotating between NSE sectors, and each sector's returns. Sector tags on individual stocks come from NSE's broad-market index lists; stocks outside them are unclassified.</p>
     </div>
   </div>
 
+  {#if data.matrix}
+    <RotationMap matrix={data.matrix} params={data.params} notice={data.notice} />
+  {:else}
+    <div class="notice">The sector rotation map isn't available right now.</div>
+  {/if}
+
   <section class="card">
-    <div class="card-head"><h2>Sector rotation</h2><span class="sub">Median return of liquid stocks · {#if today.size}Today <LiveStamp close="" />; longer periods{/if} as of {date(data.rotation.as_of)}</span></div>
+    <div class="card-head"><h2>Returns by sector</h2><span class="sub">Median return of liquid stocks · {#if today.size}Today <LiveStamp close="" />; longer periods{/if} as of {date(data.rotation.as_of)}</span></div>
     <div class="table-scroll">
       <table>
         <thead><tr><th>Sector</th>{#if today.size}<th>Today</th>{/if}<th>1W</th><th>1M</th><th>3M</th><th class="wide-only">6M</th><th class="wide-only">1Y</th><th class="wide-only">Above 50D avg</th></tr></thead>

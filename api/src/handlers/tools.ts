@@ -10,6 +10,7 @@ import { ToolError } from "./errors.js";
 import { EARNINGS_TOOLS } from "./earnings.js";
 import { FILINGS_TOOLS } from "./filings.js";
 import { MARKET_DATA_TOOLS } from "./market-data.js";
+import { ROTATION_TOOLS } from "./rotation.js";
 
 export type JsonSchema = {
   type: "object";
@@ -807,6 +808,7 @@ export const TOOLS: Tool[] = [
   ...MARKET_DATA_TOOLS,
   ...FILINGS_TOOLS,
   ...EARNINGS_TOOLS,
+  ...ROTATION_TOOLS,
 ];
 
 export const TOOLS_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
