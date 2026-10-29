@@ -22,6 +22,12 @@ export interface Env {
   /** Indian Stock API (indianapi.in) key, a secret. Its tools answer 503 until it is set. */
   INDIANAPI_KEY?: string;
   INDIANAPI_BASE_URL?: string;
+  /** Provider requests the background statement fill may spend per day (default 300; raise it to match the plan). */
+  STATEMENTS_DAILY_MAX?: string;
+  /** ipoalerts.in key, a secret: grey-market premium for the IPO board. Without it the premium fields stay empty. */
+  IPOALERTS_API_KEY?: string;
+  /** Seconds a fetched premium list is reused (default 900). */
+  IPOALERTS_TTL?: string;
   /** Durable Object namespace for the live feed (Cloudflare only; absent on the Node server). */
   LIVE_FEED?: { idFromName(name: string): unknown; get(id: unknown): { fetch(req: Request): Promise<Response> } };
   /** When set, dev sign-in also needs this code — required before exposing the site publicly. */

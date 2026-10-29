@@ -10,6 +10,7 @@ import { ToolError } from "./errors.js";
 import { EARNINGS_TOOLS } from "./earnings.js";
 import { FILINGS_TOOLS } from "./filings.js";
 import { MARKET_DATA_TOOLS } from "./market-data.js";
+import { IPO_TOOLS } from "./ipo.js";
 import { ROTATION_TOOLS } from "./rotation.js";
 
 export type JsonSchema = {
@@ -80,7 +81,7 @@ const BREADTH_UNIVERSE = "Every ordinary share traded on NSE that day: main boar
 
 const SHARES_ONLY = "COALESCE(s.instrument_type, 'ES') = 'ES'";
 
-const LIST_COLUMNS = `s.symbol, s.name, s.sector, s.series, m.close, m.change_pct, m.volume, m.turnover,
+const LIST_COLUMNS = `s.symbol, s.name, s.isin, s.sector, s.series, m.close, m.change_pct, m.volume, m.turnover,
   m.ret_1m, m.ret_1y, m.high_52w, m.low_52w, m.pct_from_high, m.pe, m.as_of,
   COALESCE(m.first_date = m.as_of, 0) AS listed_today`;
 
@@ -809,6 +810,7 @@ export const TOOLS: Tool[] = [
   ...FILINGS_TOOLS,
   ...EARNINGS_TOOLS,
   ...ROTATION_TOOLS,
+  ...IPO_TOOLS,
 ];
 
 export const TOOLS_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
