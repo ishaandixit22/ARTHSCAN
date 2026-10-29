@@ -1,6 +1,6 @@
-// Site navigation. The market tools live behind one "Markets" menu and, on any
-// of their pages, a strip of the same tools under the top bar, so moving
-// between them is one click without ten links competing in the header.
+// Site navigation. Every market tool lives behind one "Markets" menu, grouped
+// as Market, Flows and Companies, so the top bar carries three links instead of
+// fourteen.
 
 export type NavItem = { href: string; label: string; about: string; icon: string; match?: string[] };
 
@@ -22,33 +22,52 @@ const ICON = {
   api: "M8.5 7 3.5 12l5 5M15.5 7l5 5-5 5M13.5 4.5l-3 15",                          // code brackets
 };
 
-export const MARKET_TOOLS: NavItem[] = [
-  { href: "/", label: "Overview", about: "Breadth, movers and sectors today", icon: ICON.overview },
-  { href: "/heatmap", label: "Heatmap", about: "The 250 most traded stocks by sector", icon: ICON.heatmap },
-  { href: "/signals", label: "Signals", about: "Breakouts, crosses, RSI and volume spikes", icon: ICON.signals },
-  { href: "/screener", label: "Screener", about: "Filter every stock by price and fundamentals", icon: ICON.screener },
-  { href: "/stocks", label: "Stocks", about: "Every NSE stock, A to Z", icon: ICON.stocks, match: ["/stock/"] },
-  { href: "/sectors", label: "Sectors", about: "Rotation and returns by sector", icon: ICON.sectors },
-  { href: "/valuations", label: "Valuations", about: "Index P/E, P/B and yield history", icon: ICON.valuations },
-  { href: "/deliveries", label: "Deliveries", about: "Where buyers took delivery", icon: ICON.deliveries },
-  { href: "/fii-dii", label: "FII / DII", about: "Foreign and domestic flows, by sector", icon: ICON.flows },
-];
+export type NavGroup = { title: string; items: NavItem[] };
 
-/** Shown to accounts with live prices, right after Overview. */
-export const LIVE_TOOL: NavItem = { href: "/live", label: "Live", about: "Prices as they trade", icon: ICON.live };
+const OVERVIEW: NavItem = { href: "/", label: "Overview", about: "Breadth, movers and sectors today", icon: ICON.overview };
+const LIVE: NavItem = { href: "/live", label: "Live", about: "Prices as they trade", icon: ICON.live };
 
-export const RESEARCH: NavItem[] = [
+/** The Markets menu, in three labelled groups. Live joins for accounts with live prices. */
+export function navGroups(live: boolean): NavGroup[] {
+  return [
+    {
+      title: "Market",
+      items: [
+        OVERVIEW,
+        ...(live ? [LIVE] : []),
+        { href: "/heatmap", label: "Heatmap", about: "The 250 most traded stocks by sector", icon: ICON.heatmap },
+        { href: "/sectors", label: "Sector rotation", about: "Returns and leadership by sector", icon: ICON.sectors },
+        { href: "/signals", label: "Signals", about: "Breakouts, crosses, RSI and volume spikes", icon: ICON.signals },
+        { href: "/valuations", label: "Market valuation", about: "Index P/E, P/B and yield history", icon: ICON.valuations },
+        { href: "/deliveries", label: "Top deliveries", about: "Where buyers took delivery", icon: ICON.deliveries },
+      ],
+    },
+    {
+      title: "Flows",
+      items: [
+        { href: "/fii-dii", label: "FII / DII data", about: "Foreign and domestic flows, by sector", icon: ICON.flows },
+        { href: "/mutual-funds", label: "Mutual funds", about: "Categories, returns and fund details", icon: ICON.funds },
+        { href: "/ipos", label: "IPOs", about: "Open, upcoming and recently listed issues", icon: ICON.ipos },
+      ],
+    },
+    {
+      title: "Companies",
+      items: [
+        { href: "/stocks", label: "All stocks", about: "Every NSE stock, A to Z", icon: ICON.stocks, match: ["/stock/"] },
+        { href: "/screener", label: "Screener", about: "Filter by price, returns and fundamentals", icon: ICON.screener },
+        { href: "/news", label: "News", about: "Market and company headlines", icon: ICON.news },
+      ],
+    },
+  ];
+}
+
+/** Plain links beside the Markets menu in the top bar. */
+export const TOP_LINKS: NavItem[] = [
   { href: "/news", label: "News", about: "Market and company headlines", icon: ICON.news },
-  { href: "/ipos", label: "IPOs", about: "Open, upcoming and recently listed issues", icon: ICON.ipos },
-  { href: "/mutual-funds", label: "Funds", about: "Mutual fund categories and returns", icon: ICON.funds },
   { href: "/developers", label: "API", about: "REST and MCP for your AI assistant", icon: ICON.api },
 ];
 
 export function isActive(item: NavItem, path: string): boolean {
   if (item.href === "/") return path === "/";
   return path === item.href || path.startsWith(`${item.href}/`) || !!item.match?.some((m) => path.startsWith(m));
-}
-
-export function marketTools(live: boolean): NavItem[] {
-  return live ? [MARKET_TOOLS[0], LIVE_TOOL, ...MARKET_TOOLS.slice(1)] : MARKET_TOOLS;
 }

@@ -2,18 +2,16 @@
   import "../app.css";
   import { page } from "$app/state";
   import MarketsMenu from "$lib/components/MarketsMenu.svelte";
-  import NavIcon from "$lib/components/NavIcon.svelte";
   import Search from "$lib/components/Search.svelte";
   import ThemeToggle from "$lib/components/ThemeToggle.svelte";
   import TickerTape from "$lib/components/TickerTape.svelte";
   import { BRAND } from "$lib/brand";
-  import { isActive, marketTools, RESEARCH } from "$lib/nav";
+  import { isActive, navGroups, TOP_LINKS } from "$lib/nav";
 
   let { data, children } = $props();
 
-  // Derived so Live joins the tools on sign-in without a reload.
-  const tools = $derived(marketTools(!!data.live));
-  const inTools = $derived(tools.some((t) => isActive(t, page.url.pathname)));
+  // Derived so Live joins the menu on sign-in without a reload.
+  const groups = $derived(navGroups(!!data.live));
 
 </script>
 
@@ -26,8 +24,8 @@
       <span>{BRAND}</span>
     </a>
     <nav class="primary" aria-label="Main">
-      <MarketsMenu {tools} />
-      {#each RESEARCH as r (r.href)}
+      <MarketsMenu {groups} />
+      {#each TOP_LINKS as r (r.href)}
         <a href={r.href} class="link" class:current={isActive(r, page.url.pathname)} aria-current={isActive(r, page.url.pathname) ? "page" : undefined}>{r.label}</a>
       {/each}
     </nav>
@@ -43,16 +41,6 @@
   </div>
 </header>
 
-{#if inTools}
-  <nav class="strip" aria-label="Market tools">
-    <div class="wrap strip-row">
-      {#each tools as t (t.href)}
-        {@const on = isActive(t, page.url.pathname)}
-        <a href={t.href} class:on aria-current={on ? "page" : undefined}><NavIcon d={t.icon} size={14} />{t.label}</a>
-      {/each}
-    </div>
-  </nav>
-{/if}
 
 <main class="wrap">
   {@render children()}
@@ -82,16 +70,6 @@
   .link.current::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--accent); }
   .account { flex-shrink: 0; }
 
-  /* Tool strip: the same tools as the Markets menu, one click apart; the current one carries the accent line.
-     It scrolls away with the page (the Markets menu stays in the sticky bar) and wraps on phones so no tool is cut off. */
-  .strip { border-bottom: 1px solid var(--line); }
-  .strip-row { display: flex; flex-wrap: wrap; column-gap: 26px; }
-  .strip a { position: relative; display: inline-flex; align-items: center; gap: 7px; height: 40px; font-size: 13px; color: var(--ink-3); white-space: nowrap; flex-shrink: 0; }
-  .strip a:hover { color: var(--ink); }
-  .strip a.on { color: var(--ink); }
-  .strip a.on :global(svg) { color: var(--mark); }
-  .strip a.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--accent); }
-
   footer { margin-top: 24px; border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--ink-3); font-size: 12.5px; }
   .foot { display: flex; gap: 28px; align-items: flex-start; }
   .foot p { max-width: 720px; }
@@ -105,8 +83,6 @@
   @media (max-width: 640px) {
     .logo span { display: none; }
     .bar { gap: 14px; }
-    .strip-row { column-gap: 20px; }
-    .strip a { height: 36px; }
     .foot { flex-direction: column; gap: 12px; }
   }
 </style>

@@ -1,18 +1,18 @@
 <script lang="ts">
-  // The one "Markets" entry in the top bar. Opens a panel listing every market
-  // tool with a line on what it answers; on phones the panel also carries the
-  // research links that the top bar has no room for.
+  // The one "Markets" entry in the top bar: every tool in three labelled
+  // columns (Market, Flows, Companies), each with its icon. On phones the
+  // columns stack and the panel spans the header's full width.
   import { afterNavigate } from "$app/navigation";
   import { page } from "$app/state";
   import NavIcon from "$lib/components/NavIcon.svelte";
-  import { isActive, RESEARCH, type NavItem } from "$lib/nav";
+  import { isActive, TOP_LINKS, type NavGroup } from "$lib/nav";
 
-  let { tools }: { tools: NavItem[] } = $props();
+  let { groups }: { groups: NavGroup[] } = $props();
 
   let open = $state(false);
   let root: HTMLElement | undefined = $state();
   let button: HTMLButtonElement | undefined = $state();
-  const inMarkets = $derived(tools.some((t) => isActive(t, page.url.pathname)));
+  const inMarkets = $derived(groups.some((g) => g.items.some((t) => isActive(t, page.url.pathname))));
 
   afterNavigate(() => (open = false));
 
@@ -44,21 +44,25 @@
 
   {#if open}
     <div class="panel" id="markets-panel" role="navigation" aria-label="Market tools">
-      <ul class="tools">
-        {#each tools as t (t.href)}
-          {@const on = isActive(t, page.url.pathname)}
-          <li>
-            <a href={t.href} class:on aria-current={on ? "page" : undefined}>
-              <span class="icon"><NavIcon d={t.icon} size={18} /></span>
-              <span class="label">{t.label}</span>
-              <span class="about">{t.about}</span>
-            </a>
-          </li>
-        {/each}
-      </ul>
-      <ul class="research">
-        {#each RESEARCH as r (r.href)}
-          <li><a href={r.href} class:on={isActive(r, page.url.pathname)}><NavIcon d={r.icon} size={15} />{r.label}</a></li>
+      {#each groups as g (g.title)}
+        <section>
+          <h2>{g.title}</h2>
+          <ul>
+            {#each g.items as t (t.href)}
+              {@const on = isActive(t, page.url.pathname)}
+              <li>
+                <a href={t.href} class:on aria-current={on ? "page" : undefined} title={t.about}>
+                  <NavIcon d={t.icon} size={18} />
+                  <span>{t.label}</span>
+                </a>
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/each}
+      <ul class="extra">
+        {#each TOP_LINKS.filter((l) => !groups.some((g) => g.items.some((i) => i.href === l.href))) as l (l.href)}
+          <li><a href={l.href} class:on={isActive(l, page.url.pathname)}><NavIcon d={l.icon} size={18} /><span>{l.label}</span></a></li>
         {/each}
       </ul>
     </div>
@@ -79,34 +83,34 @@
   svg.flip { transform: rotate(180deg); }
 
   .panel {
-    position: absolute; top: calc(100% + 1px); left: -18px; z-index: 30; width: 780px;
-    background: var(--panel); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: var(--float);
-    padding: 10px; animation: drop 0.18s var(--ease);
+    position: absolute; top: calc(100% + 1px); left: -22px; z-index: 30; width: 680px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 24px;
+    background: var(--panel); border: 1px solid var(--line-2); border-radius: 10px; box-shadow: var(--float);
+    padding: 20px 22px 16px; animation: drop 0.18s var(--ease);
   }
   @keyframes drop { from { opacity: 0; transform: translateY(-6px); } }
+  h2 { font-size: 12.5px; font-weight: 600; color: var(--ink-3); margin: 0 0 6px 10px; letter-spacing: 0; }
   ul { list-style: none; margin: 0; padding: 0; }
-  .tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
-  .tools a {
-    position: relative; display: grid; grid-template-columns: 18px 1fr; column-gap: 12px; row-gap: 1px; align-items: start;
-    padding: 11px 12px; border-radius: 4px; transition: background 0.12s var(--ease);
+  a {
+    position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 6px;
+    font-size: 14px; color: var(--ink); transition: background 0.12s var(--ease);
   }
-  .tools a:hover { background: var(--panel-2); color: inherit; }
-  .icon { grid-row: span 2; color: var(--ink-3); padding-top: 1px; transition: color 0.15s var(--ease), transform 0.2s var(--ease); }
-  .tools a:hover .icon { color: var(--mark); transform: translateY(-1px); }
-  .tools a.on .icon { color: var(--mark); }
-  .label { font-size: 13.5px; font-weight: 600; color: var(--ink); justify-self: start; position: relative; }
-  .about { font-size: 12px; color: var(--ink-3); }
-  .tools a.on .label::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px; background: var(--accent); }
-  .research { display: none; }
+  a :global(svg) { color: var(--ink-3); transition: color 0.15s var(--ease), transform 0.2s var(--ease); }
+  a:hover { background: var(--panel-2); color: var(--ink); }
+  a:hover :global(svg) { color: var(--mark); transform: translateY(-1px); }
+  a.on :global(svg) { color: var(--mark); }
+  a.on span { position: relative; }
+  a.on span::after { content: ""; position: absolute; left: 0; right: 0; bottom: -3px; height: 1px; background: var(--accent); }
+  .extra { display: none; }
 
   @media (max-width: 860px) {
     /* The panel spans the sticky header's full width, just under it. */
     .markets { position: static; }
-    .panel { top: 100%; left: 0; right: 0; width: auto; border-radius: 0; border-width: 1px 0; max-height: calc(100dvh - 120px); overflow-y: auto; }
-    .tools { grid-template-columns: 1fr; }
-    .research { display: flex; flex-wrap: wrap; gap: 4px 20px; padding: 12px 12px 6px; margin-top: 8px; border-top: 1px solid var(--line); }
-    .research a { font-size: 13.5px; color: var(--ink-2); padding: 6px 0; display: inline-flex; align-items: center; gap: 7px; }
-    .research a.on { color: var(--ink); }
+    .panel {
+      top: 100%; left: 0; right: 0; width: auto; grid-template-columns: 1fr; gap: 14px;
+      border-radius: 0; border-width: 1px 0; max-height: calc(100dvh - 120px); overflow-y: auto;
+    }
+    .extra { display: block; border-top: 1px solid var(--line); padding-top: 10px; }
   }
   @media (prefers-reduced-motion: reduce) { .panel { animation: none; } }
 </style>
