@@ -6,6 +6,7 @@
   import StockTable from "$lib/components/StockTable.svelte";
   import FilingList from "$lib/components/FilingList.svelte";
   import LiveBadge from "$lib/components/LiveBadge.svelte";
+  import Logo from "$lib/components/Logo.svelte";
   import { BRAND } from "$lib/brand";
   import { compact, crore, date, num, pct, price, tone } from "$lib/format";
   import { live, tradeTime, watch } from "$lib/live.svelte";
@@ -138,7 +139,6 @@
   });
 
   const range = $derived(m.high_52w && m.low_52w ? (m.close - m.low_52w) / (m.high_52w - m.low_52w) : null);
-  const monogram = $derived(c.symbol.replace(/[^A-Z]/g, "").slice(0, 2) || c.symbol.slice(0, 2));
   const SH_PARTS = [
     { key: "promoter", label: "Promoters", color: "var(--brand)" },
     { key: "fii", label: "FII / FPI", color: "#3b82c4" },
@@ -155,7 +155,7 @@
   <!-- Identity and price -->
   <header class="head">
     <div class="who">
-      <div class="mono-mark" aria-hidden="true">{monogram}</div>
+      <Logo isin={c.isin} symbol={c.symbol} size={52} />
       <div>
         <h1>{c.name}</h1>
         <p class="ids">
@@ -359,7 +359,7 @@
     <section class="card">
       <div class="card-head"><h2>Peers in {c.sector ?? "this sector"}</h2></div>
       {#if c.peers?.length}
-        <StockTable rows={c.peers} cols={["close", "change_pct", "ret_1m", "ret_1y", "pe"]} />
+        <StockTable rows={c.peers} cols={["close", "change_pct", "ret_1m", "ret_1y", "pe"]} logos />
       {:else}
         <div class="empty">No sector peers for {c.symbol}.</div>
       {/if}
@@ -370,10 +370,6 @@
 <style>
   .head { display: grid; grid-template-columns: 1fr auto; gap: 18px 24px; align-items: start; }
   .who { display: flex; gap: 16px; align-items: center; min-width: 0; }
-  .mono-mark {
-    width: 52px; height: 52px; flex-shrink: 0; display: grid; place-items: center; border-radius: 12px;
-    background: var(--panel); border: 1px solid var(--line); color: var(--mark); font: 700 18px var(--font); letter-spacing: -0.02em;
-  }
   .ids { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-top: 6px; color: var(--ink-3); font-size: 12.5px; }
   .ids .chip { color: var(--brand-2); background: var(--brand-soft); }
   .quote { text-align: right; }

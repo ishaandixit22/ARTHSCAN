@@ -1,6 +1,7 @@
 import type { LayoutServerLoad } from "./$types";
 import { api } from "$lib/server/api";
 import { NIFTY_50 } from "$lib/nifty50";
+import { env } from "$env/dynamic/private";
 
 // The ticker's closing prices change once a day, but every page asks for them: keep the
 // last answer for five minutes in this Worker instead of querying the database per page view.
@@ -22,6 +23,8 @@ export const load: LayoutServerLoad = async ({ locals }) => {
     usage: locals.usage,
     live: locals.live,
     owner: locals.owner,
+    // logo.dev publishable key: public by design (it ends up in image URLs), restricted to our domain on their side.
+    logoKey: env.LOGODEV_KEY || null,
     ticker: NIFTY_50.map((s) => bySymbol.get(s)).filter(Boolean),
   };
 };

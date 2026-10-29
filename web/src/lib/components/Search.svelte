@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import Logo from "$lib/components/Logo.svelte";
   import { price, pct, tone } from "$lib/format";
 
   let q = $state("");
@@ -80,7 +81,7 @@
       {#each results as r, i}
         <li role="option" aria-selected={i === active}>
           <button type="button" class:active={i === active} onmousedown={() => choose(r.symbol)}>
-            <span class="who"><b>{r.symbol}</b> <small>{r.name}</small></span>
+            <span class="who"><Logo isin={r.isin} symbol={r.symbol} size={24} /><b>{r.symbol}</b> <small>{r.name}</small></span>
             <span class="num">{price(r.close)} <small class={tone(r.change_pct)}>{pct(r.change_pct)}</small></span>
           </button>
         </li>
@@ -114,5 +115,5 @@
   small.down { color: var(--down); }
   .num { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
   @media (max-width: 640px) { kbd { display: none; } input { padding-right: 12px; } }
-  .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; }
 </style>

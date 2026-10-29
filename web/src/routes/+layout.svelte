@@ -55,6 +55,7 @@
     <p>
       Prices are end-of-day from NSE unless marked Live. {BRAND} is not a SEBI-registered research analyst or
       investment adviser; nothing here is investment advice.
+      {#if data.logoKey}<a href="https://logo.dev" target="_blank" rel="noopener">Logos provided by Logo.dev</a>.{/if}
     </p>
   </div>
 </footer>
