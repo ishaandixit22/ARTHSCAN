@@ -5,9 +5,12 @@
   // Shows the last NSE close; accounts with live access get Dhan prices in place.
   import { date, pct, tone } from "$lib/format";
   import { live, watch } from "$lib/live.svelte";
+  import { session } from "$lib/session.svelte";
 
   type Quote = { symbol: string; close: number | null; change_pct: number | null; as_of: string | null };
-  let { quotes, liveAccess = false }: { quotes: Quote[]; liveAccess?: boolean } = $props();
+  let { quotes, liveAccess: access = false }: { quotes: Quote[]; liveAccess?: boolean } = $props();
+  // Live only while the market is open; otherwise NSE's close.
+  const liveAccess = $derived(access && session.open);
 
   $effect(() => (liveAccess && quotes.length ? watch(quotes.map((q) => q.symbol)) : undefined));
 

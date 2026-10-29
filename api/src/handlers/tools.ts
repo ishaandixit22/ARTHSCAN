@@ -75,6 +75,8 @@ const HEATMAP_INDICES: Record<string, { name: string; file: string }> = {
   smallcap250: { name: "Nifty Smallcap 250", file: "ind_niftysmallcap250list" },
 };
 
+const BREADTH_UNIVERSE = "Every ordinary share traded on NSE that day: main board (EQ, BE, BZ) and SME (SM, ST). ETFs and funds are excluded.";
+
 const SHARES_ONLY = "COALESCE(s.instrument_type, 'ES') = 'ES'";
 
 const LIST_COLUMNS = `s.symbol, s.name, s.sector, s.series, m.close, m.change_pct, m.volume, m.turnover,
@@ -449,18 +451,54 @@ export const TOOLS: Tool[] = [
     name: "get_market_summary",
     route: "/market/summary",
     title: "Market summary",
-    description: "Breadth for the latest trading day: advances, declines, unchanged, stocks at 52-week highs/lows, total turnover, plus the latest FII/DII net flows.",
+    description: "Breadth for the latest trading day across every ordinary share traded on NSE (main board and SME; ETFs excluded): advances, declines, unchanged, stocks at 52-week highs/lows, total turnover, plus the latest FII/DII net flows. get_market_breadth lists the stocks.",
     inputSchema: { type: "object", properties: {} },
     metered: true,
     handler: async (db) => {
-      const breadth = await db.prepare(`SELECT MAX(as_of) AS as_of,
-          SUM(change_pct > 0) AS advances, SUM(change_pct < 0) AS declines, SUM(change_pct = 0) AS unchanged,
-          SUM(close >= high_52w) AS at_52w_high, SUM(close <= low_52w) AS at_52w_low,
-          ROUND(SUM(turnover) / 1e7) AS turnover_cr
-        FROM stock_metrics WHERE as_of = (SELECT MAX(as_of) FROM stock_metrics)`).first();
+      const breadth = await db.prepare(`SELECT MAX(m.as_of) AS as_of, COUNT(*) AS stocks,
+          SUM(m.change_pct > 0) AS advances, SUM(m.change_pct < 0) AS declines, SUM(m.change_pct = 0) AS unchanged,
+          SUM(m.close >= m.high_52w) AS at_52w_high, SUM(m.close <= m.low_52w) AS at_52w_low,
+          ROUND(SUM(m.turnover) / 1e7) AS turnover_cr
+        FROM stock_metrics m JOIN stocks s ON s.symbol = m.symbol
+        WHERE ${SHARES_ONLY} AND m.as_of = (SELECT MAX(as_of) FROM stock_metrics)`).first();
       const { results: flows } = await db.prepare(
         "SELECT * FROM fii_dii WHERE date = (SELECT MAX(date) FROM fii_dii) ORDER BY category DESC").all();
-      return { breadth, fii_dii: flows };
+      return { breadth, universe: BREADTH_UNIVERSE, fii_dii: flows };
+    },
+  },
+  {
+    name: "get_market_breadth",
+    route: "/market/breadth",
+    title: "Market breadth: the stocks",
+    description: "The stocks behind the latest day's breadth across every ordinary share traded on NSE (main board and SME; ETFs excluded): advancing, declining, unchanged, at a 52-week high or at a 52-week low, with counts for each.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        show: { type: "string", enum: ["advances", "declines", "unchanged", "highs", "lows"], description: "Which stocks (default advances)" },
+        sector: { type: "string", description: "Only this sector" },
+        limit: { type: "integer", description: "Default 200, max 1000" },
+        offset: { type: "integer", description: "For paging" },
+      },
+    },
+    metered: true,
+    handler: async (db, { show, sector, limit, offset }) => {
+      const BUCKETS: Record<string, { where: string; order: string }> = {
+        advances: { where: "m.change_pct > 0", order: "m.change_pct DESC" },
+        declines: { where: "m.change_pct < 0", order: "m.change_pct ASC" },
+        unchanged: { where: "m.change_pct = 0", order: "m.turnover DESC" },
+        highs: { where: "m.close >= m.high_52w", order: "m.change_pct DESC" },
+        lows: { where: "m.close <= m.low_52w", order: "m.change_pct ASC" },
+      };
+      const key = show && String(show) in BUCKETS ? String(show) : "advances";
+      const base = `FROM stocks s JOIN stock_metrics m ON m.symbol = s.symbol WHERE ${SHARES_ONLY} AND m.as_of = (SELECT MAX(as_of) FROM stock_metrics)`;
+      const counts = await db.prepare(`SELECT COUNT(*) AS stocks, SUM(m.change_pct > 0) AS advances, SUM(m.change_pct < 0) AS declines,
+        SUM(m.change_pct = 0) AS unchanged, SUM(m.close >= m.high_52w) AS highs, SUM(m.close <= m.low_52w) AS lows, MAX(m.as_of) AS as_of ${base}`).first<Record<string, number | string>>();
+      const sectorSql = sector ? "AND COALESCE(s.sector, 'Other') = ?" : "";
+      const binds = sector ? [String(sector)] : [];
+      const total = await db.prepare(`SELECT COUNT(*) AS n ${base} AND ${BUCKETS[key].where} ${sectorSql}`).bind(...binds).first<{ n: number }>();
+      const { results } = await db.prepare(`SELECT ${LIST_COLUMNS} ${base} AND ${BUCKETS[key].where} ${sectorSql} ORDER BY ${BUCKETS[key].order} LIMIT ? OFFSET ?`)
+        .bind(...binds, clampLimit(limit, 200, 1000), Math.max(0, Math.floor(Number(offset) || 0))).all();
+      return { as_of: counts?.as_of ?? null, universe: BREADTH_UNIVERSE, counts, show: key, total: total?.n ?? 0, results };
     },
   },
   {

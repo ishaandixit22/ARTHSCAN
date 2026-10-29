@@ -12,7 +12,7 @@
 import { Hono, type Context } from "hono";
 import type { Account, AppEnv, Env, Principal } from "../env.js";
 import { jsonError } from "../lib/http.js";
-import { liveMarket } from "../live/market.js";
+import { type BreadthShow, liveBreadth, liveMarket } from "../live/market.js";
 
 export const live = new Hono<AppEnv>();
 
@@ -51,8 +51,13 @@ live.get("/stream", (c) => forward(c, "/stream"));
 live.get("/quotes", (c) => forward(c, "/snapshot"));
 live.get("/status", (c) => forward(c, "/status"));
 // Movers, breadth, sector moves and intraday signals over every live stock.
-live.get("/market", async (c) =>
-  c.json(await liveMarket(c.env, () => feed(c.env).fetch(new Request("https://live/all")).then((r) => r.json()))));
+const snapshot = (env: Env) => () => feed(env).fetch(new Request("https://live/all")).then((r) => r.json()) as Promise<never>;
+live.get("/market", async (c) => c.json(await liveMarket(c.env, snapshot(c.env))));
+// One breadth bucket (advances, declines, unchanged, 52-week highs or lows) with every stock in it.
+live.get("/breadth", async (c) => {
+  const show = (["advances", "declines", "unchanged", "highs", "lows"] as const).find((k) => k === c.req.query("show")) ?? "advances";
+  return c.json(await liveBreadth(c.env, snapshot(c.env), show as BreadthShow));
+});
 
 // The owner pastes a fresh Dhan access token here when the old one lapses.
 live.post("/token", async (c) => {

@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { app } from "../src/app.js";
 import { migrate, SqliteDatabase } from "../src/db/sqlite.js";
 import type { Env } from "../src/env.js";
@@ -46,7 +46,13 @@ describe("FPI flows", () => {
 });
 
 describe("live market views", () => {
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+
   it("ranks live movers, finds intraday signals and leaves out ETFs and illiquid stocks", async () => {
+    // Inside the session (Thu 29 Oct 2026, 11:00 IST), no holiday.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-29T05:30:00Z"));
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ CM: [] }))));
     const status = { state: "live", message: "", lastTickAt: 1 };
     const m = (await liveMarket(env, async () => ({
       status,
@@ -66,5 +72,20 @@ describe("live market views", () => {
     expect(m.signals.breakout_high.map((s: any) => s.symbol)).toEqual(["AAA"]);
     expect(m.signals.breakout_low.map((s: any) => s.symbol)).toEqual(["BBB"]);
     expect(m.sectors.find((s: any) => s.sector === "Banks").median_change).toBe(10);
+  });
+});
+
+describe("live views outside the session", () => {
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+  it("report the market closed after hours, so pages show NSE's closing figures", async () => {
+    const { liveMarket: lm } = await import("../src/live/market.js");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-29T15:30:00Z")); // 21:00 IST
+    const snapshot = vi.fn(async () => ({ status: { state: "live", message: "", lastTickAt: 1 }, rows: [["AAA", 110, 0, 1, 1]] as any }));
+    await new Promise((r) => setTimeout(r, 0));
+    const m = (await lm(env, snapshot)) as any;
+    expect(m.session).toBe("closed");
+    expect(m.stocks).toBe(0);
+    expect(snapshot).not.toHaveBeenCalled();
   });
 });

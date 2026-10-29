@@ -37,13 +37,15 @@
 
   <div class="grid grid-4">
     <div class="card stat">
-      <div class="label">Advances / Declines</div>
-      <div class="value"><span class="up">{int(b.advances)}</span> / <span class="down">{int(b.declines)}</span></div>
+      <a class="label" href="/breadth">Advances / Declines →</a>
+      <div class="value"><a class="up" href="/breadth?show=advances" title="See the advancing stocks">{int(b.advances)}</a> / <a class="down" href="/breadth?show=declines" title="See the declining stocks">{int(b.declines)}</a></div>
       <div class="breadth" aria-hidden="true"><span style="width: {adv * 100}%"></span></div>
+      <div class="sub">of {int(lm ? lm.stocks : b.stocks)} NSE stocks</div>
     </div>
     <div class="card stat">
-      <div class="label">52-week highs / lows</div>
-      <div class="value"><span class="up">{int(b.at_52w_high)}</span> / <span class="down">{int(b.at_52w_low)}</span></div>
+      <a class="label" href="/breadth?show=highs">52-week highs / lows →</a>
+      <div class="value"><a class="up" href="/breadth?show=highs" title="See the stocks at a 52-week high">{int(b.at_52w_high)}</a> / <a class="down" href="/breadth?show=lows" title="See the stocks at a 52-week low">{int(b.at_52w_low)}</a></div>
+      <div class="sub">at a new 52-week high / low</div>
     </div>
     <div class="card stat">
       <div class="label">Total turnover</div>
@@ -103,6 +105,9 @@
   .ban a.label { font-family: var(--font); font-size: 13px; color: var(--ink-3); }
   a.card:hover { border-color: var(--brand-2); }
   .muted { color: var(--ink-3); font-size: 16px; }
+  .stat a.label:hover { color: var(--brand-2); }
+  .stat .value a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); }
+  .stat .value a:hover { text-decoration-color: currentColor; }
   .breadth { margin-top: 10px; height: 3px; border-radius: 2px; background: var(--down); overflow: hidden; }
   .breadth span { display: block; height: 100%; background: var(--up); }
   .foot { padding: 12px 18px; color: var(--ink-3); font-size: 12px; border-top: 1px solid var(--line); }

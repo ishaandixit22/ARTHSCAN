@@ -9,6 +9,7 @@
   import { BRAND } from "$lib/brand";
   import { compact, crore, date, num, pct, price, tone } from "$lib/format";
   import { live, tradeTime, watch } from "$lib/live.svelte";
+  import { session } from "$lib/session.svelte";
 
   let { data } = $props();
   const c = $derived(data.company);
@@ -16,8 +17,10 @@
   let mode = $state<"line" | "candles">("line");
 
   // Live price from Dhan when this account has live access; end-of-day close otherwise.
-  $effect(() => (data.live ? watch([c.symbol]) : undefined));
-  const lq = $derived(data.live ? live.quotes[c.symbol] : undefined);
+  // Live only while the market is open; otherwise NSE's closing price.
+  const liveNow = $derived(!!data.live && session.open);
+  $effect(() => (liveNow ? watch([c.symbol]) : undefined));
+  const lq = $derived(liveNow ? live.quotes[c.symbol] : undefined);
 
   // ── Sections: one tab open at a time, kept in the URL (?tab=) without reloading ──
   const TABS = [
@@ -169,7 +172,7 @@
         <div class="sub dayline">O {num(lq.open)} · H {num(lq.high)} · L {num(lq.low)} · Vol {compact(lq.volume)} · {tradeTime(lq.ltt)} IST</div>
       {:else}
         <div class="px">{price(m.close)}</div>
-        <div class="chg {tone(m.change_pct)}">{pct(m.change_pct)} <span class="sub">· close {date(m.as_of)}</span>{#if data.live} <LiveBadge />{/if}</div>
+        <div class="chg {tone(m.change_pct)}">{pct(m.change_pct)} <span class="sub">· close {date(m.as_of)}</span>{#if liveNow} <LiveBadge />{/if}</div>
       {/if}
     </div>
     <dl class="keys">

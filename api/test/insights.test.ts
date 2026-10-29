@@ -124,3 +124,17 @@ describe("F&O ban with open interest", () => {
     expect(d.open_interest.near.map((n: any) => [n.symbol, n.in_ban])).toEqual([["KAYNES", true], ["MANAPPURAM", false]]);
   });
 });
+
+describe("market breadth", () => {
+  it("counts ordinary shares only and lists the stocks in each bucket", async () => {
+    const summary = await get("/v1/market/summary");
+    const list = await get("/v1/market/breadth?show=advances");
+    expect(list.counts.stocks).toBe(summary.breadth.stocks);
+    expect(list.counts.advances).toBe(summary.breadth.advances);
+    expect(list.results.every((r: any) => r.change_pct > 0)).toBe(true);
+    expect(list.results.map((r: any) => r.symbol)).not.toContain("LIQETF");
+    expect(list.total).toBe(list.results.length);
+    const dec = await get("/v1/market/breadth?show=declines");
+    expect(dec.results.every((r: any) => r.change_pct < 0)).toBe(true);
+  });
+});

@@ -6,6 +6,7 @@
   import { crore, date, pct } from "$lib/format";
   import { live, watch } from "$lib/live.svelte";
   import { useLiveMarket } from "$lib/liveMarket.svelte";
+  import { session } from "$lib/session.svelte";
 
   let { data } = $props();
   type Stock = { symbol: string; name: string; sector: string; change: number; turnover: number; close: number };
@@ -20,7 +21,7 @@
 
   // The 1D view recolours from live prices for accounts with live access.
   const stockView = $derived(data.view !== "sectors");
-  const liveDay = $derived(!!data.live && data.period === "1d" && stockView);
+  const liveDay = $derived(!!data.live && session.open && data.period === "1d" && stockView);
   const symbols = $derived(((data.map.sectors ?? []) as Sector[]).flatMap((g) => (g.stocks ?? []).map((s) => s.symbol)));
   $effect(() => (liveDay ? watch(symbols) : undefined));
   $effect(() => (liveDay ? useLiveMarket() : undefined));
