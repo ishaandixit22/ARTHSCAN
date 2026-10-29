@@ -221,7 +221,7 @@
   .tabs.main a { padding: 10px 0; font-size: 14px; }
   .controls { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chips .chip { padding: 6px 12px; font-size: 12.5px; border: 1px solid var(--line); background: var(--panel); color: var(--ink-2); }
+  .chips .chip { padding: 6px 12px; font-size: 12.5px; border: 0; background: var(--panel-2); color: var(--ink-2); }
   .chips .chip.on { border-color: var(--accent); color: var(--ink); }
   .selects { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 

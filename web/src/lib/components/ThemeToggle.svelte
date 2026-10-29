@@ -18,11 +18,11 @@
 
 <style>
   .toggle {
-    display: grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0; padding: 0;
-    border: 1px solid var(--line-2); border-radius: 999px; background: transparent; color: var(--ink-2); cursor: pointer;
+    display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; padding: 0;
+    border: 0; border-radius: 999px; background: var(--panel-2); color: var(--ink-2); cursor: pointer;
     transition: color 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.1s var(--ease);
   }
-  .toggle:hover { color: var(--ink); border-color: var(--ink-3); }
+  .toggle:hover { color: var(--ink); }
   .toggle:active { transform: scale(0.94); }
   svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 </style>

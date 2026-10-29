@@ -92,21 +92,21 @@
 
 <style>
   .search { position: relative; flex: 1; max-width: 340px; min-width: 0; margin-left: auto; }
-  input { width: 100%; padding: 0 34px 0 34px; border-radius: 999px; background: var(--panel); border-color: var(--line); }
+  input { width: 100%; padding: 0 34px 0 34px; border-radius: 999px; background: var(--panel-2); border-color: transparent; }
   input:focus { border-color: var(--accent); }
   input::-webkit-search-cancel-button { display: none; }
-  .glass { position: absolute; left: 13px; top: 10px; color: var(--ink-3); pointer-events: none; }
+  .glass { position: absolute; left: 13px; top: 12px; color: var(--ink-3); pointer-events: none; }
   kbd {
-    position: absolute; right: 10px; top: 7px; min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center;
+    position: absolute; right: 10px; top: 9px; min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center;
     font: 500 11px var(--mono); color: var(--ink-3); border: 1px solid var(--line-2); border-radius: 4px; pointer-events: none;
   }
   input:focus ~ kbd { display: none; }
   ul {
-    position: absolute; top: 40px; left: 0; right: 0; z-index: 30; margin: 0; padding: 4px; list-style: none; min-width: 300px;
-    background: var(--panel); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: var(--float);
+    position: absolute; top: 44px; left: 0; right: 0; z-index: 30; margin: 0; padding: 4px; list-style: none; min-width: 300px;
+    background: var(--panel); border: 0; border-radius: 14px; box-shadow: var(--float);
   }
   button {
-    width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 0; border-radius: 6px;
+    width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 0; border-radius: 10px;
     background: none; color: var(--ink); font: 14px var(--font); text-align: left; cursor: pointer;
   }
   button.active, button:hover { background: var(--panel-2); }

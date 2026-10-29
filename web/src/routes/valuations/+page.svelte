@@ -77,7 +77,7 @@
 
 <style>
   svg { width: 100%; height: auto; }
-  .line { fill: none; stroke: var(--brand); stroke-width: 2; }
+  .line { fill: none; stroke: var(--series); stroke-width: 2; }
   .guide { stroke: var(--line-2); stroke-dasharray: 4 4; }
   .lbl { font-size: 11px; fill: var(--ink-3); }
   tr.on { background: var(--brand-soft); }

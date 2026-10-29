@@ -275,7 +275,7 @@
   .track i.full { background: var(--up); }
   .val { text-align: right; font-variant-numeric: tabular-nums; }
   .facts { margin: 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; }
-  .gmpbox { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-variant-numeric: tabular-nums; }
+  .gmpbox { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 14px; padding: 10px 12px; border: 0; background: var(--panel-2); border-radius: 10px; font-variant-numeric: tabular-nums; }
   .gmpbox .k { display: block; color: var(--ink-3); font-size: 12px; }
   .gmpbox p { grid-column: 1 / -1; margin: 0; color: var(--ink-3); font-size: 12px; }
   .est { color: var(--ink-3); }

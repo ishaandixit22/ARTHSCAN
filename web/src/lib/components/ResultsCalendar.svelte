@@ -90,7 +90,7 @@
 
 <style>
   .days { display: flex; gap: 8px; overflow-x: auto; padding: 14px 18px; border-bottom: 1px solid var(--line); scrollbar-width: thin; }
-  .days a { display: grid; gap: 2px; min-width: 92px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; font-size: 12.5px; color: var(--ink-2); flex-shrink: 0; }
+  .days a { display: grid; gap: 2px; min-width: 92px; padding: 8px 12px; border: 0; background: var(--panel-2); border-radius: 10px; font-size: 12.5px; color: var(--ink-2); flex-shrink: 0; }
   .days a:hover { border-color: var(--line-2); color: var(--ink); }
   .days a.on { border-color: var(--accent); color: var(--ink); }
   .days b { font-size: 16px; font-weight: 500; color: var(--ink); }

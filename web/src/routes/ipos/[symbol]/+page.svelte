@@ -275,7 +275,7 @@
   .big.sm b { font-size: 24px; }
   .up { color: var(--up); } .down { color: var(--down); }
   .chip.up { color: var(--up); }
-  .grid4 { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .grid4 { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: 0; border: 0; background: var(--panel-2); border-radius: 8px; overflow: hidden; }
   .grid4 > div { padding: 12px 14px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 0 -1px -1px 0; }
   .grid4.tight { grid-column: auto; margin-bottom: 14px; }
   dt { color: var(--ink-3); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; }

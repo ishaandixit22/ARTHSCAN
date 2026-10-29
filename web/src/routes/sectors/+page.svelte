@@ -72,7 +72,7 @@
 
 <style>
   .tile { padding: 16px; display: grid; gap: 8px; color: inherit; }
-  .tile:hover { border-color: var(--brand-2); color: inherit; }
+  .tile:hover { color: inherit; }
   @media (max-width: 640px) { .wide-only { display: none; } }
   .row { display: flex; justify-content: space-between; font-size: 14px; font-variant-numeric: tabular-nums; }
   b { font-weight: 600; }

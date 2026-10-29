@@ -99,8 +99,8 @@
   .bar.pos { fill: var(--up); }
   .bar.neg { fill: var(--down); }
   .bar.dim { opacity: 0.45; }
-  .line { fill: none; stroke: var(--brand-2); stroke-width: 2; stroke-linejoin: round; }
-  .dot { fill: var(--brand-2); stroke: var(--panel); stroke-width: 2; }
+  .line { fill: none; stroke: var(--series); stroke-width: 2; stroke-linejoin: round; }
+  .dot { fill: var(--series); stroke: var(--panel); stroke-width: 2; }
   .cross { stroke: var(--ink-3); stroke-dasharray: 3 3; stroke-width: 1; }
   .tip {
     position: absolute; top: 0; width: 150px; pointer-events: none; display: grid; gap: 2px;

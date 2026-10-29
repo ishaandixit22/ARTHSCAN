@@ -164,7 +164,7 @@
   .new { margin-left: 6px; font-size: 11px; padding: 1px 6px; background: var(--brand-soft); color: var(--brand); }
   .muted { color: var(--ink-3); }
   @media (max-width: 640px) { .wide-only { display: none; } }
-  .presets .chip { padding: 6px 12px; font-size: 13px; border: 1px solid var(--line); background: var(--panel); }
+  .presets .chip { padding: 6px 12px; font-size: 13px; border: 0; background: var(--panel-2); }
   .presets .chip:hover { border-color: var(--brand-2); }
   .filters { display: grid; gap: 10px; }
   .frow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }

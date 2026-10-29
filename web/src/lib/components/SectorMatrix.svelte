@@ -80,7 +80,7 @@
   const labels = $derived(placeLabels(
     shown.filter(inView).map((s) => ({ id: s.key, x: px(s.x), y: py(s.y), w: s.name.length * 6.1 + 4, r: radius(s) })), width, height,
   ));
-  const COLOUR = { tr: "var(--up)", br: "var(--warn)", bl: "var(--down)", tl: "var(--brand-2)" } as const;
+  const COLOUR = { tr: "var(--up)", br: "var(--warn)", bl: "var(--down)", tl: "var(--series)" } as const;
   const focus = $derived(hoverKey ?? pinned);
   const tailOf = (s: MatrixSector) => s.tail.map((t) => `${px(t.x).toFixed(1)},${py(t.y).toFixed(1)}`).join(" ");
   const fmtDate = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" });
@@ -160,13 +160,13 @@
   .quad.tr { fill: color-mix(in srgb, var(--up) 9%, transparent); }
   .quad.br { fill: color-mix(in srgb, var(--warn) 9%, transparent); }
   .quad.bl { fill: color-mix(in srgb, var(--down) 9%, transparent); }
-  .quad.tl { fill: color-mix(in srgb, var(--brand-2) 9%, transparent); }
+  .quad.tl { fill: color-mix(in srgb, var(--series) 9%, transparent); }
   .grid { stroke: var(--line); stroke-width: 1; }
   .cross { stroke: var(--ink-3); stroke-width: 1; opacity: 0.55; }
   .tick { fill: var(--ink-3); font: 11px var(--mono); }
   .axis { fill: var(--ink-3); font-size: 12px; }
   .badge { font-size: 12px; font-weight: 600; opacity: 0.9; }
-  .badge.tr { fill: var(--up); } .badge.br { fill: var(--warn); } .badge.bl { fill: var(--down); } .badge.tl { fill: var(--brand-2); }
+  .badge.tr { fill: var(--up); } .badge.br { fill: var(--warn); } .badge.bl { fill: var(--down); } .badge.tl { fill: var(--series); }
   .tail { fill: none; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; opacity: 0.85; }
   .tail.dim, .tailpt.dim { opacity: 0.35; }
   .tailpt { opacity: 0.8; }

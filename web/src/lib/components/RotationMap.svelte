@@ -10,7 +10,7 @@
   const LENSES = [["classic", "Classic"], ["trend", "Trend quality"], ["risk", "Risk-adjusted"], ["volume", "Volume"]] as const;
   const SIZES = [["uniform", "Uniform"], ["rvol", "Relative volume"], ["volatility", "Volatility (ATR %)"], ["velocity", "Tail velocity"]] as const;
   const GROUPS = ["tr", "br", "bl", "tl"] as const;
-  const COLOUR = { tr: "var(--up)", br: "var(--warn)", bl: "var(--down)", tl: "var(--brand-2)" } as const;
+  const COLOUR = { tr: "var(--up)", br: "var(--warn)", bl: "var(--down)", tl: "var(--series)" } as const;
 
   const href = (p: Record<string, string>) => {
     const q = new URLSearchParams({ lens: params.lens, bm: params.bm, tf: params.tf, size: params.size, ...p });
@@ -160,7 +160,7 @@
   .switch input:checked { background: var(--accent); }
   .switch input:checked::after { transform: translateX(14px); }
 
-  .mcp { margin: 0 18px 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; display: grid; gap: 8px; justify-items: start; }
+  .mcp { margin: 0 18px 10px; padding: 12px 14px; border: 0; background: var(--panel-2); border-radius: 10px; display: grid; gap: 8px; justify-items: start; }
   .mcp pre { margin: 0; width: 100%; font-size: 12px; }
 
   .lensbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 4px 18px 12px; border-bottom: 1px solid var(--line); }

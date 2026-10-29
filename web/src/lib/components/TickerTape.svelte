@@ -54,9 +54,9 @@
 {/if}
 
 <style>
-  .ticker { display: flex; align-items: stretch; height: 36px; background: var(--panel); border-bottom: 1px solid var(--line); font-size: 12.5px; font-variant-numeric: tabular-nums; }
-  .label { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-right: 1px solid var(--line); white-space: nowrap; flex-shrink: 0; }
-  .label b { font-weight: 600; letter-spacing: 0.02em; color: var(--brand); }
+  .ticker { display: flex; align-items: stretch; height: 34px; background: var(--bg); box-shadow: inset 0 -1px 0 var(--line); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .label { display: flex; align-items: center; gap: 8px; padding: 0 14px 0 20px; box-shadow: 1px 0 0 var(--line); white-space: nowrap; flex-shrink: 0; }
+  .label b { font: 600 11.5px var(--mono); letter-spacing: 0.06em; color: var(--accent); }
   .when { color: var(--ink-3); font-size: 12px; display: flex; align-items: center; gap: 5px; }
   .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--up); }
   .viewport { flex: 1; min-width: 0; overflow: hidden; mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
