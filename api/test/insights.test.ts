@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { app } from "../src/app.js";
 import { migrate, SqliteDatabase } from "../src/db/sqlite.js";
 import type { Env } from "../src/env.js";
@@ -27,6 +27,8 @@ beforeAll(() => {
   `);
 });
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe("market insights", () => {
   it("groups the heatmap by sector with turnover-weighted change", async () => {
     const d = await get("/v1/market/heatmap");
@@ -34,6 +36,23 @@ describe("market insights", () => {
     expect(d.sectors[0].sector).toBe("Financial Services"); // most turnover
     expect(fin.change).toBe(1.25); // (2×3e9 + −1×1e9) / 4e9
     expect(fin.stocks.map((s: any) => s.symbol)).toEqual(["BANKA", "BANKB"]);
+  });
+
+  it("shows one index's members, one sector, or one tile per sector", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("Company Name,Industry,Symbol,Series,ISIN Code\nBank B,Financial Services,BANKB,EQ,INE0\n")));
+    const idx = await get("/v1/market/heatmap?index=nifty50");
+    expect(idx.view).toMatchObject({ kind: "index", name: "Nifty 50" });
+    expect(idx.sectors.flatMap((s: any) => s.stocks.map((x: any) => x.symbol))).toEqual(["BANKB"]);
+    vi.unstubAllGlobals();
+
+    const one = await get("/v1/market/heatmap?sector=Financial%20Services");
+    expect(one.view).toMatchObject({ kind: "sector", name: "Financial Services" });
+    expect(one.sectors).toHaveLength(1);
+
+    const all = await get("/v1/market/heatmap?level=sectors");
+    const fin = all.sectors.find((s: any) => s.sector === "Financial Services");
+    expect(fin).toMatchObject({ count: 2, change: 1.25, avg_change: 0.5, advances: 1, declines: 1 });
+    expect(fin.stocks).toBeUndefined();
   });
 
   it("returns signals by definition", async () => {

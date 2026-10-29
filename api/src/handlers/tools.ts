@@ -5,6 +5,7 @@
 
 import type { Database } from "../db/types.js";
 import type { Env } from "../env.js";
+import { nseFetch } from "../lib/nse.js";
 import { ToolError } from "./errors.js";
 import { EARNINGS_TOOLS } from "./earnings.js";
 import { FILINGS_TOOLS } from "./filings.js";
@@ -65,6 +66,15 @@ export const SCREENER_FIELDS: Record<string, { label: string; unit: string; desc
 const OPS: Record<string, string> = { gt: ">", gte: ">=", lt: "<", lte: "<=", eq: "=" };
 
 /** Ordinary shares only: keeps ETFs, liquid funds and exchange test symbols out of market-wide lists. */
+/** Index heatmaps: NSE's constituent list for each, from its public archive. */
+const HEATMAP_INDICES: Record<string, { name: string; file: string }> = {
+  nifty50: { name: "Nifty 50", file: "ind_nifty50list" },
+  niftynext50: { name: "Nifty Next 50", file: "ind_niftynext50list" },
+  nifty100: { name: "Nifty 100", file: "ind_nifty100list" },
+  midcap150: { name: "Nifty Midcap 150", file: "ind_niftymidcap150list" },
+  smallcap250: { name: "Nifty Smallcap 250", file: "ind_niftysmallcap250list" },
+};
+
 const SHARES_ONLY = "COALESCE(s.instrument_type, 'ES') = 'ES'";
 
 const LIST_COLUMNS = `s.symbol, s.name, s.sector, s.series, m.close, m.change_pct, m.volume, m.turnover,
@@ -534,34 +544,69 @@ export const TOOLS: Tool[] = [
     name: "get_heatmap",
     route: "/market/heatmap",
     title: "Market heatmap",
-    description: "Most traded stocks grouped by sector with their latest change and turnover, for a heatmap. Tile size = turnover (market cap isn't available yet).",
+    description: "Stocks grouped by sector with their change for a period and their turnover, for a heatmap. Pick an index (Nifty 50, Nifty Next 50, Nifty 100, Midcap 150, Smallcap 250), one sector, or level=sectors for one tile per sector across the market. Without either, the most traded stocks.",
     inputSchema: {
       type: "object",
       properties: {
         period: { type: "string", enum: ["1d", "1w", "1m", "3m", "1y"], description: "Return period to colour by (default 1d)" },
-        limit: { type: "integer", description: "Stocks to include, most traded first (default 200, max 500)" },
+        index: { type: "string", enum: Object.keys(HEATMAP_INDICES), description: "Only this index's constituents" },
+        sector: { type: "string", description: "Only this sector's stocks" },
+        level: { type: "string", enum: ["stocks", "sectors"], description: "sectors = one tile per sector across all traded stocks (default stocks)" },
+        limit: { type: "integer", description: "Stocks to include, most traded first (default 200, max 500; an index returns all its members)" },
       },
     },
     metered: true,
-    handler: async (db, { period, limit }) => {
+    handler: async (db, { period, index, sector, level, limit }, env) => {
       const col = ({ "1w": "ret_1w", "1m": "ret_1m", "3m": "ret_3m", "1y": "ret_1y" } as Record<string, string>)[period ?? "1d"] ?? "change_pct";
+      const idx = index && String(index) in HEATMAP_INDICES ? HEATMAP_INDICES[String(index)] : null;
+      const members = idx
+        ? (await nseFetch(env, `https://nsearchives.nseindia.com/content/indices/${idx.file}.csv`, 24 * 3600, (body) =>
+            body.split(/\r?\n/).slice(1).map((l) => l.split(",")[2]?.trim()).filter((x): x is string => !!x))).data
+        : null;
+      const wantSectors = level === "sectors" && !idx && !sector;
+      // An index or a sector shows all its stocks; the market-wide views cap at the most traded.
+      const cap = idx ? 600 : wantSectors ? 5000 : sector ? clampLimit(limit, 120, 500) : clampLimit(limit, 200, 500);
+      const filters = [`${SHARES_ONLY}`, "m.as_of = (SELECT MAX(as_of) FROM stock_metrics)", `m.${col} IS NOT NULL`, idx ? "1 = 1" : "m.turnover > 0"];
+      const binds: unknown[] = [];
+      if (members) {
+        filters.push(`s.symbol IN (${members.map(() => "?").join(",")})`);
+        binds.push(...members);
+      }
+      if (sector) {
+        filters.push("COALESCE(s.sector, 'Other') = ?");
+        binds.push(String(sector));
+      }
       const { results } = await db.prepare(`SELECT s.symbol, s.name, COALESCE(s.sector, 'Other') AS sector, m.${col} AS change, m.turnover, m.close
-        FROM stocks s JOIN stock_metrics m ON m.symbol = s.symbol
-        WHERE ${SHARES_ONLY} AND m.as_of = (SELECT MAX(as_of) FROM stock_metrics) AND m.turnover > 0 AND m.${col} IS NOT NULL
-        ORDER BY m.turnover DESC LIMIT ?`).bind(clampLimit(limit, 200, 500)).all<{ sector: string; turnover: number; change: number }>();
-      const bySector = new Map<string, { sector: string; turnover: number; change: number; stocks: unknown[] }>();
+        FROM stocks s JOIN stock_metrics m ON m.symbol = s.symbol WHERE ${filters.join(" AND ")}
+        ORDER BY m.turnover DESC LIMIT ?`).bind(...binds, cap).all<{ symbol: string; sector: string; turnover: number; change: number }>();
+
+      const bySector = new Map<string, { sector: string; turnover: number; weighted: number; sum: number; count: number; stocks: typeof results }>();
       for (const r of results) {
-        const g = bySector.get(r.sector) ?? { sector: r.sector, turnover: 0, change: 0, stocks: [] };
-        g.turnover += r.turnover;
-        g.change += r.change * r.turnover; // turnover-weighted
+        const g = bySector.get(r.sector) ?? { sector: r.sector, turnover: 0, weighted: 0, sum: 0, count: 0, stocks: [] };
+        g.turnover += r.turnover ?? 0;
+        g.weighted += r.change * (r.turnover ?? 0);
+        g.sum += r.change;
+        g.count++;
         g.stocks.push(r);
         bySector.set(r.sector, g);
       }
+      const round = (v: number) => Math.round(v * 100) / 100;
       const sectors = [...bySector.values()]
-        .map((g) => ({ ...g, change: Math.round((g.change / g.turnover) * 100) / 100 }))
+        .map(({ weighted, sum, stocks, ...g }) => ({
+          ...g,
+          change: g.turnover ? round(weighted / g.turnover) : round(sum / g.count), // turnover-weighted
+          avg_change: round(sum / g.count),                                         // every stock counts once
+          advances: stocks.filter((x) => x.change > 0).length,
+          declines: stocks.filter((x) => x.change < 0).length,
+          ...(wantSectors ? {} : { stocks }),
+        }))
         .sort((a, b) => b.turnover - a.turnover);
       const asOf = await db.prepare("SELECT MAX(as_of) AS d FROM stock_metrics").first<{ d: string }>();
-      return { as_of: asOf?.d, period: period ?? "1d", sizing: "turnover", sectors };
+      return {
+        as_of: asOf?.d, period: period ?? "1d",
+        view: idx ? { kind: "index", key: String(index), name: idx.name } : sector ? { kind: "sector", name: String(sector) } : wantSectors ? { kind: "sectors", name: "All sectors" } : { kind: "market", name: "Most traded" },
+        stocks: results.length, sizing: "turnover", sectors,
+      };
     },
   },
   {
