@@ -61,7 +61,7 @@ export async function callTool(
   let result: CallResult;
   try {
     const args = coerceArgs(tool, rawArgs);
-    result = { ok: true, data: await tool.handler(env.DB, args), usage };
+    result = { ok: true, data: await tool.handler(env.DB, args, env), usage };
   } catch (err) {
     if (err instanceof ToolError) result = { ok: false, status: err.status, code: err.code, message: err.message, usage };
     else if (err instanceof SyntaxError) result = { ok: false, status: 400, code: "E_BAD_ARGS", message: `Could not parse arguments: ${err.message}`, usage };

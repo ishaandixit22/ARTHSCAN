@@ -117,6 +117,16 @@ Google Cloud Console (Web application, redirect URI `https://arthscan.me/api/aut
 put its client ID in `GOOGLE_CLIENT_ID` in `api/wrangler.jsonc` (it is public), run
 `wrangler secret put GOOGLE_CLIENT_SECRET` in `api/`, and set `GOOGLE_OAUTH_ENABLED` to `"true"`.
 
+## Indian Stock API (indianapi.in)
+
+`api/src/handlers/market-data.ts` adds 18 tools under `/v1/ext/*` (and MCP): intraday stock
+profile, trending, most active, price shockers, 52-week extremes, news, IPOs, commodities,
+corporate actions, announcements, financial statements, valuation history, analyst forecasts and
+target price, industry search and mutual funds. They accept an NSE symbol or a company name.
+Answers are cached in `external_cache` (migration 0009) for 5 minutes to 24 hours per endpoint, so
+repeat calls don't spend the vendor plan. Set `INDIANAPI_KEY` in `.env` locally and
+`wrangler secret put INDIANAPI_KEY` in `api/` for production; until then these tools answer 503.
+
 ## Security notes
 
 - Every issued secret (API tokens, OAuth codes, access/refresh tokens, client secrets) is stored only

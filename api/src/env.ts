@@ -16,6 +16,9 @@ export interface Env {
   GOOGLE_OAUTH_ENABLED?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  /** Indian Stock API (indianapi.in) key, a secret. Its tools answer 503 until it is set. */
+  INDIANAPI_KEY?: string;
+  INDIANAPI_BASE_URL?: string;
 }
 
 export interface Account {

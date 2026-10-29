@@ -17,6 +17,8 @@ const env: Env = {
   GOOGLE_OAUTH_ENABLED: process.env.GOOGLE_OAUTH_ENABLED,
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+  INDIANAPI_KEY: process.env.INDIANAPI_KEY,
+  INDIANAPI_BASE_URL: process.env.INDIANAPI_BASE_URL,
 };
 
 const port = Number(process.env.API_PORT ?? 8787);

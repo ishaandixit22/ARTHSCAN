@@ -4,6 +4,9 @@
 // all three surfaces.
 
 import type { Database } from "../db/types.js";
+import type { Env } from "../env.js";
+import { ToolError } from "./errors.js";
+import { MARKET_DATA_TOOLS } from "./market-data.js";
 
 export type JsonSchema = {
   type: "object";
@@ -21,14 +24,11 @@ export interface Tool {
   inputSchema: JsonSchema;
   /** Counts against the daily quota when called with a user token. */
   metered: boolean;
-  handler: (db: Database, args: Record<string, any>) => Promise<unknown>;
+  /** env is only needed by tools that call an outside data provider. */
+  handler: (db: Database, args: Record<string, any>, env: Env) => Promise<unknown>;
 }
 
-export class ToolError extends Error {
-  constructor(public code: string, message: string, public status = 400) {
-    super(message);
-  }
-}
+export { ToolError };
 
 // ── Screener fields ────────────────────────────────────────────────
 
@@ -103,6 +103,7 @@ export const TOOLS: Tool[] = [
           "Resolve company names to symbols with search_stocks before other calls.",
           "screen_stocks accepts filters like {field:'ret_1y', op:'gt', value:20}; list fields with list_screener_fields.",
           "Values are INR; financials are INR crore.",
+          "Tools under /v1/ext (get_stock_profile, get_news, get_ipos, mutual funds, analyst forecasts…) come from the Indian Stock API and are intraday; each answer carries fetched_at.",
         ],
         disclaimer: "Not investment advice. This service is not a SEBI-registered research analyst or investment adviser.",
       };
@@ -467,6 +468,7 @@ export const TOOLS: Tool[] = [
       return { unit: "INR crore", daily, monthly };
     },
   },
+  ...MARKET_DATA_TOOLS,
 ];
 
 export const TOOLS_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));

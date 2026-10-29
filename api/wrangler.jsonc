@@ -34,6 +34,6 @@
     "GOOGLE_CLIENT_ID": "511904650558-4dt7sqlhv7hns55tkm2isc5frr645tv8.apps.googleusercontent.com"
   },
   // Secrets (wrangler secret put): TOKEN_PEPPER, INTERNAL_API_KEY,
-  // GOOGLE_CLIENT_SECRET, and AUTH_DEV_LOGIN_CODE if dev sign-in is ever enabled.
+  // GOOGLE_CLIENT_SECRET, INDIANAPI_KEY, and AUTH_DEV_LOGIN_CODE if dev sign-in is ever enabled.
   "observability": { "enabled": true }
 }
