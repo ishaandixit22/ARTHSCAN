@@ -26,7 +26,8 @@ const ICON = {
   earnings: "M6 3.5h8.5L19 8v12.5H6zM14 3.5V8h5M9.5 17v-3M12.5 17v-5.5M15.5 17v-2",   // a report with bars
   actions: "M4 6.5h16v13.5H4zM4 10.5h16M8.5 4v4M15.5 4v4M15 16.2a1.6 1.6 0 1 0 0-.1z", // calendar with a mark
   meetings: "M4 6.5h16v13.5H4zM4 10.5h16M8.5 4v4M15.5 4v4M8 14h1M11.5 14h1M15 14h1M8 17h1M11.5 17h1", // calendar grid
-  filings: "M6 3.5h8.5L19 8v12.5H6zM14 3.5V8h5M9 12h7M9 15h7M9 18h4",               // document with lines                          // code brackets
+  filings: "M6 3.5h8.5L19 8v12.5H6zM14 3.5V8h5M9 12h7M9 15h7M9 18h4",               // document with lines
+  events: "M4 6.5h16v13.5H4zM4 10.5h16M8.5 4v4M15.5 4v4M12 13v3.2l2 1.3",            // calendar with a clock hand                          // code brackets
 };
 
 export type NavGroup = { title: string; items: NavItem[] };
@@ -42,6 +43,7 @@ export function navGroups(live: boolean): NavGroup[] {
       items: [
         OVERVIEW,
         ...(live ? [LIVE] : []),
+        { href: "/events", label: "Events calendar", about: "RBI, Fed, inflation, GDP, expiries, holidays, big results", icon: ICON.events },
         { href: "/heatmap", label: "Heatmap", about: "The 250 most traded stocks by sector", icon: ICON.heatmap },
         { href: "/valuations", label: "Market valuation", about: "Index P/E, P/B and yield history", icon: ICON.valuations },
         { href: "/sectors", label: "Sector rotation", about: "Returns and leadership by sector", icon: ICON.sectors },

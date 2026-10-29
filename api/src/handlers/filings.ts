@@ -4,6 +4,8 @@
 // actions with their ex-dates, and the day's bulk and block deals.
 // All are public NSE data; answers say so and when they were fetched.
 
+import { MACRO_EVENTS } from "../data/macro-events.js";
+import { indianApi } from "../lib/indianapi.js";
 import { addDaysISO, nseDate, nseFetch, nseQueryDate, todayIST } from "../lib/nse.js";
 import { ToolError } from "./errors.js";
 import type { Tool } from "./tools.js";
@@ -120,6 +122,88 @@ function mapDeals(body: string) {
     }));
 }
 
+// ── Results documents per company ───────────────────────────────────
+
+const DOC_KINDS = ["results", "press", "presentation", "concall", "transcript", "board"] as const;
+type Doc = { time: string | null; subject: string; pdf: string | null };
+
+/** Groups filings by company: each company's results PDF, press release, presentation, con calls and transcripts together. */
+export function groupDocuments(filings: ReturnType<typeof mapAnnouncements>) {
+  const by = new Map<string, { symbol: string; company: string; latest: string; docs: Record<(typeof DOC_KINDS)[number], Doc[]> }>();
+  for (const f of filings) {
+    if (!(DOC_KINDS as readonly string[]).includes(f.kind)) continue;
+    const c = by.get(f.symbol) ?? { symbol: f.symbol, company: f.company, latest: "", docs: { results: [], press: [], presentation: [], concall: [], transcript: [], board: [] } as Record<(typeof DOC_KINDS)[number], Doc[]> };
+    c.docs[f.kind as (typeof DOC_KINDS)[number]].push({ time: f.time, subject: f.subject, pdf: f.pdf });
+    if ((f.time ?? "") > c.latest) c.latest = f.time ?? "";
+    by.set(f.symbol, c);
+  }
+  return [...by.values()].sort((a, b) => b.latest.localeCompare(a.latest));
+}
+
+// ── Market events calendar ──────────────────────────────────────────
+
+type MarketEvent = { date: string; kind: "macro" | "expiry" | "holiday" | "results" | "ipo"; title: string; detail: string; impact: "high" | "medium" | "low"; symbol?: string; source: string; url?: string };
+
+/** NIFTY expiries from NSE; the last one in each month is the monthly contract. */
+async function expiryEvents(env: Parameters<Tool["handler"]>[2]): Promise<MarketEvent[]> {
+  const r = await nseFetch(env, "https://www.nseindia.com/api/option-chain-contract-info?symbol=NIFTY", 6 * HOUR,
+    (body) => ((JSON.parse(body).expiryDates ?? []) as string[]).map((d) => nseDate(d)).filter((d): d is string => !!d));
+  const lastOfMonth = new Map<string, string>();
+  for (const d of r.data) if (d > (lastOfMonth.get(d.slice(0, 7)) ?? "")) lastOfMonth.set(d.slice(0, 7), d);
+  return r.data.map((d) => {
+    const monthly = lastOfMonth.get(d.slice(0, 7)) === d;
+    return {
+      date: d, kind: "expiry" as const, impact: monthly ? ("high" as const) : ("low" as const),
+      title: monthly ? "Monthly F&O expiry" : "Nifty weekly expiry",
+      detail: monthly ? "Monthly index and stock futures and options expire; expect heavier volumes and position roll-overs." : "Nifty weekly options expire.",
+      source: "NSE contract information (NIFTY)", url: "https://www.nseindia.com/option-chain",
+    };
+  });
+}
+
+async function holidayEvents(env: Parameters<Tool["handler"]>[2]): Promise<MarketEvent[]> {
+  const r = await nseFetch(env, "https://www.nseindia.com/api/holiday-master?type=trading", 24 * HOUR, (body) =>
+    ((JSON.parse(body).CM ?? []) as { tradingDate: string; description: string }[]).map((h) => ({ date: nseDate(h.tradingDate), name: h.description })));
+  return r.data.filter((h): h is { date: string; name: string } => !!h.date).map((h) => ({
+    date: h.date, kind: "holiday" as const, impact: "medium" as const,
+    // NSE marks days with a special session (Diwali Muhurat trading) with an asterisk.
+    title: h.name.endsWith("*") ? `${h.name.replace(/\*$/, "").trim()}: market holiday, special session` : `${h.name}: market closed`,
+    detail: h.name.endsWith("*") ? "NSE is closed for regular trading; it announces a short special session (Muhurat trading) separately." : "NSE equity and F&O segments are closed.",
+    source: "NSE trading holidays", url: "https://www.nseindia.com/resources/exchange-communication-holidays",
+  }));
+}
+
+/** Results dates of the most traded companies (their numbers move indices and sectors). */
+async function bigResultsEvents(env: Parameters<Tool["handler"]>[2], db: Parameters<Tool["handler"]>[0]): Promise<MarketEvent[]> {
+  const { results: top } = await db.prepare(`SELECT s.symbol FROM stocks s JOIN stock_metrics m ON m.symbol = s.symbol
+    WHERE COALESCE(s.instrument_type, 'ES') = 'ES' AND m.as_of = (SELECT MAX(as_of) FROM stock_metrics) ORDER BY m.turnover DESC LIMIT 150`).all<{ symbol: string }>();
+  const big = new Set(top.map((t) => t.symbol));
+  const r = await nseFetch(env, "https://www.nseindia.com/api/event-calendar", HOUR, (body) =>
+    (JSON.parse(body) as RawEvent[]).map((e) => ({ date: nseDate(e.date), symbol: e.symbol, company: e.company, purpose: e.purpose })));
+  return r.data
+    .filter((e): e is typeof e & { date: string } => !!e.date && big.has(e.symbol) && /financial result/i.test(e.purpose ?? ""))
+    .map((e) => ({
+      date: e.date, kind: "results" as const, impact: "medium" as const, symbol: e.symbol,
+      title: `${e.symbol} results`, detail: `${e.company}: board meeting to consider financial results (${e.purpose}).`,
+      source: "NSE event calendar",
+    }));
+}
+
+async function ipoEvents(env: Parameters<Tool["handler"]>[2]): Promise<MarketEvent[]> {
+  if (!env.INDIANAPI_KEY) return [];
+  const r = await indianApi(env, "/ipo", {}, HOUR);
+  const d = r.data as Record<string, { name: string; symbol: string; is_sme?: boolean; bidding_start_date?: string; bidding_end_date?: string; listing_date?: string }[]>;
+  const out: MarketEvent[] = [];
+  for (const group of ["upcoming", "active", "closed"]) {
+    for (const i of d?.[group] ?? []) {
+      if (i.is_sme) continue; // mainboard issues only; SME issues rarely move the market
+      if (i.bidding_start_date) out.push({ date: i.bidding_start_date.slice(0, 10), kind: "ipo", impact: "low", symbol: i.symbol, title: `${i.name} IPO opens`, detail: `Bidding runs to ${i.bidding_end_date?.slice(0, 10) ?? "—"}.`, source: "Indian Stock API (IPO data)" });
+      if (i.listing_date) out.push({ date: i.listing_date.slice(0, 10), kind: "ipo", impact: "low", symbol: i.symbol, title: `${i.name} lists`, detail: "Listing day on the exchanges.", source: "Indian Stock API (IPO data)" });
+    }
+  }
+  return out;
+}
+
 export const FILINGS_TOOLS: Tool[] = [
   {
     name: "get_filings",
@@ -211,6 +295,56 @@ export const FILINGS_TOOLS: Tool[] = [
         .filter((a) => !type || a.type === type)
         .sort((a, b) => (s ? (b.ex_date ?? "").localeCompare(a.ex_date ?? "") : (a.ex_date ?? "").localeCompare(b.ex_date ?? "")));
       return { source: SOURCE, fetched_at: r.fetched_at, today, total: rows.length, actions: rows };
+    },
+  },
+  {
+    name: "get_company_documents",
+    route: "/market/company-documents",
+    title: "Results documents by company",
+    description: "This results season's documents grouped by company: the results PDF, press release, investor presentation, con-call details and earnings-call transcript, each linking to the filing on NSE. Newest company first.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        symbol: symbolArg,
+        days: { type: "integer", description: "Days back from today (default 7, max 14)" },
+        limit: { type: "integer", description: "Companies to return (default 100, max 500)" },
+      },
+    },
+    metered: true,
+    handler: async (_db, { symbol, days, limit }, env) => {
+      const to = todayIST();
+      const from = addDaysISO(to, -clamp(days, 7, 14) + 1);
+      const r = await nseFetch(env, `https://www.nseindia.com/api/corporate-announcements?index=equities&from_date=${nseQueryDate(from)}&to_date=${nseQueryDate(to)}`, 10 * MIN, mapAnnouncements);
+      const s = sym(symbol);
+      const companies = groupDocuments(r.data).filter((c) => !s || c.symbol === s);
+      return { source: SOURCE, fetched_at: r.fetched_at, from, to, total: companies.length, companies: companies.slice(0, clamp(limit, 100, 500)) };
+    },
+  },
+  {
+    name: "get_market_events",
+    route: "/market/events-calendar",
+    title: "Market events calendar",
+    description: "Dates ahead that move Indian markets: RBI policy decisions, US Fed decisions, India CPI, IIP and GDP releases (from the RBI, the Fed and MoSPI's published calendars), monthly and weekly F&O expiries and market holidays (from NSE), results dates of the most traded companies, and mainboard IPO openings and listings.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        days: { type: "integer", description: "Days ahead from today (default 60, max 180)" },
+        kind: { type: "string", enum: ["macro", "expiry", "holiday", "results", "ipo"], description: "Only one kind of event" },
+      },
+    },
+    metered: true,
+    handler: async (db, { days, kind }, env) => {
+      const today = todayIST();
+      const until = addDaysISO(today, clamp(days, 60, 180));
+      // Each source can fail on its own; the calendar shows what it has and says what's missing.
+      const settled = await Promise.allSettled([expiryEvents(env), holidayEvents(env), bigResultsEvents(env, db), ipoEvents(env)]);
+      const names = ["F&O expiries", "market holidays", "company results", "IPOs"];
+      const missing = settled.flatMap((s, i) => (s.status === "rejected" ? [names[i]] : []));
+      const macro: MarketEvent[] = MACRO_EVENTS.map((m) => ({ ...m, kind: "macro" }));
+      const all = [...macro, ...settled.flatMap((s) => (s.status === "fulfilled" ? s.value : []))]
+        .filter((e) => e.date >= today && e.date <= until && (!kind || e.kind === kind))
+        .sort((a, b) => a.date.localeCompare(b.date) || ({ high: 0, medium: 1, low: 2 }[a.impact] - { high: 0, medium: 1, low: 2 }[b.impact]));
+      return { today, until, missing, total: all.length, events: all };
     },
   },
   {

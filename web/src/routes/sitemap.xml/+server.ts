@@ -24,7 +24,7 @@ export async function GET({ url }) {
 
   const urls = [
     entry("/", latest, "1.0"),
-    ...["/stocks", "/sectors", "/screener", "/fii-dii", "/fo-ban", "/earnings", "/filings", "/corporate-actions", "/board-meetings", "/deals", "/commodities", "/news", "/ipos", "/mutual-funds", "/developers"].map((p) => entry(p, latest, "0.8")),
+    ...["/stocks", "/sectors", "/screener", "/fii-dii", "/fo-ban", "/events", "/earnings", "/filings", "/corporate-actions", "/board-meetings", "/deals", "/commodities", "/news", "/ipos", "/mutual-funds", "/developers"].map((p) => entry(p, latest, "0.8")),
     ...sectors.map((s: { sector: string }) => entry(`/sectors/${esc(s.sector)}`, latest, "0.6")),
     ...stocks.map((s) => entry(`/stock/${esc(s.symbol)}`, s.as_of, "0.5")),
   ];

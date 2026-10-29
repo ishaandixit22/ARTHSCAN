@@ -84,3 +84,44 @@ describe("NSE filings tools", () => {
     expect((await get("/v1/market/events")).status).toBe(502);
   });
 });
+
+describe("results documents and the events calendar", () => {
+  it("groups each company's results PDF, presentation and transcript together", async () => {
+    db.raw.exec("DELETE FROM external_cache");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([
+      ...ANNOUNCEMENTS,
+      { an_dt: "29-Oct-2026 20:00:00", symbol: "ACC", sm_name: "ACC Limited", desc: "Press Release", attchmntText: "ACC Limited has informed the Exchange about Press Release", attchmntFile: "https://nsearchives.nseindia.com/corporate/p.pdf" },
+    ]), { status: 200 })));
+    const d = (await get("/v1/market/company-documents")).body.data;
+    const acc = d.companies.find((c: any) => c.symbol === "ACC");
+    expect(d.companies[0].symbol).toBe("ACC"); // newest filing first
+    expect(acc.docs.results).toHaveLength(1);
+    expect(acc.docs.press[0].pdf).toBe("https://nsearchives.nseindia.com/corporate/p.pdf");
+    expect(d.companies.find((c: any) => c.symbol === "TMB").docs.transcript).toHaveLength(1);
+  });
+
+  it("merges economic dates, NSE expiries, holidays and big-company results", async () => {
+    db.raw.exec(`DELETE FROM external_cache;
+      INSERT OR IGNORE INTO stocks (symbol, name) VALUES ('TCS', 'Tata Consultancy Services');
+      INSERT OR REPLACE INTO stock_metrics (symbol, as_of, close, turnover) VALUES ('TCS', '2026-10-28', 2460, 6e9);`);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-29T10:00:00Z"));
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("contract-info")) return new Response(JSON.stringify({ expiryDates: ["03-Nov-2026", "09-Nov-2026", "17-Nov-2026", "23-Nov-2026", "01-Dec-2026", "29-Dec-2026"] }));
+      if (url.includes("holiday-master")) return new Response(JSON.stringify({ CM: [{ tradingDate: "08-Nov-2026", description: "Diwali Laxmi Pujan*" }, { tradingDate: "24-Nov-2026", description: "Prakash Gurpurb Sri Guru Nanak Dev" }] }));
+      if (url.includes("event-calendar")) return new Response(JSON.stringify([{ symbol: "TCS", company: "TCS Ltd", purpose: "Financial Results", bm_desc: "", date: "12-Nov-2026" }, { symbol: "TINY", company: "Tiny Ltd", purpose: "Financial Results", bm_desc: "", date: "12-Nov-2026" }]));
+      return new Response("{}", { status: 500 });
+    }));
+    const d = (await get("/v1/market/events-calendar?days=45")).body.data;
+    vi.useRealTimers();
+    const titles = d.events.map((e: any) => `${e.date} ${e.title}`);
+    expect(titles).toContain("2026-11-12 India CPI inflation");
+    expect(titles).toContain("2026-11-23 Monthly F&O expiry");
+    expect(titles).toContain("2026-11-17 Nifty weekly expiry");
+    expect(titles).toContain("2026-11-08 Diwali Laxmi Pujan: market holiday, special session");
+    expect(titles).toContain("2026-11-12 TCS results");
+    expect(titles.some((t: string) => t.includes("TINY"))).toBe(false); // only the most traded companies
+    expect(titles).toContain("2026-12-04 RBI monetary policy decision"); // within 45 days
+    expect(d.events.every((e: any) => e.date >= "2026-10-29")).toBe(true);
+  });
+});
