@@ -51,3 +51,14 @@ export function fetchedAt(iso: string | null | undefined) {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" }) + " IST";
 }
+
+/** Today's date in India (the market's calendar), YYYY-MM-DD. */
+export const todayIST = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+
+/** How an F&O ban date reads against today: "today", "from 30 Oct" (next session) or "on 28 Oct". */
+export function banWhen(iso: string | null | undefined) {
+  if (!iso) return "";
+  const t = todayIST();
+  const d = date(iso).replace(/ \d{4}$/, "");
+  return iso === t ? "today" : iso > t ? `from ${d}` : `on ${d}`;
+}

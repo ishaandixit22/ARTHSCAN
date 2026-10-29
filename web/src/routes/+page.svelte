@@ -2,7 +2,7 @@
   import StockTable from "$lib/components/StockTable.svelte";
   import { BRAND, TAGLINE } from "$lib/brand";
   import LiveStamp from "$lib/components/LiveStamp.svelte";
-  import { cr, crore, date, int, pct, tone } from "$lib/format";
+  import { banWhen, cr, crore, date, int, pct, tone } from "$lib/format";
   import { market, useLiveMarket, type LiveStock } from "$lib/liveMarket.svelte";
 
   let { data } = $props();
@@ -28,7 +28,7 @@
       <p class="sub"><LiveStamp close="NSE close for {date(data.summary.breadth?.as_of)}" /> · {TAGLINE}</p>
     </div>
     <p class="ban">
-      F&amp;O ban{data.foBan ? ` · ${date(data.foBan.date)}` : ""}:
+      <a class="label" href="/fo-ban">In F&amp;O ban {banWhen(data.foBan?.date)}</a>:
       {#if data.foBan?.symbols.length}
         {#each data.foBan.symbols as s, i}<a href="/stock/{s}">{s}</a>{i < data.foBan.symbols.length - 1 ? ", " : ""}{/each}
       {:else}none{/if}
@@ -100,6 +100,7 @@
   .ban { font-size: 13px; color: var(--ink-3); }
   .ban a { color: var(--ink); font-family: var(--mono); font-size: 12.5px; }
   .ban a:hover { color: var(--brand-2); }
+  .ban a.label { font-family: var(--font); font-size: 13px; color: var(--ink-3); }
   a.card:hover { border-color: var(--brand-2); }
   .muted { color: var(--ink-3); font-size: 16px; }
   .breadth { margin-top: 10px; height: 3px; border-radius: 2px; background: var(--down); overflow: hidden; }

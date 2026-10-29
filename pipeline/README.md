@@ -9,6 +9,7 @@ Downloads are cached in `data/cache/`, so re-running a backfill is cheap.
 | `npm run data:daily` | Load the latest bhavcopy (walks back up to a week), then rebuild adjustments + metrics. |
 | `npm run data:daily -- 2026-10-28` | Load one specific date. |
 | `npm run data:backfill -- 365` | Load every session in the last N calendar days that isn't loaded yet. |
+| `npm run data:fo-ban` | Refresh the F&O ban for the latest session and the next one (NSE publishes it after the close), plus each F&O stock's open interest against its limit. `data:daily` does this too. |
 | `npm run metrics -w pipeline` | Rebuild `price_adjustments` and `stock_metrics` only. |
 | `npm run data:import -- <kind> <file>` | Import a file (below). |
 

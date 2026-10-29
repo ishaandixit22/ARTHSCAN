@@ -687,16 +687,26 @@ export const TOOLS: Tool[] = [
     name: "get_fo_ban",
     route: "/market/fo-ban",
     title: "F&O ban list",
-    description: "Securities in the F&O ban period (market-wide open interest above 95% of the limit, so no new positions), for the latest trade date and recent days.",
+    description: "Securities in the F&O ban period (market-wide open interest above 95% of the limit, so no new positions) for the latest trade date NSE has published, which after the close is the next session, plus recent days and the stocks near the limit (open interest at 80% or more of MWPL).",
     inputSchema: { type: "object", properties: { days: { type: "integer", description: "Trade dates of history (default 10, max 60)" } } },
     metered: true,
     handler: async (db, { days }) => {
-      const { results: dates } = await db.prepare("SELECT DISTINCT date FROM index_daily ORDER BY date DESC LIMIT ?").bind(clampLimit(days, 10, 60)).all<{ date: string }>();
+      const { results: dates } = await db.prepare("SELECT date FROM fo_ban_days ORDER BY date DESC LIMIT ?").bind(clampLimit(days, 10, 60)).all<{ date: string }>();
       const { results } = dates.length
         ? await db.prepare(`SELECT date, symbol FROM fo_ban WHERE date >= ? ORDER BY date DESC, symbol`).bind(dates[dates.length - 1].date).all<{ date: string; symbol: string }>()
         : { results: [] as { date: string; symbol: string }[] };
       const byDate = dates.map(({ date }) => ({ date, symbols: results.filter((r) => r.date === date).map((r) => r.symbol) }));
-      return { latest: byDate[0] ?? null, history: byDate };
+      const banned = new Set(byDate[0]?.symbols ?? []);
+      // Near the limit: a stock enters the ban above 95% and leaves it below 80%.
+      const { results: near } = await db.prepare(`SELECT o.symbol, s.name, o.pct_mwpl, o.fut_eq_oi, o.mwpl, o.next_day_limit
+        FROM fo_oi o LEFT JOIN stocks s ON s.symbol = o.symbol
+        WHERE o.date = (SELECT MAX(date) FROM fo_oi) AND o.pct_mwpl >= 80 ORDER BY o.pct_mwpl DESC`).all<{ symbol: string }>();
+      const oiAsOf = await db.prepare("SELECT MAX(date) AS d FROM fo_oi").first<{ d: string | null }>();
+      return {
+        latest: byDate[0] ?? null,
+        history: byDate,
+        open_interest: { as_of: oiAsOf?.d ?? null, near: near.map((r) => ({ ...r, in_ban: banned.has(r.symbol) })) },
+      };
     },
   },
   ...MARKET_DATA_TOOLS,

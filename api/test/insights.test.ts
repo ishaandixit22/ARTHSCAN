@@ -23,6 +23,7 @@ beforeAll(() => {
       ('Nifty 50', '2026-10-28', 22698, -0.2, 30152, 18.99, 2.79, 1.43),
       ('Nifty Bank', '2026-10-28', 48000, 0.5, 9000, 14.1, 2.1, 0.9);
     INSERT INTO fo_ban (date, symbol) VALUES ('2026-10-28', 'SAIL'), ('2026-10-27', 'SAIL'), ('2026-10-27', 'IDEA');
+    INSERT INTO fo_ban_days (date, stocks) VALUES ('2026-10-28', 1), ('2026-10-27', 2);
   `);
 });
 
@@ -71,5 +72,27 @@ describe("market insights", () => {
   it("ranks sectors by median 1-month return with breadth", async () => {
     const d = await get("/v1/market/sector-rotation");
     expect(d.sectors[0]).toMatchObject({ sector: "Financial Services", stocks: 2, pct_above_sma50: 50 });
+  });
+});
+
+describe("F&O ban with open interest", () => {
+  it("serves the newest published day, NIL days included, and the stocks near the limit", async () => {
+    const db2 = new SqliteDatabase(":memory:");
+    migrate(db2);
+    db2.raw.exec(`
+      INSERT INTO stocks (symbol, name) VALUES ('KAYNES', 'Kaynes Technology'), ('MANAPPURAM', 'Manappuram Finance');
+      INSERT INTO fo_ban VALUES ('2026-10-28', 'SAIL'), ('2026-10-29', 'KAYNES'), ('2026-10-29', 'SAIL');
+      INSERT INTO fo_ban_days VALUES ('2026-10-27', 0), ('2026-10-28', 1), ('2026-10-29', 2);
+      INSERT INTO fo_oi VALUES
+        ('2026-10-28', 'KAYNES', 100, 130, 95.67, 95.67, 'No Fresh Positions'),
+        ('2026-10-28', 'MANAPPURAM', 100, 90, 89.7, 89.7, '4355898'),
+        ('2026-10-28', 'IDEA', 100, 80, 78, 78, '1367739742');
+    `);
+    const res = await app.fetch(new Request("https://x/v1/market/fo-ban", { headers: { "x-internal-key": "i" } }), { ...env, DB: db2 });
+    const d = ((await res.json()) as any).data;
+    expect(d.latest).toEqual({ date: "2026-10-29", symbols: ["KAYNES", "SAIL"] });
+    expect(d.history.map((h: any) => h.date)).toEqual(["2026-10-29", "2026-10-28", "2026-10-27"]);
+    expect(d.history[2].symbols).toEqual([]);
+    expect(d.open_interest.near.map((n: any) => [n.symbol, n.in_ban])).toEqual([["KAYNES", true], ["MANAPPURAM", false]]);
   });
 });

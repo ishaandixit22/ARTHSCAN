@@ -9,6 +9,7 @@
 //   npm run data:import -- fpi-daily <file>        NSDL daily FPI equity flows (.html or .csv)
 //   npm run data:import -- fpi-sectors <files…>    NSDL fortnightly sector reports (.html or .csv)
 //   npm run data:reports [-- 365]             backfill deliveries, index valuations, F&O bans
+//   npm run data:fo-ban                       refresh today's and the next session's F&O ban + open interest
 //
 // Every price-changing command rebuilds stock_metrics at the end.
 
@@ -18,7 +19,8 @@ import { syncStocks } from "./jobs/stocks.js";
 import { syncDhanIds } from "./jobs/dhan.js";
 import { backfill, loadBhavcopy, loadLatest } from "./jobs/bhavcopy.js";
 import { rebuildMetrics } from "./jobs/metrics.js";
-import { backfillReports, loadReports } from "./jobs/reports.js";
+import { backfillReports, loadFoBan, loadOpenInterest, loadReports } from "./jobs/reports.js";
+import { addDays, isWeekday } from "./lib.js";
 import { importFiiDii, importFinancials, importFpiDaily, importFpiSectors, importShareholding } from "./jobs/imports.js";
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -42,7 +44,8 @@ async function main() {
       console.log(r ? `Bhavcopy ${r.date}: ${r.status} (${r.rows} rows)` : "No bhavcopy found in the last week.");
       if (r && r.status !== "holiday") {
         const rep = await loadReports(db, r.date);
-        console.log(`Reports ${rep.date}: ${rep.deliveries} deliveries, ${rep.indices} indices, ${rep.foBan} in F&O ban.`);
+        console.log(`Reports ${rep.date}: ${rep.deliveries} deliveries, ${rep.indices} indices, ${rep.foBan} in F&O ban, ${rep.openInterest} F&O open-interest rows.`);
+        console.log(rep.foBanNext == null ? `F&O ban for ${rep.next}: not published yet.` : `F&O ban for ${rep.next}: ${rep.foBanNext} stocks.`);
       }
       metrics();
       break;
@@ -50,6 +53,18 @@ async function main() {
     case "backfill": {
       await backfill(db, Number(args[0] ?? 365));
       metrics();
+      break;
+    }
+    case "fo-ban": {
+      // Quick refresh between daily runs: the latest session's open interest and ban
+      // lists for it and the next session.
+      const last = (db.raw.prepare("SELECT MAX(date) AS d FROM daily_prices").get() as { d: string }).d;
+      const oi = await loadOpenInterest(db, last);
+      const banLast = await loadFoBan(db, last);
+      let next = addDays(last, 1);
+      while (!isWeekday(next)) next = addDays(next, 1);
+      const banNext = await loadFoBan(db, next);
+      console.log(`Open interest ${last}: ${oi} rows. Ban ${last}: ${banLast ?? "no file"}. Ban ${next}: ${banNext ?? "not published yet"}.`);
       break;
     }
     case "reports": {

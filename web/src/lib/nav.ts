@@ -19,7 +19,8 @@ const ICON = {
   news: "M5 4.5h11.5v15H6.5A1.5 1.5 0 0 1 5 18zM16.5 8.5H19V18a1.5 1.5 0 0 1-3 0M8 8.5h5.5M8 12h5.5M8 15.5h3.5",
   ipos: "M12 3c3 2.2 4.5 5.5 4 9.5l-2 3h-4l-2-3C7.5 8.5 9 5.2 12 3zM10 15.5 8 20l4-1.8 4 1.8-2-4.5M12 9.5h.01", // rocket
   funds: "M12 4c3.9 0 7 1.3 7 3s-3.1 3-7 3-7-1.3-7-3 3.1-3 7-3zM5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5", // a stack of coins
-  api: "M8.5 7 3.5 12l5 5M15.5 7l5 5-5 5M13.5 4.5l-3 15",                          // code brackets
+  api: "M8.5 7 3.5 12l5 5M15.5 7l5 5-5 5M13.5 4.5l-3 15",
+  ban: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM5.7 5.7l12.6 12.6",                   // no-entry circle                          // code brackets
 };
 
 export type NavGroup = { title: string; items: NavItem[] };
@@ -40,6 +41,7 @@ export function navGroups(live: boolean): NavGroup[] {
         { href: "/signals", label: "Signals", about: "Breakouts, crosses, RSI and volume spikes", icon: ICON.signals },
         { href: "/valuations", label: "Market valuation", about: "Index P/E, P/B and yield history", icon: ICON.valuations },
         { href: "/deliveries", label: "Top deliveries", about: "Where buyers took delivery", icon: ICON.deliveries },
+        { href: "/fo-ban", label: "F&O ban", about: "Stocks in the ban today and those near the limit", icon: ICON.ban },
       ],
     },
     {

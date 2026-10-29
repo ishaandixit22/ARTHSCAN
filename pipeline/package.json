@@ -10,7 +10,8 @@
     "metrics": "tsx --env-file-if-exists=../.env src/cli.ts metrics",
     "import": "tsx --env-file-if-exists=../.env src/cli.ts import",
     "d1": "tsx --env-file-if-exists=../.env src/d1.ts",
-    "reports": "tsx --env-file-if-exists=../.env src/cli.ts reports"
+    "reports": "tsx --env-file-if-exists=../.env src/cli.ts reports",
+    "fo-ban": "tsx --env-file-if-exists=../.env src/cli.ts fo-ban"
   },
   "dependencies": {
     "fflate": "^0.8.2"
