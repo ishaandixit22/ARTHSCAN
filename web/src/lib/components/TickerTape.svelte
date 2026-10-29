@@ -51,7 +51,7 @@
 {/if}
 
 <style>
-  .ticker { display: flex; align-items: stretch; height: 36px; background: var(--panel); border-bottom: 1px solid var(--line); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .ticker { display: flex; align-items: stretch; height: 36px; background: var(--panel); border-bottom: 1px solid var(--line); font-size: 12.5px; font-variant-numeric: tabular-nums; }
   .label { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-right: 1px solid var(--line); white-space: nowrap; flex-shrink: 0; }
   .label b { font-weight: 600; letter-spacing: 0.02em; color: var(--brand); }
   .when { color: var(--ink-3); font-size: 12px; display: flex; align-items: center; gap: 5px; }
@@ -63,6 +63,7 @@
   li a { display: flex; align-items: center; gap: 6px; height: 100%; padding: 0 14px; white-space: nowrap; color: var(--ink); }
   li a:hover { background: var(--panel-2); color: var(--ink); }
   .sym { font-weight: 600; }
+  .px, .chg { font-family: var(--mono); font-size: 12px; }
   .px { color: var(--ink-2); }
   @keyframes scroll { to { transform: translateX(-50%); } }
   @media (prefers-reduced-motion: reduce) {

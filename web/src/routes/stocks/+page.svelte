@@ -37,7 +37,9 @@
 
 <style>
   .letters { display: flex; flex-wrap: wrap; gap: 4px; }
-  .letters a { min-width: 34px; height: 32px; display: grid; place-items: center; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); font-size: 13px; font-weight: 500; }
-  .letters a.active { background: var(--brand); border-color: var(--brand); color: var(--panel); }
+  .letters a { position: relative; min-width: 28px; height: 32px; display: grid; place-items: center; padding: 0 6px; font: 500 13px var(--mono); color: var(--ink-3); }
+  .letters a:hover { color: var(--ink); background: var(--panel-2); border-radius: 4px; }
+  .letters a.active { color: var(--ink); }
+  .letters a.active::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: 2px; height: 1px; background: var(--accent); }
   .pager { display: flex; gap: 12px; align-items: center; justify-content: center; }
 </style>

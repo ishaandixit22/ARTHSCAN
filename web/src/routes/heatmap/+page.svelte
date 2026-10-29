@@ -25,8 +25,8 @@
   const scale = $derived(({ "1d": 3, "1w": 6, "1m": 10, "3m": 20, "1y": 40 } as Record<string, number>)[data.period] ?? 3);
   function colour(change: number) {
     const t = Math.max(-1, Math.min(1, change / scale));
-    const a = 0.15 + Math.abs(t) * 0.75;
-    return t >= 0 ? `rgb(18 128 74 / ${a})` : `rgb(199 52 63 / ${a})`;
+    const mix = Math.round(12 + Math.abs(t) * 42); // capped so tile text keeps 4.5:1
+    return `color-mix(in srgb, var(${t >= 0 ? "--up" : "--down"}) ${mix}%, var(--panel))`;
   }
   const total = $derived(h.sectors.reduce((s: number, g: any) => s + g.turnover, 0));
 </script>
@@ -63,7 +63,7 @@
 </div>
 
 <style>
-  .map { display: flex; flex-wrap: wrap; gap: 6px; }
+  .map { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
   .sector { flex-basis: 260px; min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
   .sector header { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; padding: 0 2px; }
   .sector header b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -71,6 +71,6 @@
   .tile { flex-basis: 64px; min-height: 46px; border-radius: 4px; padding: 4px 6px; display: flex; flex-direction: column; justify-content: center; color: var(--ink); overflow: hidden; }
   .tile:hover { outline: 2px solid var(--ink); color: var(--ink); }
   .tile .sym { font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tile .chg { font-size: 11px; font-variant-numeric: tabular-nums; }
+  .tile .chg { font: 11px var(--mono); }
   .small { font-size: 12.5px; }
 </style>

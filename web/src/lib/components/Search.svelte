@@ -7,6 +7,17 @@
   let open = $state(false);
   let active = $state(-1);
   let timer: ReturnType<typeof setTimeout>;
+  let input: HTMLInputElement | undefined = $state();
+
+  // "/" or ⌘K / Ctrl+K jumps to search from anywhere (except while typing in a field).
+  function onGlobalKey(e: KeyboardEvent) {
+    const typing = (e.target as HTMLElement)?.closest?.("input, textarea, select, [contenteditable]");
+    if ((e.key === "k" && (e.metaKey || e.ctrlKey)) || (e.key === "/" && !typing)) {
+      e.preventDefault();
+      input?.focus();
+      input?.select();
+    }
+  }
 
   function onInput() {
     clearTimeout(timer);
@@ -48,10 +59,14 @@
   }
 </script>
 
+<svelte:window onkeydown={onGlobalKey} />
+
 <div class="search">
+  <svg class="glass" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.5" /><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
   <input
+    bind:this={input}
     type="search"
-    placeholder="Search stocks — name or symbol"
+    placeholder="Search stocks"
     aria-label="Search stocks"
     bind:value={q}
     oninput={onInput}
@@ -59,6 +74,7 @@
     onfocus={() => (open = results.length > 0)}
     onblur={() => setTimeout(() => (open = false), 150)}
   />
+  <kbd aria-hidden="true">/</kbd>
   {#if open && results.length}
     <ul role="listbox">
       {#each results as r, i}
@@ -74,11 +90,19 @@
 </div>
 
 <style>
-  .search { position: relative; flex: 1; max-width: 380px; min-width: 0; }
-  input { width: 100%; }
+  .search { position: relative; flex: 1; max-width: 340px; min-width: 0; margin-left: auto; }
+  input { width: 100%; padding: 0 34px 0 34px; border-radius: 999px; background: var(--panel); border-color: var(--line); }
+  input:focus { border-color: var(--accent); }
+  input::-webkit-search-cancel-button { display: none; }
+  .glass { position: absolute; left: 13px; top: 10px; color: var(--ink-3); pointer-events: none; }
+  kbd {
+    position: absolute; right: 10px; top: 7px; min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center;
+    font: 500 11px var(--mono); color: var(--ink-3); border: 1px solid var(--line-2); border-radius: 4px; pointer-events: none;
+  }
+  input:focus ~ kbd { display: none; }
   ul {
-    position: absolute; top: 40px; left: 0; right: 0; z-index: 20; margin: 0; padding: 4px; list-style: none;
-    background: var(--panel); border: 1px solid var(--line-2); border-radius: 10px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+    position: absolute; top: 40px; left: 0; right: 0; z-index: 30; margin: 0; padding: 4px; list-style: none; min-width: 300px;
+    background: var(--panel); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: var(--float);
   }
   button {
     width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 0; border-radius: 6px;
@@ -88,6 +112,7 @@
   small { color: var(--ink-3); }
   small.up { color: var(--up); }
   small.down { color: var(--down); }
-  .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .num { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+  @media (max-width: 640px) { kbd { display: none; } input { padding-right: 12px; } }
   .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

@@ -74,9 +74,11 @@
 </div>
 
 <style>
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chips .chip { padding: 6px 12px; font-size: 13px; border: 1px solid var(--line); background: var(--panel); }
-  .chips .chip.on { background: var(--brand); color: var(--panel); border-color: var(--brand); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px 22px; border-bottom: 1px solid var(--line); }
+  .chips .chip { position: relative; padding: 8px 0; font-size: 13px; font-weight: 500; background: none; border-radius: 0; color: var(--ink-3); }
+  .chips .chip:hover { color: var(--ink); }
+  .chips .chip.on { color: var(--ink); }
+  .chips .chip.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--accent); }
   .tiny { margin-left: 6px; font-size: 11px; padding: 1px 6px; }
   .small { font-size: 12.5px; }
   @media (max-width: 640px) { .wide-only { display: none; } }

@@ -6,7 +6,7 @@
 
   // Cell shading for the rotation table: stronger colour for bigger moves.
   const shade = (v: number | null, scale: number) =>
-    v == null ? "" : `background: ${v >= 0 ? "rgb(18 128 74" : "rgb(199 52 63"} / ${Math.min(0.55, (Math.abs(v) / scale) * 0.55)})`;
+    v == null ? "" : `background: color-mix(in srgb, var(${v >= 0 ? "--up" : "--down"}) ${Math.round(Math.min(1, Math.abs(v) / scale) * 45)}%, var(--panel))`;
 
   let { data } = $props();
   // Live accounts get a "Today" column: each sector's median move from live prices.

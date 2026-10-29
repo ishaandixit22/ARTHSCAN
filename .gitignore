@@ -14,3 +14,8 @@ data/d1/
 .wrangler/
 *.prod-secrets.env
 arthscan-mcp/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+
+# taste-skill working files
+.taste-skill/

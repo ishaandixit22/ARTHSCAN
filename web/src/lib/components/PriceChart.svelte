@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { IChartApi, ISeriesApi } from "lightweight-charts";
+  import { theme } from "$lib/theme.svelte";
 
   let { candles, mode = "line" }: { candles: { date: string; open: number; high: number; low: number; close: number; volume: number }[]; mode?: "line" | "candles" } = $props();
 
@@ -29,7 +30,8 @@
       series.push(s);
     } else {
       const color = last >= first ? up : down;
-      const s = chart.addAreaSeries({ priceFormat, lineColor: color, topColor: `${color}33`, bottomColor: `${color}00`, lineWidth: 2 });
+      // A flat, faint fill under the line: depth without a gradient.
+      const s = chart.addAreaSeries({ priceFormat, lineColor: color, topColor: `${color}14`, bottomColor: `${color}14`, lineWidth: 2 });
       s.setData(candles.map((c) => ({ time: c.date, value: c.close })));
       series.push(s);
     }
@@ -45,7 +47,7 @@
       lib = await import("lightweight-charts");
       chart = lib.createChart(el, {
         autoSize: true,
-        layout: { background: { color: "transparent" }, textColor: css("--ink-3"), fontFamily: css("--font") },
+        layout: { background: { color: "transparent" }, textColor: css("--ink-3"), fontFamily: css("--mono"), fontSize: 11 },
         grid: { vertLines: { visible: false }, horzLines: { color: css("--line") } },
         rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.08, bottom: 0.22 } },
         timeScale: { borderVisible: false },
@@ -65,6 +67,14 @@
     // Re-run when the data or the mode changes.
     void candles;
     void mode;
+    draw();
+  });
+
+  // The chart's colours come from CSS; repaint them when the theme switches.
+  $effect(() => {
+    void theme.current;
+    if (!chart) return;
+    chart.applyOptions({ layout: { textColor: css("--ink-3") }, grid: { horzLines: { color: css("--line") } } });
     draw();
   });
 </script>

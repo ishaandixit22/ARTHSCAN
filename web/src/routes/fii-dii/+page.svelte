@@ -87,7 +87,7 @@
   const heat = (net: number | null, auc: number | null) => {
     if (net == null || !auc) return "transparent";
     const p = Math.min(1, Math.abs(net / auc) / 0.02); // ±2% of holdings = full colour
-    const pctMix = Math.round(12 + p * 70);
+    const pctMix = Math.round(10 + p * 42); // capped so cell text keeps 4.5:1
     return `color-mix(in srgb, var(${net > 0 ? "--up" : "--down"}) ${pctMix}%, var(--panel))`;
   };
 

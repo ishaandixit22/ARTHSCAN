@@ -24,9 +24,15 @@
 <div class="page">
   <div class="page-head">
     <div>
-      <h1>Markets</h1>
+      <h1>Market overview</h1>
       <p class="sub"><LiveStamp close="NSE close for {date(data.summary.breadth?.as_of)}" /> · {TAGLINE}</p>
     </div>
+    <p class="ban">
+      F&amp;O ban{data.foBan ? ` · ${date(data.foBan.date)}` : ""}:
+      {#if data.foBan?.symbols.length}
+        {#each data.foBan.symbols as s, i}<a href="/stock/{s}">{s}</a>{i < data.foBan.symbols.length - 1 ? ", " : ""}{/each}
+      {:else}none{/if}
+    </p>
   </div>
 
   <div class="grid grid-4">
@@ -51,21 +57,6 @@
         <div class="value muted">Not loaded</div>
       {/if}
     </a>
-  </div>
-
-  <div class="insights">
-    <a class="card insight" href="/heatmap"><b>Heatmap</b><span class="sub">Every sector at a glance</span></a>
-    <a class="card insight" href="/signals"><b>Signals</b><span class="sub">Breakouts, crosses, RSI, volume spikes</span></a>
-    <a class="card insight" href="/valuations"><b>Valuations</b><span class="sub">Nifty P/E, P/B and yield history</span></a>
-    <a class="card insight" href="/deliveries"><b>Deliveries</b><span class="sub">Where buyers took delivery</span></a>
-    <div class="card insight">
-      <b>F&amp;O ban {data.foBan ? `· ${date(data.foBan.date)}` : ""}</b>
-      <span class="sub">
-        {#if data.foBan?.symbols.length}
-          {#each data.foBan.symbols as s, i}<a href="/stock/{s}">{s}</a>{i < data.foBan.symbols.length - 1 ? ", " : ""}{/each}
-        {:else}None{/if}
-      </span>
-    </div>
   </div>
 
   <div class="grid grid-2">
@@ -106,13 +97,12 @@
 
 <style>
   a.card { color: inherit; }
-  .insights { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-  .insight { padding: 12px 14px; display: grid; gap: 2px; font-size: 14px; }
-  .insight .sub { font-size: 12.5px; }
-  @media (max-width: 900px) { .insights { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .ban { font-size: 13px; color: var(--ink-3); }
+  .ban a { color: var(--ink); font-family: var(--mono); font-size: 12.5px; }
+  .ban a:hover { color: var(--brand-2); }
   a.card:hover { border-color: var(--brand-2); }
   .muted { color: var(--ink-3); font-size: 16px; }
-  .breadth { margin-top: 8px; height: 6px; border-radius: 3px; background: var(--down-soft); overflow: hidden; }
+  .breadth { margin-top: 10px; height: 3px; border-radius: 2px; background: var(--down); overflow: hidden; }
   .breadth span { display: block; height: 100%; background: var(--up); }
-  .foot { padding: 10px 16px; color: var(--ink-3); font-size: 12.5px; border-top: 1px solid var(--line); }
+  .foot { padding: 12px 18px; color: var(--ink-3); font-size: 12px; border-top: 1px solid var(--line); }
 </style>
