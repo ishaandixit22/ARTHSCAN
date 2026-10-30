@@ -11,6 +11,7 @@
 
 import { Hono, type Context } from "hono";
 import type { Account, AppEnv, Env, Principal } from "../env.js";
+import { CANDLE_RANGES, companyInfo, intradayCandles } from "../lib/dhan.js";
 import { jsonError } from "../lib/http.js";
 import { type BreadthShow, liveBreadth, liveMarket } from "../live/market.js";
 
@@ -51,7 +52,20 @@ live.get("/stream", (c) => forward(c, "/stream"));
 live.get("/quotes", (c) => forward(c, "/snapshot"));
 live.get("/status", (c) => forward(c, "/status"));
 // Intraday candles for one stock's 1D and 5D charts, from Dhan's charts API.
-live.get("/candles", (c) => forward(c, "/candles"));
+live.get("/candles", async (c) => {
+  const symbol = (c.req.query("symbol") ?? "").trim().toUpperCase();
+  const range = c.req.query("range") ?? "1d";
+  if (!symbol || !CANDLE_RANGES[range]) return jsonError(c, 400, "E_BAD_ARGS", "symbol and range (1d or 5d) are required");
+  const r = await intradayCandles(c.env, symbol, range);
+  return c.json(r, r.ok ? 200 : (r.status as 404));
+});
+// Dhan's company snapshot: valuation and return ratios against industry averages, latest shareholding.
+live.get("/company", async (c) => {
+  const symbol = (c.req.query("symbol") ?? "").trim().toUpperCase();
+  if (!symbol) return jsonError(c, 400, "E_BAD_ARGS", "symbol is required");
+  const r = await companyInfo(c.env, symbol, c.req.query("raw") != null);
+  return c.json(r, r.ok ? 200 : (r.status as 404));
+});
 // Movers, breadth, sector moves and intraday signals over every live stock.
 const snapshot = (env: Env) => () => feed(env).fetch(new Request("https://live/all")).then((r) => r.json()) as Promise<never>;
 live.get("/market", async (c) => c.json(await liveMarket(c.env, snapshot(c.env))));

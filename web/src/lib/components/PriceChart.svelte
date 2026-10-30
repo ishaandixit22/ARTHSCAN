@@ -27,18 +27,24 @@
     const up = css("--up");
     const down = css("--down");
     const priceFormat = { type: "custom" as const, minMove: 0.05, formatter: (p: number) => `₹${p.toFixed(2)}` };
+    // Stretch the price scale so the previous-close line is always in view.
+    const autoscaleInfoProvider = (orig: () => any) => {
+      const r = orig();
+      if (base == null || !r?.priceRange) return r;
+      return { ...r, priceRange: { minValue: Math.min(r.priceRange.minValue, base), maxValue: Math.max(r.priceRange.maxValue, base) } };
+    };
     // A one-day chart is judged against yesterday's close, the way the day's change is.
     const first = base ?? candles[0]?.close ?? 0;
     const last = candles[candles.length - 1]?.close ?? 0;
 
     if (mode === "candles") {
-      const s = chart.addCandlestickSeries({ priceFormat, upColor: up, downColor: down, borderVisible: false, wickUpColor: up, wickDownColor: down });
+      const s = chart.addCandlestickSeries({ priceFormat, autoscaleInfoProvider, upColor: up, downColor: down, borderVisible: false, wickUpColor: up, wickDownColor: down });
       s.setData(candles.map((c) => ({ time: at(c), open: c.open, high: c.high, low: c.low, close: c.close })));
       series.push(s);
     } else {
       const color = last >= first ? up : down;
       // A flat, faint fill under the line: depth without a gradient.
-      const s = chart.addAreaSeries({ priceFormat, lineColor: color, topColor: `${color}14`, bottomColor: `${color}14`, lineWidth: 2 });
+      const s = chart.addAreaSeries({ priceFormat, autoscaleInfoProvider, lineColor: color, topColor: `${color}14`, bottomColor: `${color}14`, lineWidth: 2 });
       s.setData(candles.map((c) => ({ time: at(c), value: c.close })));
       series.push(s);
     }
@@ -67,7 +73,18 @@
       });
       draw();
     })();
+    // The chart can be created before its box has a width (the page fades in), and
+    // autoSize keeps the bar spacing from that first fit; fit again when the size settles.
+    let lastWidth = 0;
+    const ro = new ResizeObserver(([e]) => {
+      const w = Math.round(e.contentRect.width);
+      if (!chart || Math.abs(w - lastWidth) < 1) return;
+      lastWidth = w;
+      requestAnimationFrame(() => chart?.timeScale().fitContent());
+    });
+    ro.observe(el);
     return () => {
+      ro.disconnect();
       chart?.remove();
     };
   });

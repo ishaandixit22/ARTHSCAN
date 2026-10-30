@@ -2,6 +2,7 @@
   import { page } from "$app/state";
   import { replaceState } from "$app/navigation";
   import PriceChart from "$lib/components/PriceChart.svelte";
+  import IndustryCompare from "$lib/components/IndustryCompare.svelte";
   import StatementTable from "$lib/components/StatementTable.svelte";
   import StockTable from "$lib/components/StockTable.svelte";
   import FilingList from "$lib/components/FilingList.svelte";
@@ -234,6 +235,10 @@
       <div class="card stat"><div class="label">Volume · 20-day avg</div><div class="value small">{compact(m.volume)} · {compact(m.avg_volume_20d)}</div></div>
       <div class="card stat"><div class="label">Delivery · 20-day avg</div><div class="value small">{pct(m.deliv_pct, false)} · {pct(m.deliv_pct_avg_20, false)}</div></div>
     </div>
+
+    {#if data.industryInfo}
+      <IndustryCompare info={data.industryInfo} industry={c.sector} />
+    {/if}
 
     <section class="card">
       <div class="card-head"><h2>Profile</h2></div>
