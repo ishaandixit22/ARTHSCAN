@@ -491,7 +491,8 @@
 
 <style>
   .city { position: relative; width: 100%; height: 100%; min-height: 320px; overflow: hidden; }
-  canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: pan-y; }
+  /* Out of flow: the canvas's own pixel size must never feed back into the box that sizes it. */
+  canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; cursor: grab; touch-action: pan-y; }
   .grabbing canvas { cursor: grabbing; }
   /* District names are set like a map's place labels: condensed capitals in ink. */
   .tag {
