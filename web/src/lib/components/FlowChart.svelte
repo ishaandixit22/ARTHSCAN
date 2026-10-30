@@ -104,8 +104,8 @@
   .cross { stroke: var(--ink-3); stroke-dasharray: 3 3; stroke-width: 1; }
   .tip {
     position: absolute; top: 0; width: 150px; pointer-events: none; display: grid; gap: 2px;
-    background: var(--panel); border: 1px solid var(--line-2); border-radius: 6px; padding: 6px 8px;
-    font-size: 12px; box-shadow: var(--float); font-family: var(--mono);
+    background: var(--panel); border: 1px solid var(--line-2); border-radius: 2px; padding: 6px 8px;
+    font-size: 12px; box-shadow: var(--float); font-family: var(--font);
   }
   .tip b { font-weight: 600; color: var(--ink-2); }
 </style>

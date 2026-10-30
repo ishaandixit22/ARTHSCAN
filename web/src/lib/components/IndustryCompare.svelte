@@ -92,21 +92,21 @@
   .means { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-3); line-height: 1.45; }
   .quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; padding: 4px 18px 18px; }
   .quick div { display: flex; flex-direction: column; }
-  .quick b { font-family: var(--mono); font-size: 22px; font-weight: 500; margin-top: 2px; }
+  .quick b { font-family: var(--font); font-size: 22px; font-weight: 500; margin-top: 2px; }
   .vs { list-style: none; margin: 0; padding: 0; }
   .vs li { padding: 16px 18px; border-top: 1px solid var(--line); }
   .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
   .say { font-size: 13px; color: var(--ink-2); }
   .bars { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px 12px; margin-top: 10px; }
   .name { font-size: 12px; color: var(--ink-3); min-width: 84px; }
-  .track { height: 8px; border-radius: 99px; background: var(--panel-2); overflow: hidden; }
-  .track i { display: block; height: 100%; border-radius: 99px; background: var(--ink-3); opacity: 0.55; transition: width 0.6s var(--spring, ease); }
+  .track { height: 8px; background: var(--panel-2); overflow: hidden; }
+  .track i { display: block; height: 100%; background: var(--ink-3); opacity: 0.55; transition: width 0.6s var(--ease); }
   .track i.me { background: var(--brand); opacity: 1; }
-  .bars b { font-family: var(--mono); font-size: 13px; font-weight: 500; text-align: right; min-width: 64px; }
+  .bars b { font-family: var(--font); font-size: 13px; font-weight: 500; text-align: right; min-width: 64px; }
   .bars b.muted { color: var(--ink-3); }
   .flows { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: baseline; padding: 16px 18px; border-top: 1px solid var(--line); font-size: 14px; }
   .flows .k { flex-basis: 100%; }
-  .flows em { font-style: normal; font-family: var(--mono); font-size: 12.5px; margin-left: 4px; }
+  .flows em { font-style: normal; font-family: var(--font); font-size: 12.5px; margin-left: 4px; }
   .flows .means { flex-basis: 100%; }
   @media (max-width: 640px) {
     .quick { grid-template-columns: 1fr; gap: 14px; }

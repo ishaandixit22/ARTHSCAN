@@ -163,7 +163,7 @@
   .quad.tl { fill: color-mix(in srgb, var(--series) 9%, transparent); }
   .grid { stroke: var(--line); stroke-width: 1; }
   .cross { stroke: var(--ink-3); stroke-width: 1; opacity: 0.55; }
-  .tick { fill: var(--ink-3); font: 11px var(--mono); }
+  .tick { fill: var(--ink-3); font: 11px var(--font); }
   .axis { fill: var(--ink-3); font-size: 12px; }
   .badge { font-size: 12px; font-weight: 600; opacity: 0.9; }
   .badge.tr { fill: var(--up); } .badge.br { fill: var(--warn); } .badge.bl { fill: var(--down); } .badge.tl { fill: var(--series); }
@@ -179,7 +179,7 @@
   .node.faded .label { opacity: 0.4; }
   .node.on .label { font-weight: 700; }
   .zoom { position: absolute; right: 16px; bottom: 0; display: flex; gap: 6px; }
-  .zoom button { min-width: 28px; height: 26px; padding: 0 8px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--panel); color: var(--ink); font: 500 16px var(--font); cursor: pointer; }
+  .zoom button { min-width: 28px; height: 26px; padding: 0 8px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--panel); color: var(--ink); font: 500 16px var(--font); cursor: pointer; }
   .zoom button.reset { font-size: 12px; }
   .zoom button:hover:not(:disabled) { border-color: var(--accent); }
   .zoom button:disabled { opacity: 0.4; cursor: default; }

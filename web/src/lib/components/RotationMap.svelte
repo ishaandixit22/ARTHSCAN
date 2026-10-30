@@ -150,7 +150,7 @@
   .link:hover, .titles a:hover { text-decoration: underline; }
   .titles a { color: var(--brand-2); }
   .toggles { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
-  .seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; }
+  .seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 2px; overflow: hidden; }
   .seg a { padding: 6px 12px; font-size: 13px; color: var(--ink-2); }
   .seg a.on { background: var(--panel-2); color: var(--ink); font-weight: 600; }
   .seg a + a { border-left: 1px solid var(--line-2); }
@@ -160,7 +160,7 @@
   .switch input:checked { background: var(--accent); }
   .switch input:checked::after { transform: translateX(14px); }
 
-  .mcp { margin: 0 18px 10px; padding: 12px 14px; border: 0; background: var(--panel-2); border-radius: 10px; display: grid; gap: 8px; justify-items: start; }
+  .mcp { margin: 0 18px 10px; padding: 12px 14px; border: 0; background: var(--panel-2); border-radius: 2px; display: grid; gap: 8px; justify-items: start; }
   .mcp pre { margin: 0; width: 100%; font-size: 12px; }
 
   .lensbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 4px 18px 12px; border-bottom: 1px solid var(--line); }
@@ -173,7 +173,7 @@
   .help:hover, .help[aria-expanded="true"] { color: var(--ink); border-color: var(--accent); }
   .sizeby { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-3); }
   .sizeby select { height: 30px; font-size: 13px; }
-  .info { margin: 10px 18px 0; padding: 12px 14px; background: var(--panel-2); border-radius: 6px; display: grid; gap: 6px; font-size: 13.5px; line-height: 1.55; }
+  .info { margin: 10px 18px 0; padding: 12px 14px; background: var(--panel-2); border-radius: 2px; display: grid; gap: 6px; font-size: 13.5px; line-height: 1.55; }
   .notice { margin: 10px 18px 0; }
 
   .body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; }
@@ -182,7 +182,7 @@
   .side { border-left: 1px solid var(--line); display: flex; flex-direction: column; max-height: 640px; }
   .sidehead { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px 8px; }
   .sidehead .sub { font-size: 12px; }
-  .allnone { display: inline-flex; border: 1px solid var(--line-2); border-radius: 6px; overflow: hidden; }
+  .allnone { display: inline-flex; border: 1px solid var(--line-2); border-radius: 2px; overflow: hidden; }
   .allnone button { background: none; border: 0; padding: 4px 10px; font-size: 12px; color: var(--ink-2); cursor: pointer; }
   .allnone button.on { background: var(--panel-2); color: var(--ink); font-weight: 600; }
   .find { margin: 0 14px 8px; width: calc(100% - 28px); }
@@ -195,7 +195,7 @@
   .row:hover, .row.hl { background: var(--panel-2); }
   .row input { width: 15px; height: 15px; padding: 0; accent-color: var(--accent); }
   .row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .row .n { text-align: right; font: 12.5px var(--mono); }
+  .row .n { text-align: right; font: 12.5px var(--font); }
   .empty { padding: 20px 14px; }
   @media (max-width: 900px) {
     .body { grid-template-columns: 1fr; }

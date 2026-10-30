@@ -62,7 +62,7 @@
       lib = await import("lightweight-charts");
       chart = lib.createChart(el, {
         autoSize: true,
-        layout: { background: { color: "transparent" }, textColor: css("--ink-3"), fontFamily: css("--mono"), fontSize: 11 },
+        layout: { background: { color: "transparent" }, textColor: css("--ink-3"), fontFamily: css("--font"), fontSize: 11 },
         grid: { vertLines: { visible: false }, horzLines: { color: css("--line") } },
         rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.08, bottom: 0.22 } },
         timeScale: { borderVisible: false },

@@ -22,6 +22,6 @@
 <style>
   .logo { width: var(--s); height: var(--s); flex: none; display: inline-grid; place-items: center; border-radius: 22%; overflow: hidden; vertical-align: middle;
     background: var(--panel); border: 1px solid var(--line); }
-  img { width: 100%; height: 100%; object-fit: contain; background: #fff; padding: 12%; box-sizing: border-box; }
+  img { width: 100%; height: 100%; object-fit: contain; background: var(--paper-hi); padding: 12%; box-sizing: border-box; }
   i { font: 700 calc(var(--s) * 0.34) var(--font); font-style: normal; color: var(--mark); letter-spacing: -0.02em; }
 </style>

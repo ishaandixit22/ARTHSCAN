@@ -96,11 +96,11 @@
   .ratio { display: grid; gap: 8px; }
   .bar { height: 6px; border-radius: 3px; background: var(--down); overflow: hidden; }
   .bar span { display: block; height: 100%; background: var(--up); }
-  .ratio b { font-family: var(--mono); font-weight: 500; }
+  .ratio b { font-family: var(--font); font-weight: 500; }
   .controls { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 24px; border-bottom: 1px solid var(--line); }
   .controls .tabs { flex-wrap: wrap; gap: 4px 22px; }
   .controls .tabs a { padding: 9px 0; font-size: 14px; }
-  .n { color: var(--ink-3); font-family: var(--mono); font-size: 11.5px; margin-left: 3px; }
+  .n { color: var(--ink-3); font-family: var(--font); font-size: 11.5px; margin-left: 3px; }
   .more { display: block; padding: 12px 18px; border-top: 1px solid var(--line); font-size: 13px; color: var(--brand-2); }
   .small { font-size: 12.5px; }
 </style>

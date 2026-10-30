@@ -465,26 +465,28 @@
   .city { position: relative; width: 100%; height: 100%; min-height: 320px; overflow: hidden; }
   canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: pan-y; }
   .grabbing canvas { cursor: grabbing; }
+  /* District names are set like a map's place labels: condensed capitals in ink. */
   .tag {
     position: absolute; left: 0; top: 0; pointer-events: none; white-space: nowrap;
-    font: 500 10.5px var(--font); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2);
-    text-shadow: 0 0 6px var(--bg), 0 0 2px var(--bg);
+    font: 800 11.5px var(--font); font-stretch: 72%; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink);
+    text-shadow: 0 0 4px var(--bg), 0 0 2px var(--bg), 0 0 1px var(--bg);
     opacity: 0; transition: opacity 0.3s var(--ease);
   }
   .tag:global(.on) { opacity: 1; }
+  /* The hover card is a small printed inset: a heavy rule on top, ruled below. */
   .tip {
     position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2; margin: 14px 0 0 14px;
-    display: grid; gap: 2px; min-width: 170px; max-width: 240px; padding: 10px 12px; border-radius: 12px;
-    background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: var(--float);
-    font-size: 12.5px; animation: tip-in 0.15s var(--ease) both;
+    display: grid; gap: 2px; min-width: 180px; max-width: 250px; padding: 8px 12px 10px;
+    background: var(--bg); border-top: var(--rule-heavy); border-bottom: 1px solid var(--ink); box-shadow: var(--float);
+    font-size: 13px; animation: tip-in 0.15s var(--ease) both;
   }
   @keyframes tip-in { from { opacity: 0; } }
-  .tip b { font-size: 14px; }
-  .nm { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .row { display: flex; justify-content: space-between; gap: 12px; margin-top: 4px; font-family: var(--mono); }
-  small { color: var(--ink-3); font-size: 11px; margin-top: 4px; }
-  .flat { display: grid; grid-template-columns: repeat(auto-fill, minmax(18px, 1fr)); gap: 4px; align-content: center; height: 100%; padding: 24px; }
-  .flat a { aspect-ratio: 1; border-radius: 4px; background: var(--panel-2); }
+  .tip b { font: 850 17px var(--display); font-stretch: 68%; letter-spacing: 0.01em; }
+  .nm { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--serif); font-size: 13px; }
+  .row { display: flex; justify-content: space-between; gap: 12px; margin-top: 4px; font-weight: 700; font-stretch: 82%; }
+  small { color: var(--ink-3); font-size: 11.5px; margin-top: 4px; font-stretch: 85%; }
+  .flat { display: grid; grid-template-columns: repeat(auto-fill, minmax(18px, 1fr)); gap: 3px; align-content: center; height: 100%; padding: 24px; }
+  .flat a { aspect-ratio: 1; background: var(--panel-2); }
   .flat a.up { background: var(--up); }
   .flat a.down { background: var(--down); }
 </style>

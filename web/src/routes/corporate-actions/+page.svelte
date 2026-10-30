@@ -68,8 +68,8 @@
 <style>
   .bar { flex-wrap: wrap; gap: 4px 20px; border-bottom: 1px solid var(--line); display: flex; }
   .bar a { padding: 9px 0; }
-  .n { color: var(--ink-3); font-family: var(--mono); font-size: 11.5px; margin-left: 3px; }
-  td:first-child { font-family: var(--mono); font-size: 12.5px; }
+  .n { color: var(--ink-3); font-family: var(--font); font-size: 11.5px; margin-left: 3px; }
+  td:first-child { font-family: var(--font); font-size: 12.5px; }
   .subject { white-space: normal; min-width: 280px; font-family: var(--font); }
   .type { margin-right: 6px; }
   tr.today td { background: color-mix(in srgb, var(--accent) 6%, transparent); }

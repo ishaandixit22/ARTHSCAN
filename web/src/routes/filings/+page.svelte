@@ -68,7 +68,7 @@
   .filters { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 24px; border-bottom: 1px solid var(--line); }
   .filters .tabs { flex-wrap: wrap; gap: 4px 20px; }
   .filters .tabs a { padding: 9px 0; }
-  .n { color: var(--ink-3); font-family: var(--mono); font-size: 11.5px; margin-left: 3px; }
+  .n { color: var(--ink-3); font-family: var(--font); font-size: 11.5px; margin-left: 3px; }
   .more { padding: 12px 18px; border-top: 1px solid var(--line); }
   .small { font-size: 12.5px; }
   @media (max-width: 640px) { .lookup { width: 100%; } .lookup input { flex: 1; width: auto; } }

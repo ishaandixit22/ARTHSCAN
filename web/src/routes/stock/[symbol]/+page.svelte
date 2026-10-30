@@ -142,9 +142,9 @@
   const range = $derived(m.high_52w && m.low_52w ? (m.close - m.low_52w) / (m.high_52w - m.low_52w) : null);
   const SH_PARTS = [
     { key: "promoter", label: "Promoters", color: "var(--brand)" },
-    { key: "fii", label: "FII / FPI", color: "#3b82c4" },
-    { key: "dii", label: "DII", color: "#d08a2c" },
-    { key: "government", label: "Government", color: "#8a6cc4" },
+    { key: "fii", label: "FII / FPI", color: "var(--series)" },
+    { key: "dii", label: "DII", color: "#a8661a" },
+    { key: "government", label: "Government", color: "#6b4a7a" },
     { key: "public", label: "Public", color: "var(--line-2)" },
     { key: "others", label: "Others", color: "var(--ink-3)" },
   ];
@@ -381,18 +381,24 @@
   .ids { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-top: 6px; color: var(--ink-3); font-size: 12.5px; }
   .ids .chip { color: var(--brand-2); background: var(--brand-soft); }
   .quote { text-align: right; }
-  .px { font: 600 32px/1.1 var(--mono); letter-spacing: -0.03em; }
-  .chg { font: 500 14px var(--mono); display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 4px; }
+  .px { font: 850 52px/0.95 var(--display); font-stretch: 66%; }
+  .chg { font: 700 15px var(--font); font-stretch: 85%; display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 4px; }
   .chg .sub { font-family: var(--font); }
-  .dayline { font-size: 12px; margin-top: 4px; font-family: var(--mono); }
-  .keys { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px 36px; margin: 0; padding-top: 16px; border-top: 1px solid var(--line); }
-  .keys dt { font-size: 12px; color: var(--ink-3); }
-  .keys dd { margin: 2px 0 0; font: 500 15px var(--mono); }
-  .summary { font-size: 15px; line-height: 1.65; color: var(--ink-2); max-width: 980px; }
+  .dayline { font-size: 12px; margin-top: 4px; font-stretch: 85%; }
+  .keys { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px 0; margin: 0; padding-top: 12px; border-top: var(--rule-heavy); }
+  .keys div { padding: 0 28px; border-left: 1px solid var(--line-2); }
+  .keys div:first-child { padding-left: 0; border-left: 0; }
+  .keys dt { font-size: 11.5px; font-weight: 700; font-stretch: 80%; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
+  .keys dd { margin: 2px 0 0; font: 800 22px var(--display); font-stretch: 72%; }
+  .summary { font: 17px/1.55 var(--serif); color: var(--ink); max-width: 72ch; }
 
-  .sections { position: sticky; top: 56px; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
-  .sections .tabs { gap: 28px; }
-  .sections button { padding: 13px 0; font-size: 14px; }
+  /* Section rail under the stock's name: printed section heads, the open one underlined in ink. */
+  .sections { position: sticky; top: 49px; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--ink); }
+  .sections .tabs { gap: 28px; border: 0; overflow: visible; }
+  .sections .tabs button { position: relative; padding: 12px 0; border: 0; background: none; color: var(--ink-2); font-size: 13.5px; }
+  .sections .tabs button:hover { background: none; color: var(--ink); }
+  .sections .tabs [aria-selected="true"], .sections .tabs [aria-selected="true"]:hover { background: none; color: var(--ink); }
+  .sections .tabs [aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 4px; background: var(--ink); }
   @media (max-width: 640px) {
     .sections { overflow-x: auto; scrollbar-width: none; }
     .sections .tabs { gap: 22px; }
@@ -409,10 +415,10 @@
   .profile dd { margin: 3px 0 0; font-size: 14px; }
   .returns { display: grid; grid-template-columns: repeat(5, 1fr); }
   .returns div { padding: 16px 18px; display: grid; gap: 4px; }
-  .returns b { font: 500 18px var(--mono); }
+  .returns b { font: 800 22px var(--display); font-stretch: 72%; }
   .kv td:first-child { color: var(--ink-2); }
   .kv td:last-child { display: flex; gap: 8px; align-items: center; justify-content: flex-end; height: 42px; }
-  .stack { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--panel-2); gap: 2px; }
+  .stack { display: flex; height: 12px; border-radius: 2px; overflow: hidden; background: var(--panel-2); gap: 2px; }
   .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; }
   .small { font-size: 12.5px; }
   .next { line-height: 1.6; }

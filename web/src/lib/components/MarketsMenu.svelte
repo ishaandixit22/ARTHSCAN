@@ -72,45 +72,47 @@
 <style>
   .markets { position: relative; }
   .trigger {
-    position: relative; display: inline-flex; align-items: center; gap: 6px; height: 62px; padding: 0;
-    border: 0; background: none; color: var(--ink-2); font: 500 13.5px var(--font); cursor: pointer;
+    position: relative; display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0;
+    border: 0; background: none; color: var(--ink); cursor: pointer;
+    font: 800 13.5px var(--font); font-stretch: 75%; text-transform: uppercase; letter-spacing: 0.07em;
     transition: color 0.15s var(--ease);
   }
-  .trigger:hover, .trigger[aria-expanded="true"] { color: var(--ink); }
-  .trigger.current { color: var(--ink); }
-  .trigger.current::after { content: ""; position: absolute; left: 0; right: 16px; bottom: 14px; height: 2px; border-radius: 2px; background: var(--accent); }
+  .trigger:hover, .trigger[aria-expanded="true"] { color: var(--brand-2); }
+  .trigger.current::after { content: ""; position: absolute; left: 0; right: 16px; bottom: 0; height: 3px; background: var(--ink); }
   svg { transition: transform 0.2s var(--ease); }
   svg.flip { transform: rotate(180deg); }
 
+  /* The menu is a page index: three ruled columns under a heavy rule. */
   .panel {
-    position: absolute; top: calc(100% + 1px); left: -22px; z-index: 30; width: 680px;
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 24px;
-    background: var(--panel); border: 0; border-radius: 18px; box-shadow: var(--float);
-    padding: 20px 22px 16px; animation: drop 0.18s var(--ease);
+    position: absolute; top: 100%; left: -24px; z-index: 30; width: 720px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
+    background: var(--bg); border-top: var(--rule-heavy); border-bottom: 1px solid var(--ink); box-shadow: var(--float);
+    padding: 0 0 12px; animation: drop 0.2s var(--ease);
   }
-  @keyframes drop { from { opacity: 0; transform: translateY(-6px); } }
-  h2 { font-size: 12.5px; font-weight: 600; color: var(--ink-3); margin: 0 0 6px 10px; letter-spacing: 0; }
+  .panel > * { padding: 14px 18px 0; }
+  .panel > * + * { border-left: 1px solid var(--line-2); }
+  @keyframes drop { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+  h2 { font-size: 12px; font-weight: 850; font-stretch: 72%; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink); margin: 0 0 6px; padding-bottom: 6px; border-bottom: 1px solid var(--ink); }
   ul { list-style: none; margin: 0; padding: 0; }
   a {
-    position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 10px;
-    font-size: 14px; color: var(--ink); transition: background 0.12s var(--ease);
+    position: relative; display: flex; align-items: center; gap: 10px; padding: 7px 4px; border-bottom: 1px solid var(--line);
+    font-size: 14.5px; font-weight: 600; color: var(--ink); transition: background 0.12s var(--ease), color 0.12s var(--ease);
   }
-  a :global(svg) { color: var(--ink-3); transition: color 0.15s var(--ease), transform 0.2s var(--ease); }
+  a :global(svg) { color: var(--ink-3); flex-shrink: 0; }
   a:hover { background: var(--panel-2); color: var(--ink); }
-  a:hover :global(svg) { color: var(--mark); transform: translateY(-1px); }
-  a.on :global(svg) { color: var(--mark); }
-  a.on span { position: relative; }
-  a.on span::after { content: ""; position: absolute; left: 0; right: 0; bottom: -3px; height: 2px; border-radius: 2px; background: var(--accent); }
+  a:hover :global(svg), a.on :global(svg) { color: var(--ink); }
+  a.on { font-weight: 800; }
+  a.on span { text-decoration: underline 2px; text-underline-offset: 4px; }
   .extra { display: none; }
 
   @media (max-width: 860px) {
-    /* The panel spans the sticky header's full width, just under it. */
     .markets { position: static; }
     .panel {
-      top: 100%; left: 0; right: 0; width: auto; grid-template-columns: 1fr; gap: 14px;
-      border-radius: 0; border-width: 1px 0; max-height: calc(100dvh - 120px); overflow-y: auto;
+      top: 100%; left: 0; right: 0; width: auto; grid-template-columns: 1fr; gap: 0;
+      max-height: calc(100dvh - 120px); overflow-y: auto;
     }
-    .extra { display: block; border-top: 1px solid var(--line); padding-top: 10px; }
+    .panel > * + * { border-left: 0; border-top: 1px solid var(--line-2); margin-top: 10px; }
+    .extra { display: block; }
   }
   @media (prefers-reduced-motion: reduce) { .panel { animation: none; } }
 </style>

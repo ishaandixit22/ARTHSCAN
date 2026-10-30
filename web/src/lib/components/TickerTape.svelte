@@ -54,20 +54,23 @@
 {/if}
 
 <style>
-  .ticker { display: flex; align-items: stretch; height: 34px; background: var(--bg); box-shadow: inset 0 -1px 0 var(--line); font-size: 12.5px; font-variant-numeric: tabular-nums; }
-  .label { display: flex; align-items: center; gap: 8px; padding: 0 14px 0 20px; box-shadow: 1px 0 0 var(--line); white-space: nowrap; flex-shrink: 0; }
-  .label b { font: 600 11.5px var(--mono); letter-spacing: 0.06em; color: var(--accent); }
-  .when { color: var(--ink-3); font-size: 12px; display: flex; align-items: center; gap: 5px; }
-  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--up); }
+  /* The index strip: an inked band across the top of every page. */
+  .ticker { display: flex; align-items: stretch; height: 32px; background: var(--ink); color: var(--on-ink); font-size: 13px; font-stretch: 85%; font-variant-numeric: tabular-nums; }
+  .label { display: flex; align-items: center; gap: 8px; padding: 0 14px 0 20px; border-right: 1px solid color-mix(in srgb, var(--on-ink) 30%, transparent); white-space: nowrap; flex-shrink: 0; }
+  .label b { font-weight: 850; font-stretch: 72%; letter-spacing: 0.08em; }
+  .when { opacity: 0.75; font-size: 12px; display: flex; align-items: center; gap: 5px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--up-rev); animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.35; } }
   .viewport { flex: 1; min-width: 0; overflow: hidden; mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
   .track { display: flex; width: max-content; height: 100%; animation: scroll var(--dur) linear infinite; }
   .ticker:hover .track, .ticker:focus-within .track { animation-play-state: paused; }
   .set { display: flex; margin: 0; padding: 0; list-style: none; }
-  li a { display: flex; align-items: center; gap: 6px; height: 100%; padding: 0 14px; white-space: nowrap; color: var(--ink); }
-  li a:hover { background: var(--panel-2); color: var(--ink); }
-  .sym { font-weight: 600; }
-  .px, .chg { font-family: var(--mono); font-size: 12px; }
-  .px { color: var(--ink-2); }
+  li a { display: flex; align-items: center; gap: 6px; height: 100%; padding: 0 14px; white-space: nowrap; color: var(--on-ink); }
+  li a:hover { background: color-mix(in srgb, var(--on-ink) 14%, transparent); color: var(--on-ink); }
+  .sym { font-weight: 800; letter-spacing: 0.02em; }
+  .px { opacity: 0.85; }
+  .chg.up { color: var(--up-rev); }
+  .chg.down { color: var(--down-rev); }
   @keyframes scroll { to { transform: translateX(-50%); } }
   @media (prefers-reduced-motion: reduce) {
     .viewport { overflow-x: auto; scrollbar-width: none; mask-image: none; }

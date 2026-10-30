@@ -251,7 +251,7 @@
   .name a { text-decoration: underline; }
   .source { font-size: 12.5px; margin-top: 16px; }
   .budget { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 16px; color: var(--ink-2); font-size: 14px; }
-  .budget input { width: 150px; padding: 7px 10px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; }
+  .budget input { width: 150px; padding: 7px 10px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--panel); color: var(--ink); font: inherit; }
   .more { font-size: 15px; margin: 24px 0 10px; }
   .more .hint { margin-left: 8px; font-weight: 400; }
   .hint { color: var(--ink-3); font-size: 13px; }
@@ -264,18 +264,18 @@
   .costs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin: 0; }
   .costs dt { color: var(--ink-3); font-size: 12px; }
   .costs dd { margin: 2px 0 0; font-variant-numeric: tabular-nums; font-weight: 600; }
-  .fit { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--up-soft); font-size: 13.5px; }
+  .fit { margin: 0; padding: 8px 10px; border-radius: 2px; background: var(--up-soft); font-size: 13.5px; }
   .fit.warn { background: var(--panel-2); color: var(--ink-2); }
   .subs { display: grid; gap: 7px; }
   .sub-row { display: grid; grid-template-columns: 138px 1fr 62px; gap: 10px; align-items: center; font-size: 13px; }
   .sub-row.total { padding-top: 6px; border-top: 1px solid var(--line); font-weight: 600; }
   .lbl { color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .track { height: 8px; border-radius: 4px; background: var(--panel-2); overflow: hidden; }
-  .track i { display: block; height: 100%; background: var(--ink-3); border-radius: 4px; }
+  .track { height: 8px; border-radius: 2px; background: var(--panel-2); overflow: hidden; }
+  .track i { display: block; height: 100%; background: var(--ink-3); border-radius: 2px; }
   .track i.full { background: var(--up); }
   .val { text-align: right; font-variant-numeric: tabular-nums; }
   .facts { margin: 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; }
-  .gmpbox { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 14px; padding: 10px 12px; border: 0; background: var(--panel-2); border-radius: 10px; font-variant-numeric: tabular-nums; }
+  .gmpbox { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 14px; padding: 10px 12px; border: 0; background: var(--panel-2); border-radius: 2px; font-variant-numeric: tabular-nums; }
   .gmpbox .k { display: block; color: var(--ink-3); font-size: 12px; }
   .gmpbox p { grid-column: 1 / -1; margin: 0; color: var(--ink-3); font-size: 12px; }
   .est { color: var(--ink-3); }

@@ -3,6 +3,9 @@
   import Logo from "$lib/components/Logo.svelte";
   import { price, pct, tone } from "$lib/format";
 
+  // `lead` is the front page's big search: its own placeholder and a Look up button,
+  // and it leaves the "/" shortcut to the masthead's search.
+  let { lead = false, placeholder = "Search stocks" }: { lead?: boolean; placeholder?: string } = $props();
   let q = $state("");
   let results = $state<any[]>([]);
   let open = $state(false);
@@ -12,6 +15,7 @@
 
   // "/" or ⌘K / Ctrl+K jumps to search from anywhere (except while typing in a field).
   function onGlobalKey(e: KeyboardEvent) {
+    if (lead) return;
     const typing = (e.target as HTMLElement)?.closest?.("input, textarea, select, [contenteditable]");
     if ((e.key === "k" && (e.metaKey || e.ctrlKey)) || (e.key === "/" && !typing)) {
       e.preventDefault();
@@ -62,12 +66,12 @@
 
 <svelte:window onkeydown={onGlobalKey} />
 
-<div class="search">
+<div class="search" class:lead>
   <svg class="glass" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.5" /><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
   <input
     bind:this={input}
     type="search"
-    placeholder="Search stocks"
+    {placeholder}
     aria-label="Search stocks"
     bind:value={q}
     oninput={onInput}
@@ -75,7 +79,11 @@
     onfocus={() => (open = results.length > 0)}
     onblur={() => setTimeout(() => (open = false), 150)}
   />
-  <kbd aria-hidden="true">/</kbd>
+  {#if lead}
+    <button class="go" type="button" onclick={() => (results[0] ? choose(results[0].symbol) : input?.focus())}>Look up</button>
+  {:else}
+    <kbd aria-hidden="true">/</kbd>
+  {/if}
   {#if open && results.length}
     <ul role="listbox">
       {#each results as r, i}
@@ -91,29 +99,38 @@
 </div>
 
 <style>
-  .search { position: relative; flex: 1; max-width: 340px; min-width: 0; margin-left: auto; }
-  input { width: 100%; padding: 0 34px 0 34px; border-radius: 999px; background: var(--panel-2); border-color: transparent; }
-  input:focus { border-color: var(--accent); }
+  .search { position: relative; flex: 1; max-width: 320px; min-width: 0; }
+  input { width: 100%; padding: 0 34px 0 34px; border-color: var(--ink); background: var(--paper-hi); }
   input::-webkit-search-cancel-button { display: none; }
-  .glass { position: absolute; left: 13px; top: 12px; color: var(--ink-3); pointer-events: none; }
+  .glass { position: absolute; left: 12px; top: 12px; color: var(--ink-2); pointer-events: none; }
   kbd {
-    position: absolute; right: 10px; top: 9px; min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center;
-    font: 500 11px var(--mono); color: var(--ink-3); border: 1px solid var(--line-2); border-radius: 4px; pointer-events: none;
+    position: absolute; right: 9px; top: 9px; min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center;
+    font: 700 11px var(--font); color: var(--ink-2); border: 1px solid var(--line-2); border-radius: 2px; pointer-events: none;
   }
   input:focus ~ kbd { display: none; }
   ul {
-    position: absolute; top: 44px; left: 0; right: 0; z-index: 30; margin: 0; padding: 4px; list-style: none; min-width: 300px;
-    background: var(--panel); border: 0; border-radius: 14px; box-shadow: var(--float);
+    position: absolute; top: 42px; left: 0; right: 0; z-index: 30; margin: 0; padding: 0; list-style: none; min-width: 300px;
+    background: var(--bg); border-top: var(--rule-heavy); border-bottom: 1px solid var(--ink); box-shadow: var(--float);
   }
   button {
-    width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 0; border-radius: 10px;
-    background: none; color: var(--ink); font: 14px var(--font); text-align: left; cursor: pointer;
+    width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 9px 12px; border: 0; border-bottom: 1px solid var(--line);
+    background: none; color: var(--ink); font: 600 14.5px var(--font); font-stretch: 90%; text-align: left; cursor: pointer;
   }
   button.active, button:hover { background: var(--panel-2); }
-  small { color: var(--ink-3); }
+  small { color: var(--ink-3); font-weight: 500; }
   small.up { color: var(--up); }
   small.down { color: var(--down); }
-  .num { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+  .num { font-size: 13px; font-stretch: 82%; white-space: nowrap; }
   @media (max-width: 640px) { kbd { display: none; } input { padding-right: 12px; } }
+  /* The front page's search: taller, inked, with its own action. */
+  .lead { max-width: none; display: flex; }
+  .lead input { height: 50px; font-size: 16px; padding-left: 40px; border-width: 2px; border-right: 0; border-radius: 2px 0 0 2px; }
+  .lead .glass { top: 18px; left: 14px; }
+  .lead .go {
+    width: auto; flex-shrink: 0; height: 50px; padding: 0 18px; border: 0; border-radius: 0 2px 2px 0; background: var(--ink); color: var(--on-ink);
+    font: 800 14px var(--font); font-stretch: 78%; text-transform: uppercase; letter-spacing: 0.06em; justify-content: center; align-items: center;
+  }
+  .lead .go:hover { background: var(--brand-2); }
+  .lead ul { top: 52px; }
   .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; }
 </style>

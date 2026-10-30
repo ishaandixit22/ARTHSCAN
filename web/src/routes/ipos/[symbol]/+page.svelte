@@ -264,7 +264,7 @@
   .pad { padding: 18px; }
   .hero { padding: 20px; display: grid; grid-template-columns: 1fr auto; gap: 18px 24px; align-items: center; }
   .who { display: flex; gap: 14px; align-items: center; min-width: 0; }
-  .who img, .mono { width: 56px; height: 56px; border-radius: 10px; object-fit: contain; background: #fff; border: 1px solid var(--line); flex: none; }
+  .who img, .mono { width: 56px; height: 56px; border-radius: 2px; object-fit: contain; background: var(--paper-hi); border: 1px solid var(--line); flex: none; }
   .mono { display: grid; place-items: center; font-size: 24px; font-weight: 600; background: var(--panel-2); color: var(--ink-2); }
   h1 { font-size: 24px; margin: 0; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
@@ -275,7 +275,7 @@
   .big.sm b { font-size: 24px; }
   .up { color: var(--up); } .down { color: var(--down); }
   .chip.up { color: var(--up); }
-  .grid4 { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: 0; border: 0; background: var(--panel-2); border-radius: 8px; overflow: hidden; }
+  .grid4 { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: 0; border: 0; background: var(--panel-2); border-radius: 2px; overflow: hidden; }
   .grid4 > div { padding: 12px 14px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 0 -1px -1px 0; }
   .grid4.tight { grid-column: auto; margin-bottom: 14px; }
   dt { color: var(--ink-3); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; }

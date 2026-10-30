@@ -1,0 +1,40 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Security print</title>
+<link href="https://fonts.googleapis.com/css2?family=Marcellus+SC&family=Archivo:wdth,wght@62..125,400..900&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+  :root { --paper:#e9e4d6; --intaglio:#2b2550; --plum:#6b2d5c; --teal:#1e5a5a; --gold:#a8873a; --up:#1e6b45; --down:#a3262a; }
+  * { box-sizing: border-box; margin: 0; }
+  body { width: 1440px; height: 900px; background: var(--paper); color: var(--intaglio); font-family: "Source Serif 4", serif; overflow: hidden; position: relative; }
+  .guil { position: absolute; inset: 0; opacity: .35; background:
+    repeating-radial-gradient(circle at 78% 46%, transparent 0 9px, rgba(43,37,80,.18) 9px 10px),
+    repeating-linear-gradient(115deg, transparent 0 5px, rgba(107,45,92,.08) 5px 6px); }
+  header { position: relative; display: flex; justify-content: space-between; align-items: center; padding: 22px 56px; border-bottom: 2px solid var(--intaglio); }
+  .logo { font: 400 34px "Marcellus SC"; letter-spacing: .12em; }
+  nav { display: flex; gap: 26px; font: 600 15px Archivo; font-stretch: 90%; }
+  .cert { position: relative; margin: 34px 56px; height: 720px; border: 10px double var(--intaglio); display: grid; grid-template-columns: 520px 1fr; }
+  .left { padding: 40px 44px; border-right: 1px solid var(--intaglio); }
+  .serial { font: 600 14px Archivo; letter-spacing: .2em; color: var(--plum); }
+  h1 { font: 400 66px/1 "Marcellus SC"; margin: 18px 0; }
+  p { font-size: 18px; line-height: 1.5; max-width: 420px; }
+  .seal { width: 150px; height: 150px; border-radius: 50%; border: 3px solid var(--plum); display: grid; place-items: center; margin-top: 40px; font: 400 20px "Marcellus SC"; color: var(--plum); text-align: center;
+    background: repeating-conic-gradient(rgba(107,45,92,.12) 0 4deg, transparent 4deg 8deg); }
+  .btn { display: inline-block; margin-top: 30px; background: var(--intaglio); color: var(--paper); font: 700 16px Archivo; padding: 14px 22px; letter-spacing: .06em; }
+  .right { position: relative; }
+  .ros { position: absolute; inset: 40px; border-radius: 50%; background:
+    repeating-conic-gradient(from 0deg, rgba(30,90,90,.5) 0 1deg, transparent 1deg 6deg),
+    repeating-radial-gradient(circle, transparent 0 14px, rgba(43,37,80,.25) 14px 15px); }
+  .num { position: absolute; left: 60px; bottom: 50px; font: 400 120px/1 "Marcellus SC"; color: var(--teal); }
+  .num small { display: block; font: 600 16px Archivo; letter-spacing: .2em; color: var(--intaglio); }
+</style></head><body><div class="guil"></div>
+<header><div class="logo">ARTHSCAN</div><nav><span>Markets</span><span>Screener</span><span>IPOs</span><span>Learn</span></nav></header>
+<section class="cert">
+  <div class="left">
+    <div class="serial">NIFTY 100 · SERIES 29·10·2026 · NO. 000100</div>
+    <h1>Every share is a certificate of ownership.</h1>
+    <p>Arthscan reads the market the way a careful owner reads a certificate: who issued it, what it is worth, and who else holds it.</p>
+    <span class="btn">EXAMINE A COMPANY</span>
+    <div class="seal">NSE<br>VERIFIED<br>DATA</div>
+  </div>
+  <div class="right"><div class="ros"></div><div class="num"><small>NIFTY 50 · CLOSE</small>24,812</div></div>
+</section>
+</body></html>

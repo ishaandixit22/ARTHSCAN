@@ -37,8 +37,8 @@
 
 <style>
   .letters { display: flex; flex-wrap: wrap; gap: 4px; }
-  .letters a { position: relative; min-width: 28px; height: 32px; display: grid; place-items: center; padding: 0 6px; font: 500 13px var(--mono); color: var(--ink-3); }
-  .letters a:hover { color: var(--ink); background: var(--panel-2); border-radius: 4px; }
+  .letters a { position: relative; min-width: 28px; height: 32px; display: grid; place-items: center; padding: 0 6px; font: 500 13px var(--font); color: var(--ink-3); }
+  .letters a:hover { color: var(--ink); background: var(--panel-2); border-radius: 2px; }
   .letters a.active { color: var(--ink); }
   .letters a.active::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: 2px; height: 1px; background: var(--accent); }
   .pager { display: flex; gap: 12px; align-items: center; justify-content: center; }

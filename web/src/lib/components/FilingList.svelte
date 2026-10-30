@@ -53,10 +53,10 @@
   .chip.strong { background: var(--brand-soft); color: var(--brand-2); }
   .subject { margin-top: 4px; font-size: 13.5px; color: var(--ink); line-height: 1.45; overflow-wrap: anywhere; }
   .company { margin-top: 2px; font-size: 12px; color: var(--ink-3); }
-  .pdf { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+  .pdf { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid var(--line-2); border-radius: 2px; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
   .pdf:hover { border-color: var(--accent); color: var(--ink); }
   .pdf svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; color: var(--down); }
-  .pdf small { color: var(--ink-3); font-size: 11px; font-family: var(--mono); }
+  .pdf small { color: var(--ink-3); font-size: 11px; font-family: var(--font); }
   .pdf.none { border-style: dashed; color: var(--ink-3); }
   @media (max-width: 640px) {
     li { grid-template-columns: 1fr auto; gap: 6px 12px; }

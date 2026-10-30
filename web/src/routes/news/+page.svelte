@@ -49,7 +49,7 @@
   .title { font-weight: 600; font-size: 15.5px; line-height: 1.35; }
   .summary { color: var(--ink-2); font-size: 14px; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .meta { color: var(--ink-3); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  img { width: 132px; height: 88px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: var(--panel-2); }
+  img { width: 132px; height: 88px; object-fit: cover; border-radius: 2px; flex-shrink: 0; background: var(--panel-2); }
   .source { font-size: 12.5px; }
   @media (max-width: 640px) { img { width: 88px; height: 66px; } .summary { -webkit-line-clamp: 2; line-clamp: 2; } }
 </style>

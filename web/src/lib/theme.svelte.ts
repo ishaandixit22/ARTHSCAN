@@ -6,11 +6,11 @@ export type Theme = "light" | "dark";
 function effective(): Theme {
   const set = document.documentElement.dataset.theme;
   if (set === "light" || set === "dark") return set;
-  return matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  return "light"; // the day edition, whatever the device prefers
 }
 
 export const theme = $state<{ current: Theme; sync(): void }>({
-  current: "dark",
+  current: "light",
   sync() {
     this.current = effective();
   },
@@ -26,7 +26,3 @@ export function setTheme(t: Theme) {
   theme.current = t;
 }
 
-if (typeof window !== "undefined") {
-  // A device switch counts only while the visitor hasn't picked a theme.
-  matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => theme.sync());
-}

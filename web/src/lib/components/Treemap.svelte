@@ -111,7 +111,7 @@
   .ghead { position: absolute; inset: 0 0 auto 0; height: 20px; display: flex; justify-content: space-between; gap: 6px; align-items: center; padding: 0 6px; font-size: 11.5px; font-weight: 600; color: var(--ink-2); overflow: hidden; }
   .ghead:hover { color: var(--ink); }
   .gname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .gchg { font: 500 11px var(--mono); flex-shrink: 0; }
+  .gchg { font: 500 11px var(--font); flex-shrink: 0; }
   .tile {
     position: absolute; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1px;
     border-radius: 3px; color: var(--ink); overflow: hidden; text-align: center; padding: 2px;
@@ -120,7 +120,7 @@
   }
   .tile:hover { outline-color: var(--ink); color: var(--ink); z-index: 2; filter: brightness(1.06); }
   .sym { font-weight: 600; line-height: 1.1; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chg { font: 500 11px var(--mono); line-height: 1.2; }
+  .chg { font: 500 11px var(--font); line-height: 1.2; }
   .tile.big .chg { font-size: 13px; }
   .sub { font-size: 11px; color: var(--ink-2); }
   @media (prefers-reduced-motion: reduce) { .tile { transition: none; } }

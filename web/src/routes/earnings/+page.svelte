@@ -240,7 +240,7 @@
   .board { list-style: none; margin: 0; padding: 4px 0; counter-reset: rank; }
   .board li { display: grid; grid-template-columns: 22px auto 1fr auto; gap: 10px; align-items: baseline; padding: 9px 18px; border-bottom: 1px solid var(--line); counter-increment: rank; }
   .board li:last-child { border-bottom: 0; }
-  .board li::before { content: counter(rank); color: var(--ink-3); font: 12px var(--mono); }
+  .board li::before { content: counter(rank); color: var(--ink-3); font: 12px var(--font); }
   .board .name { max-width: none; }
   .board b { font-weight: 500; font-size: 13px; }
   .small { font-size: 12.5px; line-height: 1.6; }

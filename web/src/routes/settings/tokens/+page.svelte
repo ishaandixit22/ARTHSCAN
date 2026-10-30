@@ -166,13 +166,13 @@
 <style>
   section h2 { margin-bottom: 12px; }
   .usage p { margin-top: 8px; }
-  .meter { height: 10px; border-radius: 5px; background: var(--panel-2); overflow: hidden; }
+  .meter { height: 10px; border-radius: 2px; background: var(--panel-2); overflow: hidden; }
   .meter span { display: block; height: 100%; background: var(--brand); }
   .create { display: flex; gap: 8px; }
   .create input { flex: 1; }
-  .secret { margin-top: 14px; padding: 12px; border-radius: 8px; background: var(--brand-soft); display: grid; gap: 8px; }
+  .secret { margin-top: 14px; padding: 12px; border-radius: 2px; background: var(--brand-soft); display: grid; gap: 8px; }
   .secret .row { display: flex; gap: 8px; align-items: center; }
-  .secret code { flex: 1; overflow-x: auto; padding: 6px 8px; border-radius: 6px; background: var(--panel); }
+  .secret code { flex: 1; overflow-x: auto; padding: 6px 8px; border-radius: 2px; background: var(--panel); }
   .connect { display: grid; gap: 10px; }
   .connect h3 { margin-top: 6px; }
   .err { color: var(--down); margin-top: 8px; }

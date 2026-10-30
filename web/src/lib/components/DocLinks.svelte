@@ -32,7 +32,7 @@
 
 <style>
   .docs { display: inline-flex; flex-wrap: wrap; gap: 6px; white-space: nowrap; }
-  a, .none { display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 999px; font: 500 12px var(--font); white-space: nowrap; }
+  a, .none { display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 2px; font: 500 12px var(--font); white-space: nowrap; }
   a { border: 1px solid var(--line-2); color: var(--ink); transition: border-color 0.15s var(--ease); }
   a::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--down); margin-right: 6px; }
   a:hover { border-color: var(--accent); color: var(--ink); }

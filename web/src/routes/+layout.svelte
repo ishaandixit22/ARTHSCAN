@@ -12,26 +12,22 @@
 
   // Derived so Live joins the menu on sign-in without a reload.
   const groups = $derived(navGroups(!!data.live));
+  // The edition line under the masthead: today's date in India.
+  const edition = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
 
 </script>
 
 <TickerTape quotes={data.ticker} liveAccess={!!data.live} />
 
-<header>
-  <div class="wrap bar">
+<header class="mast" class:front={page.url.pathname === "/"}>
+  <div class="wrap top">
+    <p class="edition"><b>Market edition</b><span>{edition}</span></p>
     <a class="logo" href="/" aria-label="{BRAND} home">
-      <svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><path d="M5 23l7-8 5 5 10-12" fill="none" stroke="var(--mark)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" /><circle cx="27" cy="8" r="2.6" fill="var(--mark)" /></svg>
-      <span>{BRAND}</span>
+      <span class="deva" aria-hidden="true">अर्थ</span><span class="word">{BRAND.toUpperCase()}</span>
     </a>
-    <nav class="primary" aria-label="Main">
-      <MarketsMenu {groups} />
-      {#each TOP_LINKS as r (r.href)}
-        <a href={r.href} class="link" class:current={isActive(r, page.url.pathname)} aria-current={isActive(r, page.url.pathname) ? "page" : undefined}>{r.label}</a>
-      {/each}
-    </nav>
-    <Search />
-    <ThemeToggle />
-    <div class="account">
+    <div class="tools">
+      <Search />
+      <ThemeToggle />
       {#if data.account}
         <a href="/settings/tokens" class="btn small">{data.account.name}</a>
       {:else}
@@ -41,6 +37,15 @@
   </div>
 </header>
 
+<nav class="sections" aria-label="Main">
+  <div class="wrap row">
+    <MarketsMenu {groups} />
+    {#each TOP_LINKS as r (r.href)}
+      <a href={r.href} class="link" class:current={isActive(r, page.url.pathname)} aria-current={isActive(r, page.url.pathname) ? "page" : undefined}>{r.label}</a>
+    {/each}
+    <span class="tagline">The stock market, explained as it moves</span>
+  </div>
+</nav>
 
 <main class="wrap">
   {@render children()}
@@ -48,45 +53,59 @@
 
 <footer>
   <div class="wrap foot">
-    <a class="logo small" href="/" aria-label="{BRAND} home">
-      <svg viewBox="0 0 32 32" width="18" height="18" aria-hidden="true"><path d="M5 23l7-8 5 5 10-12" fill="none" stroke="var(--mark)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" /><circle cx="27" cy="8" r="2.6" fill="var(--mark)" /></svg>
-      <span>{BRAND}</span>
-    </a>
+    <a class="logo small" href="/" aria-label="{BRAND} home"><span class="deva" aria-hidden="true">अर्थ</span><span class="word">{BRAND.toUpperCase()}</span></a>
     <p>
-      Prices are end-of-day from NSE unless marked Live. {BRAND} is not a SEBI-registered research analyst or
-      investment adviser; nothing here is investment advice.
+      Prices are end-of-day from NSE unless marked Live; live prices and intraday charts come from Dhan.
+      {BRAND} is not a SEBI-registered research analyst or investment adviser; nothing here is investment advice.
       {#if data.logoKey}<a href="https://logo.dev" target="_blank" rel="noopener">Logos provided by Logo.dev</a>.{/if}
     </p>
   </div>
 </footer>
 
 <style>
-  /* Glass header: the page scrolls under it, softened. */
-  header { background: var(--glass); backdrop-filter: saturate(1.4) blur(16px); -webkit-backdrop-filter: saturate(1.4) blur(16px); box-shadow: 0 1px 0 var(--line); position: sticky; top: 0; z-index: 20; }
-  .bar { display: flex; align-items: center; gap: 28px; height: 62px; }
-  .logo { display: flex; align-items: center; gap: 10px; font: 600 17px var(--font); letter-spacing: -0.03em; color: var(--ink); flex-shrink: 0; }
+  /* The masthead: edition line, the name, tools. Full size on the front page, compact inside. */
+  .mast { background: var(--bg); }
+  .top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; padding-top: 14px; padding-bottom: 10px; }
+  .edition { display: flex; flex-direction: column; font-size: 12.5px; font-stretch: 82%; color: var(--ink-2); line-height: 1.35; }
+  .edition b { font-weight: 850; font-stretch: 72%; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink); }
+  .logo { display: flex; align-items: baseline; gap: 10px; color: var(--ink); line-height: 0.85; }
   .logo:hover { color: var(--ink); }
-  .logo svg { transition: transform 0.4s var(--spring); }
-  .logo:hover svg { transform: translateY(-2px) rotate(-6deg); }
-  .primary { display: flex; align-items: center; gap: 24px; }
-  .link { position: relative; display: inline-flex; align-items: center; height: 62px; font-size: 13.5px; font-weight: 500; color: var(--ink-2); }
-  .link:hover, .link.current { color: var(--ink); }
-  .link.current::after { content: ""; position: absolute; left: 0; right: 0; bottom: 14px; height: 2px; border-radius: 2px; background: var(--accent); }
-  .account { flex-shrink: 0; }
+  .word { font: 900 46px var(--display); font-stretch: 62%; letter-spacing: 0.01em; }
+  .deva { font: 400 30px var(--deva); transform: translateY(-2px); }
+  .front .word { font-size: clamp(56px, 7vw, 92px); }
+  .front .deva { font-size: clamp(34px, 4.2vw, 54px); }
+  .front .top { padding-top: 22px; padding-bottom: 16px; }
+  .tools { display: flex; align-items: center; gap: 10px; justify-content: flex-end; min-width: 0; }
 
-  footer { margin-top: 40px; background: var(--panel); padding: 40px 0 48px; color: var(--ink-3); font-size: 12.5px; }
+  /* Section rail: a double rule above, the paper's section names, sticky. */
+  .sections { position: sticky; top: 0; z-index: 20; background: var(--bg); border-top: 4px double var(--ink); border-bottom: 1px solid var(--ink); }
+  .row { display: flex; align-items: center; gap: 26px; height: 44px; }
+  .link { position: relative; display: inline-flex; align-items: center; height: 44px; font: 800 13.5px var(--font); font-stretch: 75%; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink); }
+  .link:hover { color: var(--brand-2); }
+  .link.current::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--ink); }
+  .tagline { margin-left: auto; font: italic 400 14px var(--serif); color: var(--ink-2); white-space: nowrap; }
+
+  footer { margin-top: 48px; border-top: 4px double var(--ink); padding: 26px 0 48px; color: var(--ink-2); font: 13.5px/1.65 var(--serif); }
   .foot { display: flex; gap: 40px; align-items: flex-start; }
-  .foot p { max-width: 720px; line-height: 1.7; }
-  .logo.small { font-size: 15px; color: var(--ink-2); }
+  .foot p { max-width: 760px; }
+  .foot a:not(.logo) { text-decoration: underline; text-underline-offset: 3px; }
+  .logo.small .word { font-size: 30px; }
+  .logo.small .deva { font-size: 20px; }
 
-  @media (max-width: 1080px) { .bar { gap: 20px; } .primary { gap: 18px; } }
+  @media (max-width: 1080px) { .tagline { display: none; } }
   @media (max-width: 860px) {
-    .primary .link { display: none; } /* they move into the Markets panel */
-    .bar { gap: 16px; }
+    .top { grid-template-columns: auto 1fr; }
+    .edition { display: none; }
+    .sections .link { display: none; } /* they move into the Markets panel */
   }
   @media (max-width: 640px) {
-    .logo span { display: none; }
-    .bar { gap: 12px; height: 58px; }
+    /* Name on its own line, centred like a paper's flag; tools in a full-width row beneath. */
+    .top, .front .top { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 12px; padding-top: 16px; padding-bottom: 12px; }
+    .tools { width: 100%; }
+    .tools :global(.search) { max-width: none; }
+    .word, .front .word { font-size: 44px; }
+    .deva, .front .deva { font-size: 28px; }
+    .tools :global(.btn.small) { padding: 0 9px; }
     .foot { flex-direction: column; gap: 14px; }
   }
 </style>

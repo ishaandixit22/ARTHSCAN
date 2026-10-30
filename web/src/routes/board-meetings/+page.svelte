@@ -75,7 +75,7 @@
 <style>
   .bar { flex-wrap: wrap; gap: 4px 20px; border-bottom: 1px solid var(--line); display: flex; }
   .bar a { padding: 9px 0; }
-  .n { color: var(--ink-3); font-family: var(--mono); font-size: 11.5px; margin-left: 3px; }
+  .n { color: var(--ink-3); font-family: var(--font); font-size: 11.5px; margin-left: 3px; }
   .purpose { white-space: normal; min-width: 180px; }
   td:has(:global(.docs)) { min-width: 210px; }
   .details { white-space: normal; min-width: 340px; color: var(--ink-2); font-size: 12.5px; }

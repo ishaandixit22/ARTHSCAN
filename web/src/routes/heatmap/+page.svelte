@@ -167,10 +167,10 @@
   .right { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; }
   .right select { min-width: 190px; }
   .summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; color: var(--ink-2); }
-  .summary b { font-family: var(--mono); font-weight: 500; }
+  .summary b { font-family: var(--font); font-weight: 500; }
   .mapcard { padding: 10px; }
-  .legend { display: flex; align-items: center; gap: 10px; padding: 10px 4px 2px; font: 12px var(--mono); }
-  .ramp { width: 160px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--down) 60%, var(--panel)), var(--panel-2), color-mix(in srgb, var(--up) 60%, var(--panel))); }
+  .legend { display: flex; align-items: center; gap: 10px; padding: 10px 4px 2px; font: 12px var(--font); }
+  .ramp { width: 160px; height: 8px; border-radius: 2px; background: linear-gradient(90deg, color-mix(in srgb, var(--down) 60%, var(--panel)), var(--panel-2), color-mix(in srgb, var(--up) 60%, var(--panel))); }
   .legend .sub { font-family: var(--font); margin-left: auto; }
   .movers { list-style: none; margin: 0; padding: 4px 0; }
   .movers li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: baseline; padding: 9px 18px; border-bottom: 1px solid var(--line); }

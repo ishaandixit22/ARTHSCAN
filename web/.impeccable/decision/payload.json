@@ -1,0 +1,238 @@
+{
+ "title": "Choose ARTHSCAN's visual world",
+ "question": "The roll assigned the Pink Paper market page. Keep it, take an alternate, or re-roll.",
+ "options": [
+  {
+   "id": "assigned",
+   "kind": "assigned",
+   "label": "Pink Paper market page",
+   "kicker": "THE ROLL",
+   "lineage": "Salmon-stock Indian business dailies and their stock-listing pages",
+   "thesis": "Arthscan as the day's market edition: salmon newsprint, dense ruled listings, and a front page that tells you what happened in one line.",
+   "palette": [
+    "#f3d9c6",
+    "#1d1714",
+    "#0f6b3a",
+    "#b0241b",
+    "#ebc9b2"
+   ],
+   "materials": [
+    "salmon newsprint as the whole ground",
+    "ink rules and column gutters",
+    "condensed headline grotesque with a Devanagari अर्थ masthead"
+   ],
+   "viewport": "Masthead with edition date and index strip; a three-column front page: the day's headline in plain words, the 3D Nifty 100 city as the lead photograph, and gainers, losers and FII/DII as listings.",
+   "risk": "Newspaper pastiche if the city and live data feel like decoration rather than the front page doing its job; salmon must hold contrast for long reading.",
+   "raised": [
+    {
+     "from": "dream-surreal-impossible-worlds-moon-shadow-bazaar",
+     "raise": "Every figure carries its ticket: source and as-of time printed beside it, like a dateline."
+    },
+    {
+     "from": "japanese-high-density-web",
+     "raise": "Density courage: listings pages run as tight as a real stock table, ruled, not padded into cards."
+    },
+    {
+     "from": "architecture-inhabitable-space-versailles-bosquet-vistas",
+     "raise": "Gainers and losers mirror about one axis, so up and down are read as one picture."
+    },
+    {
+     "from": "signals-instruments-darkroom-safelight-bay",
+     "raise": "The screener previews a strip of matching stocks as each filter is set, before you commit."
+    },
+    {
+     "from": "medium-native-ebru-floated-pigment",
+     "raise": "Live ticks ripple outward from the stock that moved, through the city and the listings."
+    }
+   ],
+   "html": ".impeccable/decision/assigned.html"
+  },
+  {
+   "id": "model-pick",
+   "kind": "pick",
+   "label": "Security print",
+   "kicker": "IMPECCABLE’S PICK",
+   "lineage": "Indian banknotes and pre-demat engraved share certificates",
+   "thesis": "Every share is a certificate of ownership: intaglio lines, guilloche rosettes drawn from live data, denomination colours as the palette.",
+   "palette": [
+    "#e9e4d6",
+    "#2b2550",
+    "#6b2d5c",
+    "#1e5a5a",
+    "#a8873a"
+   ],
+   "materials": [
+    "engraved line work",
+    "guilloche generated from prices",
+    "security-paper ground"
+   ],
+   "viewport": "One certificate filling the page: a serial line, the claim in engraved capitals, and a data rosette on the right.",
+   "risk": "Ornament can swamp dense data pages, and engraved capitals read slowly on phones.",
+   "html": ".impeccable/decision/pick.html"
+  },
+  {
+   "id": "challenger-lexicon",
+   "kind": "challenger",
+   "catalogId": "rw-lexicon-shoulder-and-plate",
+   "label": "Market Lexicon",
+   "verdict": "competitive",
+   "lineage": "Nineteenth-century lexicon page with shoulder notes and colour plates",
+   "thesis": "Every company an entry; plain-English glosses run in the shoulder; colour lives only inside chart plates.",
+   "palette": [
+    "#f1ead8",
+    "#141210",
+    "#2a7a3b",
+    "#c2361f",
+    "#e2a316"
+   ],
+   "materials": [
+    "uncoated cream stock",
+    "black text column",
+    "bordered colour plates"
+   ],
+   "viewport": "Guide words naming the companies in view, a shoulder index, entries in a column, and the city as a bordered plate.",
+   "case": "Wins on clarity (the shoulder is where explanations live) but Indian beginners know the pink papers far better than a Victorian lexicon.",
+   "risk": "Reads as an antique book; cream plus serif is close to the generic AI look.",
+   "html": ".impeccable/decision/lexicon.html"
+  },
+  {
+   "id": "challenger-safelight",
+   "kind": "challenger",
+   "catalogId": "signals-instruments-darkroom-safelight-bay",
+   "label": "Darkroom Safelight",
+   "verdict": "declined",
+   "lineage": "photo darkroom stations under amber light",
+   "thesis": "Research as developing a print, station by station.",
+   "palette": [
+    "#d9822b",
+    "#2a2420",
+    "#c7c2b8"
+   ],
+   "materials": [
+    "amber safelight",
+    "wet silver prints"
+   ],
+   "viewport": "Stations in a row; the chosen stock develops into view.",
+   "case": "Beginners do not see themselves in a darkroom, and amber hurts number legibility.",
+   "risk": "Mood over clarity.",
+   "kept": "Test strips: preview results before committing a filter."
+  },
+  {
+   "id": "challenger-ebru",
+   "kind": "challenger",
+   "catalogId": "medium-native-ebru-floated-pigment",
+   "label": "Ebru floated pigment",
+   "verdict": "declined",
+   "lineage": "Turkish marbling on a liquid bath",
+   "thesis": "The market as pigment displacing on water.",
+   "palette": [
+    "#1c3f6e",
+    "#c9472f",
+    "#e8d9b0"
+   ],
+   "materials": [
+    "floating pigment",
+    "sized paper"
+   ],
+   "viewport": "A marbled field reacting to prices.",
+   "case": "Beautiful but unreadable as data; no Indian investor association.",
+   "risk": "Art piece, not a research tool.",
+   "kept": "Motion as displacement outward from the stock that moved."
+  },
+  {
+   "id": "challenger-bazaar",
+   "kind": "challenger",
+   "catalogId": "dream-surreal-impossible-worlds-moon-shadow-bazaar",
+   "label": "Moon-shadow bazaar",
+   "verdict": "declined",
+   "lineage": "a surreal night market",
+   "thesis": "Stocks as goods in a moonlit lane.",
+   "palette": [
+    "#141a2e",
+    "#c8953f",
+    "#e9ecf2"
+   ],
+   "materials": [
+    "night lane",
+    "stall canvas"
+   ],
+   "viewport": "A lane of stalls, one per sector.",
+   "case": "Whimsy undercuts the trust investors and incubators need.",
+   "risk": "Fantasy over finance.",
+   "kept": "Every item carries a ticket of origin: source and time on each figure."
+  },
+  {
+   "id": "challenger-versailles",
+   "kind": "challenger",
+   "catalogId": "architecture-inhabitable-space-versailles-bosquet-vistas",
+   "label": "Versailles vistas",
+   "verdict": "declined",
+   "lineage": "French formal gardens",
+   "thesis": "Axial vistas through the market.",
+   "palette": [
+    "#3f5b3a",
+    "#cbb994",
+    "#b08d3c"
+   ],
+   "materials": [
+    "clipped hedges",
+    "gravel"
+   ],
+   "viewport": "A symmetrical plan of sectors.",
+   "case": "Foreign to the audience and grandiose for a beginner tool.",
+   "risk": "Pomp.",
+   "kept": "Mirrored symmetry: gainers and losers about one axis."
+  },
+  {
+   "id": "challenger-jp-dense",
+   "kind": "challenger",
+   "catalogId": "japanese-high-density-web",
+   "label": "Japanese high-density web",
+   "verdict": "declined",
+   "lineage": "dense Japanese portal sites",
+   "thesis": "Pack every module onto one screen.",
+   "palette": [
+    "#ffffff",
+    "#111111",
+    "#d0021b"
+   ],
+   "materials": [
+    "hairline modules",
+    "tiny gothic type"
+   ],
+   "viewport": "A mosaic of boxed modules.",
+   "case": "Overwhelms beginners and recreates the boxed look the user rejected.",
+   "risk": "Clutter.",
+   "kept": "Density courage in listings."
+  }
+ ],
+ "reroll": {
+  "registers": [
+   "safer",
+   "bolder"
+  ]
+ },
+ "buildPath": {
+  "value": "code",
+  "toggle": false
+ },
+ "canon": true,
+ "canonCard": {
+  "kind": "canon",
+  "label": "The category standard",
+  "thesis": "A clean white fintech app with one green accent, the way Groww and Tickertape look, executed impeccably.",
+  "palette": [
+   "#ffffff",
+   "#111827",
+   "#00a35c"
+  ],
+  "materials": [
+   "white cards",
+   "system sans"
+  ],
+  "viewport": "Headline and button beside a chart card, index tiles below.",
+  "risk": "Indistinguishable from the competition by design.",
+  "html": ".impeccable/decision/canon.html"
+ },
+ "steer": true
+}
