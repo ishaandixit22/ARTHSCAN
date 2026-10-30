@@ -9,6 +9,7 @@
 // latest end-of-day stock_metrics, cached per isolate.
 
 import type { Env } from "../env.js";
+import { liveIndices } from "../lib/dhan.js";
 import { marketOpen } from "../lib/market-hours.js";
 
 type Ref = {
@@ -84,6 +85,8 @@ export async function liveBreadth(env: Env, snapshot: () => Promise<{ status: St
 export async function liveMarket(env: Env, snapshot: () => Promise<{ status: Status; rows: LiveRow[] }>) {
   if (snapCache && Date.now() - snapCache.at < SNAPSHOT_TTL_MS) return snapCache.body;
   const { open, status, stocks, asOf } = await liveStocks(env, snapshot);
+  // Index levels come from Dhan's quote API, not the feed; a failure leaves the page on NSE's closes.
+  const idx = open ? await liveIndices(env).catch(() => null) : null;
   // ₹1 crore of turnover keeps penny-stock noise out, as on the end-of-day lists.
   const liquid = stocks.filter((s) => s.turnover >= 1e7);
   const top = <T,>(xs: T[], by: (x: T) => number, n = 50) => [...xs].sort((a, b) => by(b) - by(a)).slice(0, n);
@@ -116,6 +119,7 @@ export async function liveMarket(env: Env, snapshot: () => Promise<{ status: Sta
       breakout_low: top(liquid.filter(BREADTH.lows.pick), (s) => s.turnover, 100),
     },
     sectors: [...sectors].map(([sector, xs]) => ({ sector, stocks: xs.length, median_change: median(xs) })),
+    indices: idx?.ok ? idx.indices : [],
   };
   snapCache = { at: Date.now(), body };
   return body;

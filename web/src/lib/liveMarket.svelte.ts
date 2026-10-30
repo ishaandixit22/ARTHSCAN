@@ -15,6 +15,7 @@ export type LiveMarket = {
   movers: { gainers: LiveStock[]; losers: LiveStock[]; active: LiveStock[] };
   signals: { volume_spike: LiveStock[]; breakout_high: LiveStock[]; breakout_low: LiveStock[] };
   sectors: { sector: string; stocks: number; median_change: number | null }[];
+  indices: { index_name: string; ltp: number; prev_close: number | null; change_pct: number | null }[];
 };
 
 const POLL_MS = 15_000;

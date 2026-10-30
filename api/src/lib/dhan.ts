@@ -13,6 +13,11 @@ const CANDLE_TTL_S = 60;
 // Ratios and shareholding move slowly; one answer per stock serves for six hours.
 const COMPANY_TTL_S = 6 * 3600;
 const IST_MS = 5.5 * 3600_000;
+// The indices the front page shows, by their Dhan id (segment IDX_I, from Dhan's scrip master).
+// The names match index_daily, where their previous closes come from.
+export const LIVE_INDICES: Record<string, number> = { "Nifty 50": 13, "Nifty Bank": 25, "Nifty Midcap 100": 37, "Nifty Smallcap 100": 5, "Nifty IT": 29, "India VIX": 21 };
+// Market Quote allows one request a second; a few seconds' reuse keeps every viewer inside that.
+const INDEX_TTL_S = 5;
 const COMPANY_FIELDS = {
   overview: { MARKET_CAP: "market_cap_cr", INDUSTRY: "industry", SECTOR: "sector", DIVIDEND_YIELD: "dividend_yield", EPS: "eps", EBITDA: "ebitda_cr", BOOK_VALUE: "book_value", FIFTY_TWO_WEEK_HIGH: "high_52w", FIFTY_TWO_WEEK_LOW: "low_52w" },
   ratios: { PE_RATIO: "pe", PB_RATIO: "pb", DEBT_TO_EQUITY: "debt_to_equity", PE_TO_SECTOR_PE: "pe_to_sector_pe", ROE: "roe", ROCE: "roce", INDUSTRY_EPS: "industry_eps", INDUSTRY_DEBT_TO_EQUITY: "industry_debt_to_equity", INDUSTRY_PB_RATIO: "industry_pb", INDUSTRY_CURRENT_RATIO: "industry_current_ratio", INDUSTRY_DIVIDEND_YIELD: "industry_dividend_yield", INDUSTRY_OPERATING_MARGIN: "industry_operating_margin" },
@@ -97,9 +102,38 @@ export function intradayCandles(env: Env, symbol: string, range: string) {
     const days = [...new Set(all.map((c) => c.day))].slice(-sessions);
     const candles = all.filter((c) => days.includes(c.day)).map(({ day, ...c }) => c);
     // The close before the first kept session, so a one-day chart can say how far the stock has moved.
+    // NSE's official close (the last half hour's weighted average) is the base every other page
+    // measures from; the previous session's last candle is only a fallback.
     const firstIdx = all.findIndex((c) => c.day === days[0]);
-    const prevClose = firstIdx > 0 ? all[firstIdx - 1].close : null;
+    const official = await env.DB.prepare("SELECT close FROM daily_prices WHERE symbol = ? AND date < ? ORDER BY date DESC LIMIT 1")
+      .bind(symbol, days[0]).first<{ close: number }>().catch(() => null);
+    const prevClose = official?.close ?? (firstIdx > 0 ? all[firstIdx - 1].close : null);
     return { ok: true as const, symbol, range, interval: Number(interval), sessions: days, prevClose, candles };
+  });
+}
+
+/** Live index levels from Dhan, each measured against NSE's previous close as stored in index_daily. */
+export function liveIndices(env: Env) {
+  return cached("indices", INDEX_TTL_S, async () => {
+    const r = await post(env, "/marketfeed/ltp", { IDX_I: Object.values(LIVE_INDICES) }, "index prices");
+    if (!r.ok) return r;
+    const quotes = (r.data?.data?.IDX_I ?? {}) as Record<string, { last_price?: number }>;
+    const today = new Date(Date.now() + IST_MS).toISOString().slice(0, 10);
+    const names = Object.keys(LIVE_INDICES);
+    const { results } = await env.DB.prepare(`
+      SELECT d.index_name, d.close FROM index_daily d
+      JOIN (SELECT index_name, MAX(date) AS date FROM index_daily WHERE date < ? AND index_name IN (${names.map(() => "?").join(",")}) GROUP BY index_name) last
+        ON last.index_name = d.index_name AND last.date = d.date`).bind(today, ...names).all<{ index_name: string; close: number | null }>();
+    const prev = new Map(results.map((x) => [x.index_name, x.close]));
+    const indices = names.flatMap((index_name) => {
+      const ltp = quotes[String(LIVE_INDICES[index_name])]?.last_price;
+      if (!ltp) return [];
+      const prev_close = prev.get(index_name) ?? null;
+      const change_pct = prev_close ? Math.round(((ltp - prev_close) / prev_close) * 10000) / 100 : null;
+      return [{ index_name, ltp, prev_close, change_pct }];
+    });
+    if (!indices.length) return fail(502, "Dhan returned no index prices");
+    return { ok: true as const, fetched_at: new Date().toISOString(), indices };
   });
 }
 

@@ -5,6 +5,7 @@
   import { BRAND } from "$lib/brand";
   import LiveStamp from "$lib/components/LiveStamp.svelte";
   import { banWhen, cr, crSigned, crore, date, int, pct, tone } from "$lib/format";
+  import { live, watch } from "$lib/live.svelte";
   import { market, useLiveMarket, type LiveStock } from "$lib/liveMarket.svelte";
   import { reveal } from "$lib/reveal";
 
@@ -25,13 +26,30 @@
   const topDown = $derived((lm ? asRows(lm.movers.losers) : data.losers).slice(0, 5));
   const moveMax = $derived(Math.max(1, ...[...topUp, ...topDown].map((r: any) => Math.abs(r.change_pct ?? 0))));
 
+  // During the session each sector's move is the live median of its stocks; otherwise the close's average.
+  const liveSector = $derived(new Map((lm?.sectors ?? []).map((s) => [s.sector, s.median_change])));
+  const sectorMove = (s: any): number | null => (lm ? (liveSector.get(s.sector) ?? null) : s.avg_change_pct);
   const sectors = $derived(data.sectors.slice(0, 10));
-  const sectorMax = $derived(Math.max(0.5, ...sectors.map((s: any) => Math.abs(s.avg_change_pct ?? 0))));
-  const ranked = $derived([...data.sectors].filter((s: any) => s.avg_change_pct != null && s.stocks >= 5).sort((a: any, z: any) => z.avg_change_pct - a.avg_change_pct));
+  const sectorMax = $derived(Math.max(0.5, ...sectors.map((s: any) => Math.abs(sectorMove(s) ?? 0))));
+  const ranked = $derived([...data.sectors].filter((s: any) => sectorMove(s) != null && s.stocks >= 5).sort((a: any, z: any) => sectorMove(z)! - sectorMove(a)!));
 
-  const nifty = $derived(data.indices.find((i) => i.index_name === "Nifty 50"));
-  const cityUp = $derived(data.cityStocks.filter((s) => (s.change ?? 0) > 0).length);
-  const cityDown = $derived(data.cityStocks.filter((s) => (s.change ?? 0) < 0).length);
+  // Index levels from Dhan while the market is open, NSE's closes otherwise.
+  const indices = $derived(data.indices.map((i) => {
+    const q = lm?.indices.find((x) => x.index_name === i.index_name);
+    return q ? { ...i, close: q.ltp, change_pct: q.change_pct } : i;
+  }));
+  const indicesLive = $derived(!!lm?.indices.length);
+  const nifty = $derived(indices.find((i) => i.index_name === "Nifty 50"));
+
+  // The city keeps its layout (sector districts, footprint by the last close's turnover); live prices move the towers.
+  $effect(() => (lm ? watch(data.cityStocks.map((s) => s.symbol)) : undefined));
+  const city = $derived(lm ? data.cityStocks.map((s) => {
+    const q = live.quotes[s.symbol];
+    return q?.changePct != null ? { ...s, change: q.changePct, close: q.ltp } : s;
+  }) : data.cityStocks);
+  const cityLive = $derived(!!lm && data.cityStocks.some((s) => live.quotes[s.symbol]));
+  const cityUp = $derived(city.filter((s) => (s.change ?? 0) > 0).length);
+  const cityDown = $derived(city.filter((s) => (s.change ?? 0) < 0).length);
 
   // The day's headline, written from the data: who won the day, which sectors led and lagged.
   const headline = $derived.by(() => {
@@ -63,15 +81,15 @@
 
 <div class="front">
   {#if data.indices.length}
-    <section class="indices" aria-label="Index closes">
-      {#each data.indices as i (i.index_name)}
+    <section class="indices" aria-label={indicesLive ? "Index levels" : "Index closes"}>
+      {#each indices as i (i.index_name)}
         <a href={i.index_name === "Nifty 50" || i.index_name === "Nifty Bank" ? "/valuations" : "/heatmap"}>
           <span class="iname">{i.index_name}</span>
           <b>{i.close?.toLocaleString("en-IN", { maximumFractionDigits: 2 }) ?? "—"}</b>
           <span class={tone(i.change_pct)}>{pct(i.change_pct)}</span>
         </a>
       {/each}
-      <span class="dateline asof">NSE close · {date(data.indicesAsOf)}</span>
+      <span class="dateline asof">{#if indicesLive}<LiveStamp close="" />{:else}NSE close · {date(data.indicesAsOf)}{/if}</span>
     </section>
   {/if}
 
@@ -80,7 +98,7 @@
       <p class="dateline"><LiveStamp close="NSE close · {date(data.summary.breadth?.as_of)}" /></p>
       <h1>{headline}</h1>
       <p class="standfirst">
-        {#if nifty?.close}The Nifty 50 closed at {nifty.close.toLocaleString("en-IN", { maximumFractionDigits: 2 })}, <span class={tone(nifty.change_pct)}>{pct(nifty.change_pct)}</span>. {/if}
+        {#if nifty?.close}The Nifty 50 {indicesLive ? "is at" : "closed at"} {nifty.close.toLocaleString("en-IN", { maximumFractionDigits: 2 })}, <span class={tone(nifty.change_pct)}>{pct(nifty.change_pct)}</span>. {/if}
         Of {int(lm ? lm.stocks : b.stocks)} NSE stocks, <a class="up" href="/breadth?show=advances">{int(b.advances)} rose</a> and
         <a class="down" href="/breadth?show=declines">{int(b.declines)} fell</a>.
         {#if fii}Foreign institutions were net <a href="/fii-dii" class={tone(fii.net_value)}>{(fii.net_value ?? 0) >= 0 ? "buyers" : "sellers"} of {cr(Math.abs(fii.net_value ?? 0))}</a>{#if dii}, Indian institutions net <a href="/fii-dii" class={tone(dii.net_value)}>{(dii.net_value ?? 0) >= 0 ? "buyers" : "sellers"} of {cr(Math.abs(dii.net_value ?? 0))}</a>{/if}.{/if}
@@ -103,12 +121,12 @@
       </figcaption>
       {#if data.cityStocks.length}
         <div class="plate">
-          <MarketCity stocks={data.cityStocks} label="The Nifty 100 as a 3D city: {cityUp} companies rose and {cityDown} fell on {day}." />
+          <MarketCity stocks={city} label="The Nifty 100 as a 3D city: {cityUp} companies {cityLive ? "are up" : "rose"} and {cityDown} {cityLive ? "are down" : "fell"}{cityLive ? " right now" : ` on ${day}`}." />
         </div>
         <figcaption class="caption">
-          <span><i class="sw up"></i>{cityUp} rose</span>
-          <span><i class="sw down"></i>{cityDown} fell, sunk below the street</span>
-          <span class="dateline">Nifty 100 · NSE close {day}</span>
+          <span><i class="sw up"></i>{cityUp} {cityLive ? "up" : "rose"}</span>
+          <span><i class="sw down"></i>{cityDown} {cityLive ? "down" : "fell"}, sunk below the street</span>
+          <span class="dateline">{#if cityLive}Nifty 100 · <LiveStamp close="" />{:else}Nifty 100 · NSE close {day}{/if}</span>
         </figcaption>
       {/if}
     </figure>
@@ -193,7 +211,7 @@
       <div class="card-head"><h2>Sectors today</h2><a class="more" href="/sectors">All sectors →</a></div>
       <ul class="sectors">
         {#each sectors as s (s.sector)}
-          {@const v = s.avg_change_pct ?? 0}
+          {@const v = sectorMove(s) ?? 0}
           <li>
             <a href="/sectors/{encodeURIComponent(s.sector)}">
               <span class="sname">{s.sector}<small>{s.stocks} stocks · {crore(s.turnover)}</small></span>
@@ -203,7 +221,7 @@
           </li>
         {/each}
       </ul>
-      <p class="foot">Average day change of each sector's stocks. One-month view on <a href="/sectors">sector rotation</a>.</p>
+      <p class="foot">{lm ? "Median live change of each sector's stocks." : "Average day change of each sector's stocks."} One-month view on <a href="/sectors">sector rotation</a>.</p>
     </section>
   </div>
 

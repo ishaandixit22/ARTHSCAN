@@ -4,6 +4,9 @@
   type Tower = { s: CityStock; x: number; z: number; h: number; w: number; delay: number };
   type District = { sector: string; x: number; z: number; top: number; count: number };
 
+  /** A tower's height from the day's move: up out of the ground for gains, down for losses. */
+  const height = (c: number | null) => (c == null ? 0.08 : Math.sign(c || 1) * (0.2 + Math.min(Math.abs(c), 8) * 0.8));
+
   /** Sectors become districts (a near-square block of towers each), packed in shelves into one square-ish city. */
   export function plan(stocks: CityStock[]): { towers: Tower[]; districts: District[]; radius: number } {
     const bySector = new Map<string, CityStock[]>();
@@ -26,8 +29,7 @@
       if (x > 0 && x + b.cols > shelfW) { x = 0; z += shelfH + GAP; shelfH = 0; }
       let top = 0;
       b.list.forEach((s, i) => {
-        const c = s.change;
-        const h = c == null ? 0.08 : Math.sign(c || 1) * (0.2 + Math.min(Math.abs(c), 8) * 0.8);
+        const h = height(s.change);
         top = Math.max(top, h);
         towers.push({ s, x: x + (i % b.cols) + 0.5, z: z + Math.floor(i / b.cols) + 0.5, h, w: 0.5 + 0.36 * Math.sqrt(s.turnover / maxTurnover), delay: 0 });
       });
@@ -55,7 +57,7 @@
   // Drag to turn it, hover a tower to read it, click to open the stock.
   // No library: one instanced box, one ground quad, ~6 KB of code.
   import { goto } from "$app/navigation";
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { pct, price } from "$lib/format";
   import { theme } from "$lib/theme.svelte";
 
@@ -70,7 +72,11 @@
   const tagEls: HTMLSpanElement[] = [];
   let grabbing = $state(false);
 
-  const city = $derived(plan(stocks));
+  // The layout is fixed at first render so towers don't jump between plots; live prices
+  // (a new `stocks` with the same symbols) only change heights, colours and the tooltip.
+  const city = plan(untrack(() => stocks));
+  const now = $derived(new Map(stocks.map((s) => [s.symbol, s])));
+  const cur = (s: CityStock) => now.get(s.symbol) ?? s;
 
   // NSE's sector names are long; a district label needs the name people say.
   const SHORT: Record<string, string> = {
@@ -214,7 +220,8 @@
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 24, 0);
     gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 24, 12);
     const inst = new Float32Array(towers.flatMap((t) => [t.x, t.z, t.h, t.w, t.delay]));
-    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    const instBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
     gl.bufferData(gl.ARRAY_BUFFER, inst, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 20, 0); gl.vertexAttribDivisor(2, 1);
     gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 1, gl.FLOAT, false, 20, 16); gl.vertexAttribDivisor(4, 1);
@@ -238,7 +245,8 @@
     function paint() {
       const up = rgb("--up"), down = rgb("--down"), flat = rgb("--ink-3");
       palette = { bg: rgb("--bg"), edge: rgb("--ink") };
-      const cols = towers.flatMap(({ s }) => {
+      const cols = towers.flatMap((tw) => {
+        const s = cur(tw.s);
         if (s.change == null || s.change === 0) return flat;
         const t = 0.35 + 0.65 * Math.min(Math.abs(s.change) / 4, 1);
         const to = s.change > 0 ? up : down;
@@ -276,7 +284,7 @@
     const setHot = (i: number) => {
       if (i === hot) return;
       hot = i;
-      hover = i >= 0 ? towers[i].s : null;
+      hover = i >= 0 ? cur(towers[i].s) : null;
     };
     const onDown = (e: PointerEvent) => {
       drag = { x: e.clientX, y: e.clientY, moved: 0, at: now() };
@@ -429,11 +437,30 @@
       });
     });
 
+    // Live prices: raise or sink each tower to its new move, at most once a frame.
+    let moved = 0;
+    const stopLive = $effect.root(() => {
+      $effect(() => {
+        now;
+        if (moved) return;
+        moved = requestAnimationFrame(() => {
+          moved = 0;
+          towers.forEach((t, i) => (inst[i * 5 + 2] = t.h = height(cur(t.s).change)));
+          gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
+          gl.bufferSubData(gl.ARRAY_BUFFER, 0, inst);
+          paint();
+          if (hover) hover = cur(hover);
+        });
+      });
+    });
+
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
       io.disconnect();
       stopTheme();
+      stopLive();
+      cancelAnimationFrame(moved);
     };
   });
 </script>
@@ -442,7 +469,8 @@
   {#if failed}
     <div class="flat" role="img" aria-label={label}>
       {#each city.towers as t (t.s.symbol)}
-        <a href="/stock/{encodeURIComponent(t.s.symbol)}" class={t.s.change == null ? "" : t.s.change > 0 ? "up" : "down"} title="{t.s.symbol} {pct(t.s.change)}"></a>
+        {@const s = cur(t.s)}
+        <a href="/stock/{encodeURIComponent(s.symbol)}" class={s.change == null ? "" : s.change > 0 ? "up" : "down"} title="{s.symbol} {pct(s.change)}"></a>
       {/each}
     </div>
   {:else}
