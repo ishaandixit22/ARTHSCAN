@@ -3,7 +3,11 @@
   import type { IChartApi, ISeriesApi } from "lightweight-charts";
   import { theme } from "$lib/theme.svelte";
 
-  let { candles, mode = "line" }: { candles: { date: string; open: number; high: number; low: number; close: number; volume: number }[]; mode?: "line" | "candles" } = $props();
+  // Daily candles carry a `date`; intraday ones a `time` in seconds (IST written as UTC, so the axis reads IST).
+  type Candle = { date?: string; time?: number; open: number; high: number; low: number; close: number; volume: number };
+  let { candles, mode = "line", base = null }: { candles: Candle[]; mode?: "line" | "candles"; base?: number | null } = $props();
+
+  const at = (c: Candle) => (c.time ?? c.date) as any;
 
   let el: HTMLDivElement;
   let chart: IChartApi | undefined;
@@ -14,6 +18,8 @@
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   }
 
+  const s0 = () => series[0];
+
   function draw() {
     if (!chart || !lib) return;
     for (const s of series) chart.removeSeries(s);
@@ -21,23 +27,26 @@
     const up = css("--up");
     const down = css("--down");
     const priceFormat = { type: "custom" as const, minMove: 0.05, formatter: (p: number) => `₹${p.toFixed(2)}` };
-    const first = candles[0]?.close ?? 0;
+    // A one-day chart is judged against yesterday's close, the way the day's change is.
+    const first = base ?? candles[0]?.close ?? 0;
     const last = candles[candles.length - 1]?.close ?? 0;
 
     if (mode === "candles") {
       const s = chart.addCandlestickSeries({ priceFormat, upColor: up, downColor: down, borderVisible: false, wickUpColor: up, wickDownColor: down });
-      s.setData(candles.map((c) => ({ time: c.date, open: c.open, high: c.high, low: c.low, close: c.close })));
+      s.setData(candles.map((c) => ({ time: at(c), open: c.open, high: c.high, low: c.low, close: c.close })));
       series.push(s);
     } else {
       const color = last >= first ? up : down;
       // A flat, faint fill under the line: depth without a gradient.
       const s = chart.addAreaSeries({ priceFormat, lineColor: color, topColor: `${color}14`, bottomColor: `${color}14`, lineWidth: 2 });
-      s.setData(candles.map((c) => ({ time: c.date, value: c.close })));
+      s.setData(candles.map((c) => ({ time: at(c), value: c.close })));
       series.push(s);
     }
     const vol = chart.addHistogramSeries({ priceScaleId: "vol", lastValueVisible: false, priceLineVisible: false, priceFormat: { type: "volume" }, color: css("--line-2") });
     chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
-    vol.setData(candles.map((c) => ({ time: c.date, value: c.volume ?? 0 })));
+    if (base != null) s0()?.createPriceLine({ price: base, color: css("--ink-3"), lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: "prev close" });
+    chart.timeScale().applyOptions({ timeVisible: candles[0]?.time != null, secondsVisible: false });
+    vol.setData(candles.map((c) => ({ time: at(c), value: c.volume ?? 0 })));
     series.push(vol);
     chart.timeScale().fitContent();
   }

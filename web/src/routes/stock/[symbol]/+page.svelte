@@ -212,12 +212,15 @@
       </div>
       <div class="card-body">
         {#if data.history?.candles.length}
-          <PriceChart candles={data.history.candles} {mode} />
+          <PriceChart candles={data.history.candles} {mode} base={data.period === "1d" ? data.history.prevClose : null} />
+          {#if data.history.intraday}
+            <p class="sub note">{data.history.interval}-minute candles{data.period === "1d" ? ` for ${date(data.history.sessions?.at(-1))}` : ` over the last ${data.history.sessions?.length ?? 5} sessions`}, times in IST.{data.period === "1d" && data.history.prevClose != null ? " The dashed line is yesterday's close." : ""}</p>
+          {/if}
           {#if data.history.adjustments?.length}
             <p class="sub note">Prices before {data.history.adjustments.map((a: any) => date(a.ex_date)).join(", ")} are adjusted for a split, bonus or consolidation.</p>
           {/if}
         {:else}
-          <div class="empty">No price history yet.</div>
+          <div class="empty">{data.period === "1d" || data.period === "5d" ? "Intraday prices aren't available right now. Try a longer range." : "No price history yet."}</div>
         {/if}
       </div>
     </section>

@@ -17,6 +17,11 @@ import { parsePackets, REQUEST, subscribeMessages, type LiveEvent } from "./pack
 
 const DEFAULT_FEED_URL = "wss://api-feed.dhan.co";
 const RENEW_URL = "https://api.dhan.co/v2/RenewToken";
+const INTRADAY_URL = "https://api.dhan.co/v2/charts/intraday";
+// Intraday chart ranges: candle size and how many sessions to keep.
+const CANDLE_RANGES: Record<string, { interval: string; sessions: number }> = { "1d": { interval: "5", sessions: 1 }, "5d": { interval: "15", sessions: 5 } };
+const CANDLE_TTL_MS = 60_000;
+const IST_MS = 5.5 * 3600_000;
 const FLUSH_MS = 1_000;
 const IDLE_DISCONNECT_MS = 10 * 60_000;
 const ALARM_MS = 60_000;
@@ -55,6 +60,7 @@ export class LiveFeed {
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private lastDemand = 0;
   private status: Status = { state: "idle", message: "Not connected", since: Date.now(), instruments: 0, lastTickAt: null };
+  private candleCache = new Map<string, { at: number; body: unknown }>();
 
   constructor(private state: DOState, private env: Env) {}
 
@@ -95,6 +101,21 @@ export class LiveFeed {
         if (q) rows.push([symbol, q.ltp, q.changePct, q.volume, q.atp]);
       }
       return Response.json({ status: this.status, rows });
+    }
+
+    if (url.pathname.endsWith("/candles")) {
+      const symbol = (url.searchParams.get("symbol") ?? "").trim().toUpperCase();
+      const range = url.searchParams.get("range") ?? "1d";
+      if (!symbol || !CANDLE_RANGES[range]) return Response.json({ ok: false, error: "symbol and range (1d or 5d) are required" }, { status: 400 });
+      const key = `${symbol}|${range}`;
+      const hit = this.candleCache.get(key);
+      if (hit && Date.now() - hit.at < CANDLE_TTL_MS) return Response.json(hit.body);
+      const res = await this.intradayCandles(symbol, range);
+      if (res.ok) {
+        if (this.candleCache.size > 500) this.candleCache.clear();
+        this.candleCache.set(key, { at: Date.now(), body: res });
+      }
+      return Response.json(res, { status: res.ok ? 200 : res.status });
     }
 
     if (url.pathname.endsWith("/status")) {
@@ -297,6 +318,50 @@ export class LiveFeed {
         /* ignore */
       }
     }
+  }
+
+  // ── Intraday candles (Dhan charts API) ────────────────────────────
+
+  /** The last few sessions of intraday candles for one stock. Times are IST shown as UTC seconds, for the chart. */
+  private async intradayCandles(symbol: string, range: string) {
+    const fail = (status: number, error: string) => ({ ok: false as const, status, error });
+    const creds = await this.credentials();
+    if (!creds) return fail(503, "Dhan is not configured");
+    const row = await this.env.DB.prepare("SELECT dhan_security_id AS id FROM stocks WHERE symbol = ?").bind(symbol).first<{ id: string | null }>();
+    if (!row?.id) return fail(404, `No Dhan instrument for ${symbol}`);
+    const { interval, sessions } = CANDLE_RANGES[range];
+    // Ask for two weeks so holidays and weekends still leave enough sessions.
+    const ist = (ms: number) => new Date(ms + IST_MS).toISOString().slice(0, 10);
+    const now = Date.now();
+    const body = {
+      securityId: String(row.id), exchangeSegment: "NSE_EQ", instrument: "EQUITY", interval, oi: false,
+      fromDate: `${ist(now - 14 * 86400_000)} 09:15:00`, toDate: `${ist(now + 86400_000)} 00:00:00`,
+    };
+    let res: Response;
+    try {
+      res = await fetch(INTRADAY_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json", "access-token": creds.token, "client-id": creds.clientId },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      return fail(502, "Dhan is not reachable");
+    }
+    const data = (await res.json().catch(() => null)) as Record<string, number[]> | null;
+    if (!res.ok || !data?.timestamp) {
+      console.error(`dhan intraday ${symbol} -> ${res.status}: ${JSON.stringify(data).slice(0, 300)}`);
+      return fail(502, "Dhan returned no candles");
+    }
+    const all = data.timestamp.map((t, i) => ({
+      time: Math.round(t + IST_MS / 1000), day: ist(t * 1000),
+      open: data.open[i], high: data.high[i], low: data.low[i], close: data.close[i], volume: Math.round(data.volume[i] ?? 0),
+    }));
+    const days = [...new Set(all.map((c) => c.day))].slice(-sessions);
+    const candles = all.filter((c) => days.includes(c.day)).map(({ day, ...c }) => c);
+    // The close before the first kept session, so a one-day chart can say how far the stock has moved.
+    const firstIdx = all.findIndex((c) => c.day === days[0]);
+    const prevClose = firstIdx > 0 ? all[firstIdx - 1].close : null;
+    return { ok: true as const, symbol, range, interval: Number(interval), sessions: days, prevClose, candles };
   }
 
   // ── Housekeeping: idle disconnect + token renewal ─────────────────

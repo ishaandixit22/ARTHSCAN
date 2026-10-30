@@ -50,6 +50,8 @@ live.use("*", async (c, next) => {
 live.get("/stream", (c) => forward(c, "/stream"));
 live.get("/quotes", (c) => forward(c, "/snapshot"));
 live.get("/status", (c) => forward(c, "/status"));
+// Intraday candles for one stock's 1D and 5D charts, from Dhan's charts API.
+live.get("/candles", (c) => forward(c, "/candles"));
 // Movers, breadth, sector moves and intraday signals over every live stock.
 const snapshot = (env: Env) => () => feed(env).fetch(new Request("https://live/all")).then((r) => r.json()) as Promise<never>;
 live.get("/market", async (c) => c.json(await liveMarket(c.env, snapshot(c.env))));
