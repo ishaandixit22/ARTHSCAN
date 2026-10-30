@@ -15,7 +15,7 @@ const COMPANY_TTL_S = 6 * 3600;
 const IST_MS = 5.5 * 3600_000;
 // The indices the front page shows, by their Dhan id (segment IDX_I, from Dhan's scrip master).
 // The names match index_daily, where their previous closes come from.
-export const LIVE_INDICES: Record<string, number> = { "Nifty 50": 13, "Nifty Bank": 25, "Nifty Midcap 100": 37, "Nifty Smallcap 100": 5, "Nifty IT": 29, "India VIX": 21 };
+export const LIVE_INDICES: Record<string, number> = { "Nifty 50": 13, "Nifty Bank": 25, "NIFTY Midcap 100": 37, "NIFTY Smallcap 100": 5, "Nifty IT": 29, "India VIX": 21 };
 // Market Quote allows one request a second; a few seconds' reuse keeps every viewer inside that.
 const INDEX_TTL_S = 5;
 const COMPANY_FIELDS = {

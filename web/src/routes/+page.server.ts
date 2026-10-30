@@ -13,7 +13,7 @@ export async function load() {
     // Index closes for the front page's index strip.
     api("/v1/market/valuations", { allowError: true }).catch(() => null),
   ]);
-  const WANT = ["Nifty 50", "Nifty Bank", "Nifty Midcap 100", "Nifty Smallcap 100", "Nifty IT", "India VIX"];
+  const WANT = ["Nifty 50", "Nifty Bank", "NIFTY Midcap 100", "NIFTY Smallcap 100", "Nifty IT", "India VIX"];
   const all = (valuations?.indices ?? []) as { index_name: string; close: number | null; change_pct: number | null; pe: number | null }[];
   const indices = WANT.map((n) => all.find((i) => i.index_name === n)).filter((i): i is (typeof all)[number] => !!i);
   const cityStocks = ((city?.sectors ?? []) as { stocks?: any[] }[]).flatMap((g) =>
