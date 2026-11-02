@@ -23,12 +23,13 @@ export default {
       mode: "hash",
       directives: {
         "default-src": ["self"],
-        "script-src": ["self"],
+        // Cloudflare Web Analytics: its beacon script and where that script reports.
+        "script-src": ["self", "https://static.cloudflareinsights.com"],
         "style-src": ["self", "unsafe-inline"],
         "font-src": ["self"],
         // News thumbnails come from many publishers' image hosts; images can't run code.
         "img-src": ["self", "data:", "https:"],
-        "connect-src": ["self"],
+        "connect-src": ["self", "https://cloudflareinsights.com"],
         "object-src": ["none"],
         "base-uri": ["self"],
         "frame-ancestors": ["none"],
