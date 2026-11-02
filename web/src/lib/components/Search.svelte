@@ -2,6 +2,7 @@
   import { goto } from "$app/navigation";
   import Logo from "$lib/components/Logo.svelte";
   import { price, pct, tone } from "$lib/format";
+  import { loadSearchIndex, searchLocally } from "$lib/searchIndex";
 
   // `lead` is the front page's big search: its own placeholder and a Look up button,
   // and it leaves the "/" shortcut to the masthead's search.
@@ -26,20 +27,29 @@
 
   function onInput() {
     clearTimeout(timer);
+    void loadSearchIndex();
     const query = q.trim();
     if (!query) {
       results = [];
       open = false;
       return;
     }
+    // Answered in the browser when the company table has arrived; the server covers the rest.
+    const local = searchLocally(query);
+    if (local?.length) {
+      results = local;
+      open = true;
+      active = -1;
+      return;
+    }
     timer = setTimeout(async () => {
       const res = await fetch(`/search.json?q=${encodeURIComponent(query)}`);
-      if (res.ok) {
+      if (res.ok && q.trim() === query) {
         results = (await res.json()).results;
         open = true;
         active = -1;
       }
-    }, 120);
+    }, 250);
   }
 
   function choose(symbol: string) {
@@ -76,7 +86,7 @@
     bind:value={q}
     oninput={onInput}
     onkeydown={onKey}
-    onfocus={() => (open = results.length > 0)}
+    onfocus={() => (loadSearchIndex(), (open = results.length > 0))}
     onblur={() => setTimeout(() => (open = false), 150)}
   />
   {#if lead}

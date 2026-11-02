@@ -127,6 +127,11 @@ mostly network. "Server" is time spent in our Workers on the first visit.
 5. **Edge cache.** GET requests to `/v1` with the site's own key are kept for five minutes, so a
    repeat answer costs about 5 to 10 ms of server time.
 
+5a. **Page cache.** Signed-out pages are kept per Cloudflare location for five minutes and then served
+   stale while they re-render (four hours for stock pages, an hour for market pages); see
+   `web/src/lib/server/page-cache.ts`. Intraday chart periods and anything with a session cookie skip it.
+   Request-path calls to third parties give up after 3.5 s, or 5.5 s for Indian Stock API (`api/src/lib/upstream.ts`).
+
 ## 6. Known gaps
 
 - Financial statements are stored for the 60 largest companies so far; the background job fills the

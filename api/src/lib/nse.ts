@@ -8,8 +8,9 @@
 
 import type { Env } from "../env.js";
 import { ToolError } from "../handlers/errors.js";
+import { UPSTREAM_TIMEOUT_MS } from "./upstream.js";
 
-const TIMEOUT_MS = 20_000;
+const TIMEOUT_MS = UPSTREAM_TIMEOUT_MS;
 const MAX_CACHE_BYTES = 1_000_000;
 export const NSE_HEADERS = {
   "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",

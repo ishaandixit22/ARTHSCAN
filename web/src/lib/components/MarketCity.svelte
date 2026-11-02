@@ -241,10 +241,11 @@
     const gu = { vp: U(groundProg, "uViewProj"), size: U(groundProg, "uSize"), bg: U(groundProg, "uBg"), edge: U(groundProg, "uEdge"), radius: U(groundProg, "uRadius") };
 
     // Colours follow the theme: green and red by the size of the move, faded toward grey for small ones.
-    let palette = { bg: [0, 0, 0] as V3, edge: [1, 1, 1] as V3 };
+    let palette = { bg: [0, 0, 0] as V3, edge: [1, 1, 1] as V3, up: [0, 0, 0] as V3, down: [0, 0, 0] as V3, flat: [0, 0, 0] as V3 };
+    // Reading CSS colours is the slow part, so it happens per theme, not per price tick.
+    const readTheme = () => (palette = { bg: rgb("--bg"), edge: rgb("--ink"), up: rgb("--up"), down: rgb("--down"), flat: rgb("--ink-3") });
     function paint() {
-      const up = rgb("--up"), down = rgb("--down"), flat = rgb("--ink-3");
-      palette = { bg: rgb("--bg"), edge: rgb("--ink") };
+      const { up, down, flat } = palette;
       const cols = towers.flatMap((tw) => {
         const s = cur(tw.s);
         if (s.change == null || s.change === 0) return flat;
@@ -255,6 +256,7 @@
       gl!.bindBuffer(gl!.ARRAY_BUFFER, colorBuf);
       gl!.bufferData(gl!.ARRAY_BUFFER, new Float32Array(cols), gl!.STATIC_DRAW);
     }
+    readTheme();
     paint();
 
     // Camera: orbiting, pitched down at the city; drag turns it, and it keeps a little spin after you let go.
@@ -433,7 +435,7 @@
     const stopTheme = $effect.root(() => {
       $effect(() => {
         theme.current;
-        requestAnimationFrame(paint);
+        requestAnimationFrame(() => (readTheme(), paint()));
       });
     });
 

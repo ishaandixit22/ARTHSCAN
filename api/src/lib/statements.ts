@@ -6,6 +6,7 @@
 import type { Env } from "../env.js";
 import { ToolError } from "../handlers/errors.js";
 import { providerName } from "./results.js";
+import { INDIANAPI_TIMEOUT_MS } from "./upstream.js";
 
 const BASE = "https://stock.indianapi.in";
 /** A stored copy this young is served without asking the provider. */
@@ -20,7 +21,7 @@ export type Bundle = Record<string, Record<string, Record<string, number | null>
 async function askProvider(env: Env, names: string[]): Promise<Bundle | null> {
   for (const name of names) {
     const res = await fetch(`${env.INDIANAPI_BASE_URL || BASE}/historical_stats?${new URLSearchParams({ stock_name: name, stats: "all" })}`,
-      { headers: { "x-api-key": env.INDIANAPI_KEY!, accept: "application/json" }, signal: AbortSignal.timeout(20_000) });
+      { headers: { "x-api-key": env.INDIANAPI_KEY!, accept: "application/json" }, signal: AbortSignal.timeout(INDIANAPI_TIMEOUT_MS) });
     if (res.status === 429) throw new ToolError("E_UPSTREAM_QUOTA", "The data provider's request limit is used up for now. Try again later.", 503);
     if (res.status === 401 || res.status === 403) throw new ToolError("E_UNAVAILABLE", "This data source is not available right now: the provider rejected our API key.", 503);
     if (!res.ok) continue;

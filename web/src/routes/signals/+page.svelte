@@ -14,7 +14,7 @@
     breakout_low: "Trading below its 52-week low",
   };
   const liveCapable = $derived(!!data.live && data.signal in LIVE_DEFS);
-  $effect(() => (liveCapable ? useLiveMarket() : undefined));
+  $effect(() => (liveCapable ? useLiveMarket({ signals: true }) : undefined));
   const lm = $derived(liveCapable ? market.data : null);
   const d = $derived.by(() => {
     if (!lm) return data.data;

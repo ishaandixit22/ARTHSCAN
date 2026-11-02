@@ -17,10 +17,11 @@ export async function load({ url }) {
   const [fields, sectors, result] = await Promise.all([
     api("/v1/screener/fields"),
     api("/v1/sectors"),
-    api("/v1/screener", {
-      body: { filters, sector, sort, order, above_sma_200: above200, limit: 50, offset: (page - 1) * 50 },
-      allowError: true,
-    }),
+    // A GET, so a repeat of the same screen comes from the API's edge cache.
+    api(`/v1/screener?${new URLSearchParams({
+      filters: JSON.stringify(filters), sort, order, limit: "50", offset: String((page - 1) * 50),
+      ...(sector ? { sector } : {}), ...(above200 ? { above_sma_200: "true" } : {}),
+    })}`, { allowError: true }),
   ]);
   return {
     fields: fields.fields,

@@ -5,6 +5,7 @@
 // old code until it goes idle, which can be hours while someone watches prices.
 
 import type { Env } from "../env.js";
+import { UPSTREAM_TIMEOUT_MS } from "./upstream.js";
 
 const BASE = "https://api.dhan.co/v2";
 // Intraday chart ranges: candle size and how many sessions to keep.
@@ -67,6 +68,7 @@ async function post(env: Env, path: string, body: unknown, what: string): Promis
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json", "access-token": creds.token, "client-id": creds.clientId },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
   } catch {
     return fail(502, "Dhan is not reachable");

@@ -1,6 +1,7 @@
 import { redirect, type Handle } from "@sveltejs/kit";
 import { env } from "$env/dynamic/private";
 import { api } from "$lib/server/api";
+import { cachedPage } from "$lib/server/page-cache";
 
 // Paths the API Worker owns. In production Cloudflare routes send them to it
 // before this Worker runs; under `wrangler dev` there are no routes, so we
@@ -61,12 +62,16 @@ export const handle: Handle = async ({ event, resolve }) => {
     redirect(303, path === "/" ? "/login" : `/login?return_to=${encodeURIComponent(path)}`);
   }
 
-  const t0 = Date.now();
-  const response = await resolve(event);
-  for (const [k, v] of Object.entries(SECURITY_HEADERS)) response.headers.set(k, v);
-  // Where a page's time went, visible in the browser's network panel: each API call, and the page in all.
-  const calls = (event.locals.timings ?? []).map((t, i) => `api${i};desc="${t.path.slice(0, 40)}";dur=${t.ms}`);
-  response.headers.set("Server-Timing", [`page;dur=${Date.now() - t0}`, ...calls].join(", "));
-  if (inviteOnly) response.headers.set("X-Robots-Tag", "noindex, nofollow");
-  return response;
+  const render = async () => {
+    const t0 = Date.now();
+    const response = await resolve(event);
+    for (const [k, v] of Object.entries(SECURITY_HEADERS)) response.headers.set(k, v);
+    // Where a page's time went, visible in the browser's network panel: each API call, and the page in all.
+    const calls = (event.locals.timings ?? []).map((t, i) => `api${i};desc="${t.path.slice(0, 40)}";dur=${t.ms}`);
+    response.headers.set("Server-Timing", [`page;dur=${Date.now() - t0}`, ...calls].join(", "));
+    if (inviteOnly) response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    return response;
+  };
+  // Signed-out pages are the same for everyone; a session cookie always gets its own render.
+  return inviteOnly || cookie?.includes("al_session=") ? render() : cachedPage(event, render);
 };

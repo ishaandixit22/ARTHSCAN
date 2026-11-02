@@ -290,7 +290,10 @@
         <span class="sub">INR crore · consolidated where filed</span>
       </div>
       {#if current === "loading" || current === undefined}
-        <div class="empty">Loading the {spec.label.toLowerCase()} for {c.symbol}…</div>
+        <!-- Holds roughly the table's height, so the page doesn't jump when the figures arrive. -->
+        <div class="table-skeleton" role="status" aria-label="Loading the {spec.label.toLowerCase()} for {c.symbol}">
+          {#each { length: 13 } as _}<i></i>{/each}
+        </div>
       {:else if current}
         <StatementTable periods={current.periods} rows={current.rows} growthFor={[...spec.growth]} lag={spec.lag} />
       {:else}
@@ -376,6 +379,8 @@
 </div>
 
 <style>
+  .table-skeleton { display: grid; }
+  .table-skeleton i { height: 37px; border-bottom: 1px solid var(--line); background: linear-gradient(var(--panel-2), var(--panel-2)) no-repeat 0 50% / 180px 12px; }
   .head { display: grid; grid-template-columns: 1fr auto; gap: 18px 24px; align-items: start; }
   .who { display: flex; gap: 16px; align-items: center; min-width: 0; }
   .ids { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-top: 6px; color: var(--ink-3); font-size: 12.5px; }

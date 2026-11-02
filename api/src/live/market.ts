@@ -21,6 +21,7 @@ type Status = { state: string; message: string; lastTickAt: number | null };
 
 const REF_TTL_MS = 10 * 60_000;
 const SNAPSHOT_TTL_MS = 5_000;
+const LITE_MOVERS = 8; // what the front page's lists show
 let refCache: { at: number; bySymbol: Map<string, Ref> } | null = null;
 let snapCache: { at: number; body: unknown } | null = null;
 
@@ -80,6 +81,12 @@ export async function liveBreadth(env: Env, snapshot: () => Promise<{ status: St
   const { open, status, stocks } = await liveStocks(env, snapshot);
   const counts = Object.fromEntries((Object.keys(BREADTH) as BreadthShow[]).map((k) => [k, stocks.filter(BREADTH[k].pick).length]));
   return { session: open ? "open" : "closed", status, universe: stocks.length, counts, show, stocks: stocks.filter(BREADTH[show].pick).sort(BREADTH[show].by) };
+}
+
+/** The market answer without the long lists: the signals page alone needs those, and every viewer polls this. */
+export function liteMarket<T extends { movers: Record<string, unknown[]>; signals: Record<string, unknown[]> }>(body: T): T {
+  const short = (lists: Record<string, unknown[]>, n: number) => Object.fromEntries(Object.entries(lists).map(([k, v]) => [k, v.slice(0, n)]));
+  return { ...body, movers: short(body.movers, LITE_MOVERS), signals: short(body.signals, 0) };
 }
 
 export async function liveMarket(env: Env, snapshot: () => Promise<{ status: Status; rows: LiveRow[] }>) {

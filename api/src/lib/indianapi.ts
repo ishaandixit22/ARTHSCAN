@@ -4,9 +4,10 @@
 
 import type { Env } from "../env.js";
 import { ToolError } from "../handlers/errors.js";
+import { INDIANAPI_TIMEOUT_MS } from "./upstream.js";
 
 const DEFAULT_BASE = "https://stock.indianapi.in";
-const TIMEOUT_MS = 15_000;
+const TIMEOUT_MS = INDIANAPI_TIMEOUT_MS;
 // D1 caps a row near 2 MB; larger bodies are served but not cached.
 const MAX_CACHE_BYTES = 1_000_000;
 

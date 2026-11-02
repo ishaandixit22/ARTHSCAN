@@ -9,8 +9,9 @@ let tickerCache: { at: number; quotes: any[] } | null = null;
 
 async function closingQuotes(): Promise<any[]> {
   if (tickerCache && Date.now() - tickerCache.at < 5 * 60_000) return tickerCache.quotes;
-  const r = await api<{ quotes: any[] }>("/v1/quotes", { body: { symbols: NIFTY_50 }, allowError: true }).catch(() => null);
-  const quotes = r?.quotes ?? [];
+  // A GET, so it comes from the API's edge cache; only what the ticker draws goes into every page.
+  const r = await api<{ quotes: any[] }>(`/v1/quotes?symbols=${NIFTY_50.join(",")}`, { allowError: true }).catch(() => null);
+  const quotes = (r?.quotes ?? []).map(({ symbol, close, change_pct, as_of }) => ({ symbol, close, change_pct, as_of }));
   if (quotes.length) tickerCache = { at: Date.now(), quotes };
   return quotes.length ? quotes : (tickerCache?.quotes ?? []);
 }

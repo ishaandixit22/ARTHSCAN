@@ -442,7 +442,9 @@ export const TOOLS: Tool[] = [
       // A listing-day "change" is vs the IPO price, not a prior close — it would top every gainers list.
       const listing = k === "active" ? "" : "AND (m.first_date IS NULL OR m.first_date < m.as_of)";
       // ₹1 crore of turnover keeps penny-stock noise out of the lists.
-      const { results } = await db.prepare(`SELECT ${LIST_COLUMNS} FROM stocks s JOIN stock_metrics m ON m.symbol = s.symbol
+      // Named because the planner has no statistics to prefer it: walking the day's rows by change stops at LIMIT.
+      const walk = k === "active" ? "" : "INDEXED BY idx_metrics_day_change";
+      const { results } = await db.prepare(`SELECT ${LIST_COLUMNS} FROM stocks s JOIN stock_metrics m ${walk} ON m.symbol = s.symbol
         WHERE m.turnover >= 1e7 AND m.change_pct IS NOT NULL AND ${SHARES_ONLY} ${listing}
           AND m.as_of = (SELECT MAX(as_of) FROM stock_metrics)
         ORDER BY ${order} LIMIT ?`).bind(clampLimit(limit, 10, 50)).all();

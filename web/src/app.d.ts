@@ -14,6 +14,9 @@ declare global {
         /** Service binding to the arthscan-api Worker (Cloudflare only). */
         API?: { fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> };
       };
+      /** The Cloudflare edge cache and request context (absent under Vite). */
+      caches?: { default: Cache };
+      ctx: { waitUntil: (work: Promise<unknown>) => void };
     }
   }
 }

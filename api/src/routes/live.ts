@@ -13,7 +13,7 @@ import { Hono, type Context } from "hono";
 import type { Account, AppEnv, Env, Principal } from "../env.js";
 import { CANDLE_RANGES, companyInfo, intradayCandles } from "../lib/dhan.js";
 import { jsonError } from "../lib/http.js";
-import { type BreadthShow, liveBreadth, liveMarket } from "../live/market.js";
+import { type BreadthShow, liteMarket, liveBreadth, liveMarket } from "../live/market.js";
 
 export const live = new Hono<AppEnv>();
 
@@ -68,7 +68,10 @@ live.get("/company", async (c) => {
 });
 // Movers, breadth, sector moves and intraday signals over every live stock.
 const snapshot = (env: Env) => () => feed(env).fetch(new Request("https://live/all")).then((r) => r.json()) as Promise<never>;
-live.get("/market", async (c) => c.json(await liveMarket(c.env, snapshot(c.env))));
+live.get("/market", async (c) => {
+  const body = (await liveMarket(c.env, snapshot(c.env))) as Parameters<typeof liteMarket>[0];
+  return c.json(c.req.query("lite") ? liteMarket(body) : body);
+});
 // One breadth bucket (advances, declines, unchanged, 52-week highs or lows) with every stock in it.
 live.get("/breadth", async (c) => {
   const show = (["advances", "declines", "unchanged", "highs", "lows"] as const).find((k) => k === c.req.query("show")) ?? "advances";

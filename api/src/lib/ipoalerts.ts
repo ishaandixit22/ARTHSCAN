@@ -5,6 +5,7 @@
 // copy is served and the reason is returned so the page can say why a premium is missing.
 
 import type { Env } from "../env.js";
+import { UPSTREAM_TIMEOUT_MS } from "./upstream.js";
 
 const BASE = "https://api.ipoalerts.in";
 const KEEP = 24; // hourly points kept per issue: a day of movement
@@ -45,7 +46,7 @@ export async function premiums(env: Env, symbols: string[]): Promise<PremiumResu
     const list: Premium[] = [];
     for (const symbol of wanted) {
       const res = await fetch(`${BASE}/ipos/${encodeURIComponent(symbol)}/gmp?interval=hourly&field=median&from=${encodeURIComponent(from)}`,
-        { headers: { "x-api-key": env.IPOALERTS_API_KEY, accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
+        { headers: { "x-api-key": env.IPOALERTS_API_KEY, accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
       if (res.status === 404) continue; // an issue the provider does not track
       if (!res.ok) throw new Error(refusal(res.status));
       const p = parseTrend(symbol, await res.json());
@@ -97,8 +98,8 @@ export async function detail(env: Env, symbol: string): Promise<DetailResult> {
   const headers = { "x-api-key": env.IPOALERTS_API_KEY, accept: "application/json" };
   try {
     const [a, g] = await Promise.all([
-      fetch(`${BASE}/ipos/${encodeURIComponent(sym)}`, { headers, signal: AbortSignal.timeout(15_000) }),
-      fetch(`${BASE}/ipos/${encodeURIComponent(sym)}/gmp?interval=hourly&field=median&from=${encodeURIComponent(new Date(Date.now() - 30 * 86400_000).toISOString())}`, { headers, signal: AbortSignal.timeout(15_000) }),
+      fetch(`${BASE}/ipos/${encodeURIComponent(sym)}`, { headers, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) }),
+      fetch(`${BASE}/ipos/${encodeURIComponent(sym)}/gmp?interval=hourly&field=median&from=${encodeURIComponent(new Date(Date.now() - 30 * 86400_000).toISOString())}`, { headers, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) }),
     ]);
     for (const r of [a, g]) if (!r.ok && r.status !== 404) throw new Error(refusal(r.status));
     const body: any = a.ok ? await a.json() : null;

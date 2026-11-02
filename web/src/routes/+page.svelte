@@ -244,6 +244,8 @@
 
 <style>
   .front { display: grid; gap: 40px; padding: 0 0 96px; }
+  /* Below the fold: skip layout and paint until they come near the viewport. */
+  .boards, .learn { content-visibility: auto; contain-intrinsic-size: auto 720px; }
 
   /* Index strip: the paper's market-data line under the masthead. */
   .indices { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 0; padding: 9px 0; border-bottom: 1px solid var(--ink); font-stretch: 82%; }
