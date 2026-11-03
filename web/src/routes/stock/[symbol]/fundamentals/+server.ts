@@ -1,6 +1,6 @@
 // Quarterly results and shareholding from the Indian Stock API, for stock pages
-// whose fundamentals haven't been imported. The page calls this from the browser
-// after it loads, so crawlers walking ~3,500 stock pages don't spend the plan.
+// missing either one in the database. The page calls this from the browser at a
+// visitor's first interaction, so crawlers walking ~3,500 stock pages don't spend the plan.
 
 import { json } from "@sveltejs/kit";
 import { api, ext } from "$lib/server/api";

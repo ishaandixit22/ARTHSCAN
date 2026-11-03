@@ -106,7 +106,8 @@
   $effect(() => {
     const sym = c.symbol;
     extFund = null;
-    if (data.financials.periods.length || data.shareholding.quarters.length) return;
+    extLoading = false;
+    if (!engaged || (data.financials.periods.length && data.shareholding.quarters.length)) return;
     extLoading = true;
     let stale = false;
     fetch(`/stock/${encodeURIComponent(sym)}/fundamentals`)
@@ -260,7 +261,7 @@
   </header>
 
   {#if summary}
-    <p class="summary">{summary}{#if extLoading}<span class="sub"> Loading quarterly figures…</span>{/if}</p>
+    <p class="summary">{summary}{#if extLoading && !data.financials.periods.length}<span class="sub"> Loading quarterly figures…</span>{/if}</p>
   {/if}
 
   <!-- Section rail: jumps down this one page -->
@@ -405,7 +406,7 @@
           </table>
         </div>
       {:else}
-        <div class="empty">{extLoading ? `Loading shareholding for ${c.symbol}…` : `Shareholding for ${c.symbol} isn't available right now.`}</div>
+        <div class="empty">{extLoading || !engaged ? `Loading shareholding for ${c.symbol}…` : `Shareholding for ${c.symbol} isn't available right now.`}</div>
       {/if}
     </section>
   </div>
