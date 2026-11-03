@@ -136,7 +136,7 @@
             <tbody>
               {#each rows as r (r.symbol)}
                 <tr>
-                  <td><a href="/stock/{r.symbol}?tab=financials" class="sym">{r.symbol}</a><span class="name">{r.name}</span></td>
+                  <td><a href="/stock/{r.symbol}#financials" class="sym">{r.symbol}</a><span class="name">{r.name}</span></td>
                   <td class="left wide-only sector">{r.sector}</td>
                   <td>{crore(r.revenue)}</td>
                   <td style={tint(r.sales_yoy)} class={r.sales_yoy == null ? "na" : r.sales_yoy >= 0 ? "up" : "down"}>{signed(r.sales_yoy)}</td>
@@ -187,7 +187,7 @@
             {#if b.rows.length}
               <ol class="board">
                 {#each b.rows as r (r.symbol)}
-                  <li><a href="/stock/{r.symbol}?tab=financials" class="sym">{r.symbol}</a><span class="name">{r.name}</span><b class="mono {VERDICT_TONE[r.verdict]}">{b.value(r)}</b></li>
+                  <li><a href="/stock/{r.symbol}#financials" class="sym">{r.symbol}</a><span class="name">{r.name}</span><b class="mono {VERDICT_TONE[r.verdict]}">{b.value(r)}</b></li>
                 {/each}
               </ol>
             {:else}<div class="empty">None yet.</div>{/if}

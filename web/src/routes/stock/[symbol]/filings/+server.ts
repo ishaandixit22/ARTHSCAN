@@ -1,6 +1,6 @@
 // One company's exchange filings (last 12 months, with PDFs), corporate-action
-// history and upcoming board meetings, for the stock page's Filings tab. The
-// page asks for it when the tab opens, so crawlers don't trigger NSE requests.
+// history and upcoming board meetings, for the stock page's Filings section. The
+// page asks at a visitor's first interaction, so crawlers don't trigger NSE requests.
 
 import { json } from "@sveltejs/kit";
 import { api } from "$lib/server/api";

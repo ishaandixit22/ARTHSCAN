@@ -104,7 +104,7 @@
                     <div class="top">
                       <span class="chip kind">{kindLabel[e.kind]}</span>
                       {#if e.impact === "high"}<span class="chip impact">High impact</span>{/if}
-                      <span class="title">{#if e.symbol && e.kind === "results"}<a href="/stock/{e.symbol}?tab=filings">{e.title}</a>{:else}{e.title}{/if}</span>
+                      <span class="title">{#if e.symbol && e.kind === "results"}<a href="/stock/{e.symbol}#filings">{e.title}</a>{:else}{e.title}{/if}</span>
                     </div>
                     <p class="detail">{e.detail}</p>
                     <p class="src">{#if e.url}<a href={e.url} target="_blank" rel="noopener noreferrer">{e.source}</a>{:else}{e.source}{/if}</p>

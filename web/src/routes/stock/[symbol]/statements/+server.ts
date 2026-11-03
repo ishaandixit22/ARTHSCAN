@@ -1,7 +1,7 @@
 // A company's full financial statements from the Indian Stock API: quarterly
 // results, annual profit and loss, balance sheet, cash flow and efficiency
-// ratios. The stock page asks for one when its Financials tab opens, from the
-// browser, so crawlers walking every stock page don't spend the plan.
+// ratios. The stock page asks for these at a visitor's first interaction, from
+// the browser, so crawlers walking every stock page don't spend the plan.
 //
 // Returns { periods: ["Mar 2024", …, "TTM"] oldest first, rows: [{ label, note, kind, values }] }.
 

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from "$app/state";
-  import { replaceState } from "$app/navigation";
+  import { onMount, untrack } from "svelte";
   import PriceChart from "$lib/components/PriceChart.svelte";
   import IndustryCompare from "$lib/components/IndustryCompare.svelte";
   import StatementTable from "$lib/components/StatementTable.svelte";
@@ -24,8 +24,8 @@
   $effect(() => (liveNow ? watch([c.symbol]) : undefined));
   const lq = $derived(liveNow ? live.quotes[c.symbol] : undefined);
 
-  // ── Sections: one tab open at a time, kept in the URL (?tab=) without reloading ──
-  const TABS = [
+  // ── Sections: one long page; the rail jumps to each and marks the one being read ──
+  const SECTIONS = [
     { key: "overview", label: "Overview" },
     { key: "technicals", label: "Technicals" },
     { key: "financials", label: "Financials" },
@@ -33,16 +33,72 @@
     { key: "filings", label: "Filings" },
     { key: "peers", label: "Peers" },
   ] as const;
-  type Tab = (typeof TABS)[number]["key"];
-  const initialTab = (): Tab => (TABS.find((t) => t.key === page.url.searchParams.get("tab"))?.key ?? "overview");
-  let tab = $state<Tab>(initialTab());
-  function openTab(t: Tab) {
-    tab = t;
-    const u = new URL(page.url);
-    if (t === "overview") u.searchParams.delete("tab");
-    else u.searchParams.set("tab", t);
-    replaceState(u, {});
+  type Section = (typeof SECTIONS)[number]["key"];
+  let active = $state<Section>("overview");
+  let rail = $state<HTMLElement>();
+  // Statements and filings load at a visitor's first sign of life, ahead of the scroll that reaches
+  // them, rather than on render: crawlers walking every stock page shouldn't spend the plan or call NSE.
+  let engaged = $state(false);
+  // Sections above a jump's target can grow while it scrolls, as their data arrives. Until that
+  // settles, or the reader scrolls for themselves, the page keeps aiming at the target.
+  let root = $state<HTMLElement>();
+  let aimAt: string | null = null;
+  let aimTimer: ReturnType<typeof setTimeout>;
+  function aim(key: string) {
+    engaged = true;
+    aimAt = key;
+    clearTimeout(aimTimer);
+    aimTimer = setTimeout(() => (aimAt = null), 4000);
   }
+  onMount(() => {
+    const engage = () => (engaged = true);
+    const signs = ["pointermove", "pointerdown", "touchstart", "keydown", "wheel", "scroll"];
+    for (const s of signs) addEventListener(s, engage, { once: true, passive: true });
+
+    const stopAiming = () => (aimAt = null);
+    const ownScroll = ["wheel", "touchmove", "keydown"];
+    for (const s of ownScroll) addEventListener(s, stopAiming, { passive: true });
+    const growth = new ResizeObserver(() => {
+      if (aimAt) document.getElementById(aimAt)?.scrollIntoView({ behavior: "instant" });
+    });
+    growth.observe(root!);
+
+    // Older links and bookmarks say ?tab=; a #section the browser has already scrolled to.
+    const wanted = location.hash.slice(1) || page.url.searchParams.get("tab");
+    if (SECTIONS.some((s) => s.key === wanted)) {
+      engage();
+      aim(wanted!);
+      if (!location.hash) document.getElementById(wanted!)?.scrollIntoView({ behavior: "instant" });
+    }
+
+    let frame = 0;
+    const mark = () => {
+      frame = 0;
+      const line = (rail?.getBoundingClientRect().bottom ?? 0) + 24;
+      let now: Section = "overview";
+      for (const s of SECTIONS) if ((document.getElementById(s.key)?.getBoundingClientRect().top ?? Infinity) <= line) now = s.key;
+      // The last section may be too short to ever reach the line.
+      if (innerHeight + scrollY >= document.documentElement.scrollHeight - 2) now = "peers";
+      active = now;
+    };
+    const onScroll = () => (frame ||= requestAnimationFrame(mark));
+    addEventListener("scroll", onScroll, { passive: true });
+    mark();
+    return () => {
+      for (const s of signs) removeEventListener(s, engage);
+      for (const s of ownScroll) removeEventListener(s, stopAiming);
+      growth.disconnect();
+      clearTimeout(aimTimer);
+      removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
+    };
+  });
+  // On a phone the rail scrolls sideways; keep the marked section in it.
+  $effect(() => {
+    const link = rail?.querySelector<HTMLElement>(`[href="#${active}"]`);
+    // Instant: a second smooth scroll here could interrupt the page's own.
+    if (link) rail!.scrollTo({ left: link.offsetLeft - 16, behavior: "instant" });
+  });
 
   // ── Quarterly results + shareholding (imported, or from the provider in the browser) ──
   let extFund = $state<{ periods: any[]; quarters: any[]; fetched_at: string | null } | null>(null);
@@ -68,7 +124,7 @@
   const latestSh = $derived(sh[0]);
   const hasPledge = $derived(sh.some((q: any) => q.pledged_pct != null));
 
-  // ── Full statements, fetched when the Financials tab first opens ──
+  // ── Full statements, fetched ahead of the Financials section ──
   const STATEMENTS = [
     { key: "quarter_results", label: "Quarterly", growth: ["Sales", "Revenue", "Net Profit"], lag: 4 },
     { key: "yoy_results", label: "Profit & loss", growth: ["Sales", "Revenue", "Net Profit"], lag: 1 },
@@ -84,37 +140,55 @@
     void c.symbol;
     statements = {};
   });
-  $effect(() => {
-    if (tab !== "financials") return;
-    const key = statementKey;
-    if (statements[key] !== undefined) return;
+  function loadStatement(key: StatementKey) {
+    if (statements[key] !== undefined) return Promise.resolve();
+    const sym = c.symbol;
     statements[key] = "loading";
-    fetch(`/stock/${encodeURIComponent(c.symbol)}/statements?stats=${key}`)
+    return fetch(`/stock/${encodeURIComponent(sym)}/statements?stats=${key}`)
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null)
-      .then((d) => (statements[key] = d?.rows?.length ? d : null));
+      .then((d) => {
+        if (sym === c.symbol) statements[key] = d?.rows?.length ? d : null;
+      });
+  }
+  $effect(() => {
+    if (!engaged) return;
+    const sym = c.symbol;
+    // One first: it stores the company's whole bundle, so the rest don't each ask the provider.
+    untrack(() => loadStatement("quarter_results")).then(() => {
+      if (sym === c.symbol) for (const s of STATEMENTS) loadStatement(s.key);
+    });
   });
   const current = $derived(statements[statementKey]);
 
-  // ── Filings, corporate actions and meetings, fetched when the Filings tab first opens ──
+  // ── Filings, corporate actions and meetings, fetched ahead of the Filings section ──
   type FilingsData = { filings: any[] | null; kinds: Record<string, string>; counts: Record<string, number>; actions: any[] | null; events: any[] | null; fetched_at: string | null };
   let filingsData = $state<FilingsData | "loading" | null | undefined>(undefined);
   let filingKind = $state("");
+  // A year of filings would bury Peers below it, so these open short.
+  const SHORT_LIST = 10;
+  let allFilings = $state(false);
+  let allActions = $state(false);
   $effect(() => {
     void c.symbol;
     filingsData = undefined;
     filingKind = "";
+    allFilings = allActions = false;
   });
   $effect(() => {
-    if (tab !== "filings" || filingsData !== undefined) return;
+    if (!engaged || filingsData !== undefined) return;
+    const sym = c.symbol;
     filingsData = "loading";
-    fetch(`/stock/${encodeURIComponent(c.symbol)}/filings`)
+    fetch(`/stock/${encodeURIComponent(sym)}/filings`)
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null)
-      .then((d) => (filingsData = d));
+      .then((d) => {
+        if (sym === c.symbol) filingsData = d;
+      });
   });
   const fd = $derived(filingsData && filingsData !== "loading" ? filingsData : null);
   const shownFilings = $derived((fd?.filings ?? []).filter((f: any) => !filingKind || f.kind === filingKind));
+  const shownActions = $derived(fd?.actions ?? []);
   const spec = $derived(STATEMENTS.find((s) => s.key === statementKey)!);
 
   // ── Summary: plain facts from the figures on this page ──
@@ -152,7 +226,7 @@
 
 <svelte:head><title>{c.symbol} · {c.name} — {BRAND}</title></svelte:head>
 
-<div class="page">
+<div class="page" bind:this={root}>
   <!-- Identity and price -->
   <header class="head">
     <div class="who">
@@ -189,16 +263,16 @@
     <p class="summary">{summary}{#if extLoading}<span class="sub"> Loading quarterly figures…</span>{/if}</p>
   {/if}
 
-  <!-- Section tabs -->
-  <nav class="sections" aria-label="Stock sections">
-    <div class="tabs" role="tablist">
-      {#each TABS as t}
-        <button role="tab" aria-selected={tab === t.key} class:active={tab === t.key} onclick={() => openTab(t.key)}>{t.label}</button>
+  <!-- Section rail: jumps down this one page -->
+  <nav class="sections" aria-label="Stock sections" bind:this={rail}>
+    <div class="tabs">
+      {#each SECTIONS as s}
+        <a href="#{s.key}" aria-current={active === s.key ? "true" : undefined} onclick={() => aim(s.key)}>{s.label}</a>
       {/each}
     </div>
   </nav>
 
-  {#if tab === "overview"}
+  <div id="overview" class="block">
     <section class="card">
       <div class="card-head">
         <div class="tabs">
@@ -251,7 +325,10 @@
         <div><dt>Series</dt><dd>{c.series ?? "—"}</dd></div>
       </dl>
     </section>
-  {:else if tab === "technicals"}
+  </div>
+
+  <div id="technicals" class="block">
+    <h2>Technicals</h2>
     <section class="card">
       <div class="card-head"><h2>Returns</h2><span class="sub">adjusted for splits and bonuses</span></div>
       <div class="returns">
@@ -279,7 +356,10 @@
         </tbody>
       </table>
     </section>
-  {:else if tab === "financials"}
+  </div>
+
+  <div id="financials" class="block">
+    <h2>Financials</h2>
     <section class="card">
       <div class="card-head">
         <div class="tabs" role="tablist" aria-label="Statement">
@@ -301,9 +381,12 @@
       {/if}
     </section>
     <p class="sub small">Source: Indian Stock API, from company filings. Annual columns are financial years; TTM is the trailing twelve months.</p>
-  {:else if tab === "shareholding"}
+  </div>
+
+  <div id="shareholding" class="block">
+    <h2>Shareholding</h2>
     <section class="card">
-      <div class="card-head"><h2>Shareholding pattern</h2>{#if latestSh}<span class="sub">as of {date(latestSh.quarter_end)}</span>{/if}</div>
+      {#if latestSh}<div class="card-head"><span class="sub">as of {date(latestSh.quarter_end)}</span></div>{/if}
       {#if latestSh}
         <div class="card-body">
           <div class="stack" aria-hidden="true">
@@ -325,9 +408,13 @@
         <div class="empty">{extLoading ? `Loading shareholding for ${c.symbol}…` : `Shareholding for ${c.symbol} isn't available right now.`}</div>
       {/if}
     </section>
-  {:else if tab === "filings"}
+  </div>
+
+  <div id="filings" class="block">
+    <h2>Filings</h2>
     {#if filingsData === "loading" || filingsData === undefined}
-      <div class="card empty">Loading {c.symbol}'s filings from NSE…</div>
+      <!-- Holds roughly the lists' height, so the page doesn't jump when they arrive. -->
+      <div class="card empty filings-loading">Loading {c.symbol}'s filings from NSE…</div>
     {:else if !fd}
       <div class="card empty">{c.symbol}'s filings aren't available from NSE right now.</div>
     {:else}
@@ -346,39 +433,52 @@
           </div>
           <span class="sub">last 12 months · PDFs from NSE</span>
         </div>
-        <FilingList filings={shownFilings} kinds={fd.kinds} showCompany={false} empty="No filings of this kind in the last year." />
+        <FilingList filings={allFilings ? shownFilings : shownFilings.slice(0, SHORT_LIST)} kinds={fd.kinds} showCompany={false} empty="No filings of this kind in the last year." />
+        {#if !allFilings && shownFilings.length > SHORT_LIST}
+          <button class="btn small more" onclick={() => (allFilings = true)}>Show all {shownFilings.length} filings</button>
+        {/if}
       </section>
       <section class="card">
         <div class="card-head"><h2>Corporate actions</h2><span class="sub">dividends, bonuses, splits</span></div>
-        {#if fd.actions?.length}
+        {#if shownActions.length}
           <div class="table-scroll">
             <table>
               <thead><tr><th>Ex-date</th><th class="left">Action</th><th>Record date</th></tr></thead>
               <tbody>
-                {#each fd.actions as a, i (a.subject + i)}
+                {#each allActions ? shownActions : shownActions.slice(0, SHORT_LIST) as a, i (a.subject + i)}
                   <tr><td>{date(a.ex_date)}</td><td class="left">{a.subject}</td><td>{date(a.record_date)}</td></tr>
                 {/each}
               </tbody>
             </table>
           </div>
+          {#if !allActions && shownActions.length > SHORT_LIST}
+            <button class="btn small more" onclick={() => (allActions = true)}>Show all {shownActions.length} actions</button>
+          {/if}
         {:else}
           <div class="empty">No corporate actions on record for {c.symbol}.</div>
         {/if}
       </section>
     {/if}
-  {:else if tab === "peers"}
+  </div>
+
+  <div id="peers" class="block">
+    <h2>Peers in {c.sector ?? "this sector"}</h2>
     <section class="card">
-      <div class="card-head"><h2>Peers in {c.sector ?? "this sector"}</h2></div>
       {#if c.peers?.length}
         <StockTable rows={c.peers} cols={["close", "change_pct", "ret_1m", "ret_1y", "pe"]} logos />
       {:else}
         <div class="empty">No sector peers for {c.symbol}.</div>
       {/if}
     </section>
-  {/if}
+  </div>
 </div>
 
 <style>
+  /* One section of the page. The scroll margin clears the two sticky rails above it. */
+  .block { display: grid; grid-template-columns: minmax(0, 1fr); gap: 34px; scroll-margin-top: 108px; }
+  .block > h2 { margin-bottom: -22px; padding-top: 14px; border-top: var(--rule-heavy); font-size: 30px; font-weight: 850; font-stretch: 66%; line-height: 1; }
+  .filings-loading { min-height: 480px; }
+  .more { margin-top: 12px; }
   .table-skeleton { display: grid; }
   .table-skeleton i { height: 37px; border-bottom: 1px solid var(--line); background: linear-gradient(var(--panel-2), var(--panel-2)) no-repeat 0 50% / 180px 12px; }
   .head { display: grid; grid-template-columns: 1fr auto; gap: 18px 24px; align-items: start; }
@@ -397,17 +497,17 @@
   .keys dd { margin: 2px 0 0; font: 800 22px var(--display); font-stretch: 72%; }
   .summary { font: 17px/1.55 var(--serif); color: var(--ink); max-width: 72ch; }
 
-  /* Section rail under the stock's name: printed section heads, the open one underlined in ink. */
+  /* Section rail under the stock's name: printed section heads, the one being read underlined in ink. */
   .sections { position: sticky; top: 49px; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--ink); }
   .sections .tabs { gap: 28px; border: 0; overflow: visible; }
-  .sections .tabs button { position: relative; padding: 12px 0; border: 0; background: none; color: var(--ink-2); font-size: 13.5px; }
-  .sections .tabs button:hover { background: none; color: var(--ink); }
-  .sections .tabs [aria-selected="true"], .sections .tabs [aria-selected="true"]:hover { background: none; color: var(--ink); }
-  .sections .tabs [aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 4px; background: var(--ink); }
+  .sections .tabs a { position: relative; padding: 12px 0; border: 0; background: none; color: var(--ink-2); font-size: 13.5px; }
+  .sections .tabs a:hover { background: none; color: var(--ink); }
+  .sections .tabs [aria-current="true"], .sections .tabs [aria-current="true"]:hover { background: none; color: var(--ink); }
+  .sections .tabs [aria-current="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 4px; background: var(--ink); }
   @media (max-width: 640px) {
     .sections { overflow-x: auto; scrollbar-width: none; }
     .sections .tabs { gap: 22px; }
-    .sections button { white-space: nowrap; }
+    .sections a { white-space: nowrap; }
   }
 
   .note { margin-top: 8px; font-size: 12.5px; }

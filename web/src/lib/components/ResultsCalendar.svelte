@@ -77,7 +77,7 @@
         <tbody>
           {#each season.slice(0, 150) as c (c.symbol)}
             <tr>
-              <td><a href="/stock/{c.symbol}?tab=filings" class="sym">{c.symbol}</a><span class="name">{c.company}</span></td>
+              <td><a href="/stock/{c.symbol}#filings" class="sym">{c.symbol}</a><span class="name">{c.company}</span></td>
               <td class="left"><DocLinks docs={c.docs} /></td>
               <td>{filed(c.latest)}</td>
             </tr>
