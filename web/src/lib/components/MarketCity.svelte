@@ -275,8 +275,8 @@
     let drag: { x: number; y: number; moved: number; at: number } | null = null;
     let hot = -1;
     let viewProj: number[] = [];
-    const now = () => performance.now() / 1000;
-    const start = now();
+    const clock = () => performance.now() / 1000;
+    const start = clock();
     let last = start;
 
     const local = (e: PointerEvent) => {
@@ -289,7 +289,7 @@
       hover = i >= 0 ? cur(towers[i].s) : null;
     };
     const onDown = (e: PointerEvent) => {
-      drag = { x: e.clientX, y: e.clientY, moved: 0, at: now() };
+      drag = { x: e.clientX, y: e.clientY, moved: 0, at: clock() };
       velocity = 0;
       grabbing = true;
       canvas.setPointerCapture(e.pointerId);
@@ -301,7 +301,7 @@
       drag.moved += Math.abs(dx) + Math.abs(dy);
       yaw -= dx * 0.006; velocity = -dx * 0.006 * 60;
       pitch = Math.min(1.2, Math.max(0.22, pitch + dy * 0.004));
-      drag.x = e.clientX; drag.y = e.clientY; drag.at = now();
+      drag.x = e.clientX; drag.y = e.clientY; drag.at = clock();
     };
     const onUp = (e: PointerEvent) => {
       if (drag && drag.moved < 6) {
@@ -310,7 +310,7 @@
         const i = pick(p.x, p.y);
         if (i >= 0) goto(`/stock/${encodeURIComponent(towers[i].s.symbol)}`);
         velocity = 0;
-      } else if (drag && now() - drag.at > 0.08) velocity = 0; // held still before letting go: no fling
+      } else if (drag && clock() - drag.at > 0.08) velocity = 0; // held still before letting go: no fling
       drag = null; grabbing = false;
       if (e.pointerType !== "mouse") { pointer = null; setHot(-1); }
     };
@@ -359,7 +359,7 @@
     let raf = 0;
     const frame = () => {
       raf = requestAnimationFrame(frame);
-      const t = now();
+      const t = clock();
       const dt = Math.min(0.05, t - last);
       last = t;
       if (!visible || document.hidden || !w || !h) return;
@@ -448,6 +448,8 @@
         moved = requestAnimationFrame(() => {
           moved = 0;
           towers.forEach((t, i) => (inst[i * 5 + 2] = t.h = height(cur(t.s).change)));
+          // District names ride on their tallest tower, so they move with it.
+          for (const d of districts) d.top = Math.max(0, ...towers.filter((t) => (t.s.sector || "Other") === d.sector).map((t) => t.h));
           gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
           gl.bufferSubData(gl.ARRAY_BUFFER, 0, inst);
           paint();

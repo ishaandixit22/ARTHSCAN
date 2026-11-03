@@ -42,7 +42,9 @@
   const nifty = $derived(indices.find((i) => i.index_name === "Nifty 50"));
 
   // The city keeps its layout (sector districts, footprint by the last close's turnover); live prices move the towers.
-  $effect(() => (lm ? watch(data.cityStocks.map((s) => s.symbol)) : undefined));
+  // Keyed on a boolean: `lm` is a new object every poll, which would drop and resend the subscription each time.
+  const isLive = $derived(!!lm);
+  $effect(() => (isLive ? watch(data.cityStocks.map((s) => s.symbol)) : undefined));
   const city = $derived(lm ? data.cityStocks.map((s) => {
     const q = live.quotes[s.symbol];
     return q?.changePct != null ? { ...s, change: q.changePct, close: q.ltp } : s;
