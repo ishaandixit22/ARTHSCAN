@@ -1,100 +1,99 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
+  import { page } from "$app/state";
   import { BRAND } from "$lib/brand";
-  import { fetchedAt, int, price, tone } from "$lib/format";
+  import IpoLogo from "$lib/components/IpoLogo.svelte";
+  import { date, fetchedAt, int, todayIST, tone } from "$lib/format";
 
   let { data } = $props();
   const d = $derived(data.dashboard);
   const rows = $derived<any[]>(d?.rows ?? []);
+  const today = todayIST();
+  const dayMs = 86_400_000;
+  const daysTo = (iso: string) => Math.round((Date.parse(iso) - Date.parse(today)) / dayMs);
+  const monthAgo = new Date(Date.parse(today) - 31 * dayMs).toISOString().slice(0, 10);
 
-  const VIEWS = [{ key: "gmp", label: "Live GMP" }, { key: "subscription", label: "Subscription" }, { key: "listed", label: "Listing performance" }];
-  const STAGE: Record<string, { label: string; cls: string }> = {
-    open: { label: "Open", cls: "open" }, closing: { label: "Closes today", cls: "closing" }, upcoming: { label: "Upcoming", cls: "up-next" }, expected: { label: "Expected", cls: "up-next" },
-    closed: { label: "Closed", cls: "closed" }, allotted: { label: "Awaiting listing", cls: "closed" }, listed: { label: "Listed", cls: "listed" },
-  };
-  const ORDER = ["open", "closing", "upcoming", "expected", "closed", "allotted", "listed"];
-  const FILTERS = [
-    { key: "active", label: "Active", match: (r: any) => r.stage !== "listed" },
-    { key: "open", label: "Open", match: (r: any) => r.stage === "open" || r.stage === "closing" },
-    { key: "closing", label: "Closing today", match: (r: any) => r.stage === "closing" },
-    { key: "upcoming", label: "Upcoming", match: (r: any) => r.stage === "upcoming" || r.stage === "expected" },
-    { key: "closed", label: "Closed", match: (r: any) => r.stage === "closed" || r.stage === "allotted" },
-    { key: "listed", label: "Listed", match: (r: any) => r.stage === "listed" },
-    { key: "all", label: "All", match: () => true },
+  type Tab = "open" | "upcoming" | "expected" | "closed" | "listed";
+  const TABS: { key: Tab; label: string; heading: string; stages: string[]; empty: string }[] = [
+    { key: "open", label: "Open", heading: "Open for bidding", stages: ["open", "closing"], empty: "No IPO is taking bids right now." },
+    { key: "upcoming", label: "Upcoming", heading: "Opening soon", stages: ["upcoming"], empty: "No IPO has announced its bidding dates right now. New issues appear here as soon as the dates are out." },
+    { key: "expected", label: "Expected", heading: "Expected, dates awaited", stages: ["expected"], empty: "Our IPO data provider isn't quoting any company ahead of its dates right now." },
+    { key: "closed", label: "Closed", heading: "Bidding closed, not yet listed", stages: ["closed", "allotted"], empty: "No IPO is waiting to list right now." },
+    { key: "listed", label: "Listed", heading: "Recently listed", stages: ["listed"], empty: "No IPO listed in this period." },
   ];
+  const num = (key: string) => (a: any, b: any) => (a[key] == null ? 1 : b[key] == null ? -1 : b[key] - a[key]);
+  const soonest = (key: string) => (a: any, b: any) => (a[key] ?? "9").localeCompare(b[key] ?? "9");
+  const latest = (key: string) => (a: any, b: any) => (b[key] ?? "").localeCompare(a[key] ?? "");
+  const SORTS: Record<Tab, { key: string; label: string; by: ((a: any, b: any) => number) | null }[]> = {
+    open: [{ key: "close", label: "Closing soon", by: soonest("close") }, { key: "sub", label: "Most subscribed", by: num("times_total") }, { key: "gmp", label: "Highest GMP", by: num("gmp_pct") }, { key: "size", label: "Largest issue", by: num("size_cr") }],
+    upcoming: [{ key: "open", label: "Opening soon", by: soonest("open") }, { key: "gmp", label: "Highest GMP", by: num("gmp_pct") }, { key: "size", label: "Largest issue", by: num("size_cr") }],
+    expected: [{ key: "provider", label: "Newest first", by: null }, { key: "name", label: "A to Z", by: (a, b) => a.name.localeCompare(b.name) }, { key: "gmp", label: "Highest GMP", by: num("gmp") }],
+    closed: [{ key: "listing", label: "Listing soon", by: soonest("listing") }, { key: "sub", label: "Most subscribed", by: num("times_total") }, { key: "gmp", label: "Highest GMP", by: num("gmp_pct") }, { key: "size", label: "Largest issue", by: num("size_cr") }],
+    listed: [{ key: "listing", label: "Recently listed", by: latest("listing") }, { key: "gain", label: "Best listing gain", by: num("listing_gain") }, { key: "since", label: "Best since issue", by: num("current_gain") }, { key: "sub", label: "Most subscribed", by: num("times_total") }, { key: "size", label: "Largest issue", by: num("size_cr") }],
+  };
 
-  let stageFilter = $state("active");
-  let boardFilter = $state("all");
-  let onlyGmp = $state(false);
+  // Listed means the last month unless the reader asks for everything the calendar carries.
+  let allListed = $state(false);
+  const recent = (r: any) => (r.listing ?? "") >= monthAgo;
+  const inTab = (t: (typeof TABS)[number]) => rows.filter((r) => t.stages.includes(r.stage) && (t.key !== "listed" || allListed || recent(r)));
+  const counts = $derived(Object.fromEntries(TABS.map((t) => [t.key, inTab(t).length])) as Record<Tab, number>);
+
+  // The tab is in the address so it can be shared. Old ?view=listed links still land in the right place.
+  const asked = $derived(page.url.searchParams.get("tab") ?? (page.url.searchParams.get("view") === "listed" ? "listed" : null));
+  const fallback = $derived<Tab>(counts.open ? "open" : counts.upcoming ? "upcoming" : counts.closed ? "closed" : "listed");
+  const tab = $derived(TABS.find((t) => t.key === asked) ?? TABS.find((t) => t.key === fallback)!);
+
   let search = $state("");
-  let budget = $state("");
-  let sort = $state<{ key: string; dir: 1 | -1 } | null>(null);
-  const amount = $derived(Number(budget.replace(/[^\d]/g, "")) || 0);
-  const effectiveStage = $derived(data.view === "listed" ? "listed" : stageFilter);
+  let board = $state("all");
+  let sorts = $state<Partial<Record<Tab, string>>>({});
+  const sortKey = $derived(sorts[tab.key] ?? SORTS[tab.key][0].key);
+  const boardKey = (r: any) => (r.board === "SME" ? (/bse/i.test(r.exchange ?? "") ? "bse-sme" : "nse-sme") : "mainboard");
+  const BOARDS = [["all", "All boards"], ["mainboard", "Mainboard"], ["nse-sme", "NSE SME"], ["bse-sme", "BSE SME"]] as const;
 
-  const COLS: Record<string, { key: string; label: string; right?: boolean; wide?: boolean; title?: string }[]> = {
-    gmp: [
-      { key: "gmp", label: "GMP", right: true }, { key: "est_listing", label: "Est. listing", right: true }, { key: "profit_per_lot", label: "Profit / lot", right: true, title: "GMP × shares in a lot, if allotted and the premium holds" },
-      { key: "times_total", label: "Sub.", right: true }, { key: "price_high", label: "Price", right: true }, { key: "size_cr", label: "Size", right: true, wide: true }, { key: "lot", label: "Lot", right: true, wide: true },
-      { key: "open", label: "Open", wide: true }, { key: "close", label: "Close" }, { key: "allotment", label: "Allot.", wide: true }, { key: "listing", label: "Listing" }, { key: "gmp_updated", label: "Read at", wide: true },
-    ],
-    subscription: [
-      { key: "times_total", label: "Total", right: true }, { key: "qib", label: "QIB", right: true }, { key: "snii", label: "sNII", right: true, title: "Small non-institutional, ₹2–10 lakh" }, { key: "bnii", label: "bNII", right: true, title: "Big non-institutional, above ₹10 lakh" },
-      { key: "nii", label: "NII", right: true }, { key: "retail", label: "Retail", right: true }, { key: "demand_cr", label: "Demand", right: true, wide: true, title: "Shares bid for × top of the band" }, { key: "size_cr", label: "Size", right: true, wide: true }, { key: "price_high", label: "Price", right: true, wide: true }, { key: "close", label: "Close" }, { key: "sub_as_of", label: "As of" },
-    ],
-    listed: [
-      { key: "listing", label: "Listed" }, { key: "price_high", label: "Issue price", right: true }, { key: "listing_price", label: "Listing price", right: true }, { key: "listing_gain", label: "Listing gain", right: true }, { key: "cmp", label: "Now", right: true }, { key: "current_gain", label: "Since issue", right: true },
-      { key: "times_total", label: "Sub.", right: true, wide: true }, { key: "gmp", label: "Last GMP", right: true, wide: true }, { key: "size_cr", label: "Size", right: true, wide: true },
-    ],
-  };
-  const cols = $derived(COLS[data.view]);
-
-  const stageCount = (key: string) => rows.filter((r) => (boardFilter === "all" || r.board === boardFilter) && FILTERS.find((f) => f.key === key)!.match(r)).length;
-  const shown = $derived.by(() => {
-    const f = FILTERS.find((x) => x.key === effectiveStage)!;
+  const base = $derived.by(() => {
     const q = search.trim().toLowerCase();
-    const list = rows.filter((r) => f.match(r) && (boardFilter === "all" || r.board === boardFilter) && (!onlyGmp || (r.gmp ?? 0) !== 0) && (!q || r.name.toLowerCase().includes(q) || (r.symbol ?? "").toLowerCase().includes(q)));
-    if (sort) {
-      const { key, dir } = sort;
-      return [...list].sort((a, b) => {
-        const x = a[key], y = b[key];
-        if (x == null && y == null) return 0;
-        if (x == null) return 1;
-        if (y == null) return -1; // unknowns stay last in either direction
-        return (typeof x === "string" ? x.localeCompare(y) : x - y) * dir;
-      });
-    }
-    if (effectiveStage === "listed") return [...list].sort((a, b) => (b.listing ?? "").localeCompare(a.listing ?? ""));
-    return [...list].sort((a, b) => ORDER.indexOf(a.stage) - ORDER.indexOf(b.stage) || (a.close ?? "9").localeCompare(b.close ?? "9"));
+    return inTab(tab).filter((r) => !q || r.name.toLowerCase().includes(q) || (r.symbol ?? "").toLowerCase().includes(q));
   });
-  const toggle = (key: string) => { sort = sort?.key === key ? (sort.dir === -1 ? { key, dir: 1 } : null) : { key, dir: -1 }; };
+  const boardCount = (k: string) => (k === "all" ? base.length : base.filter((r) => boardKey(r) === k).length);
+  const shown = $derived.by(() => {
+    const list = base.filter((r) => board === "all" || boardKey(r) === board);
+    const by = SORTS[tab.key].find((s) => s.key === sortKey)?.by;
+    return by ? [...list].sort(by) : list;
+  });
+  const olderListed = $derived(rows.filter((r) => r.stage === "listed" && !recent(r)).length);
 
-  const short = (iso: string | null | undefined) => (iso ? new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }) : "—");
-  const stamp = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }) : "—");
-  const x = (v: number | null | undefined) => (v == null ? "—" : `${v >= 100 ? v.toFixed(0) : v.toFixed(2)}×`);
+  const short = (iso: string | null | undefined) => (iso ? new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }) : "TBA");
+  const stamp = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }) : "");
+  const times = (v: number | null | undefined) => (v == null ? "—" : `${v >= 100 ? v.toFixed(0) : v.toFixed(2)}×`);
   const money = (v: number | null | undefined) => (v == null ? "—" : `${v < 0 ? "−" : ""}₹${Math.abs(v).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`);
-  const crore = (v: number | null | undefined) => (v == null ? "—" : `₹${v >= 100 ? Math.round(v).toLocaleString("en-IN") : v.toFixed(2)} Cr`);
+  const size = (v: number | null | undefined) => (v == null ? "—" : `₹${v >= 100 ? Math.round(v).toLocaleString("en-IN") : v.toFixed(2)} Cr`);
   const signed = (v: number | null | undefined) => (v == null ? "—" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(2)}%`);
-  const lakhs = (v: number) => (v >= 1e7 ? `₹${(v / 1e7).toFixed(2)} Cr` : v >= 1e5 ? `₹${(v / 1e5).toFixed(2)} L` : `₹${int(v)}`);
-  const heat = (v: number | null | undefined) => (v == null ? "" : v >= 50 ? "hot" : v >= 10 ? "warm" : v >= 1 ? "ok" : "cold");
+  const band = (r: any) => (r.price_high == null ? "TBA" : r.price_low != null && r.price_low !== r.price_high ? `₹${int(r.price_low)} – ₹${int(r.price_high)}` : `₹${int(r.price_high)}`);
+  const sooner = (word: string, iso: string) => { const n = daysTo(iso); return n <= 0 ? `${word} today` : n === 1 ? `${word} tomorrow` : `${word} in ${n} days`; };
 
-  const fit = (r: any) => {
-    if (!amount || !r.costs) return null;
-    const lots = Math.floor(amount / r.costs.lot_cost);
-    if (!lots) return `Below one lot (${lakhs(r.costs.lot_cost)})`;
-    const spend = lots * r.costs.lot_cost;
-    return `${lots} lot${lots > 1 ? "s" : ""} · ${lakhs(spend)} · ${spend <= 2e5 ? "Retail" : spend <= 1e6 ? "sNII" : "bNII"}`;
+  /** Where the issue stands, in the words a reader wants first. */
+  const badge = (r: any): { text: string; cls: string } => {
+    if (r.stage === "open" || r.stage === "closing") { const urgent = r.close && daysTo(r.close) <= 1; return { text: r.close ? sooner("Closes", r.close) : "Open", cls: urgent ? "urgent" : "live" }; }
+    if (r.stage === "upcoming") return { text: r.open ? sooner("Opens", r.open) : "Dates awaited", cls: "plain" };
+    if (r.allotment && r.allotment > today) return { text: `Allotment ${short(r.allotment)}`, cls: "plain" };
+    return { text: r.listing ? `Lists ${short(r.listing)}` : "Awaiting listing", cls: "plain" };
   };
+  /** What the multiple means, for someone meeting the word "subscribed" for the first time. */
+  const reading = (v: number | null | undefined) => (v == null ? null : v >= 1 ? `Bids for ${v >= 100 ? v.toFixed(0) : v.toFixed(2)} times the shares on offer` : `Bids for ${Math.round(v * 100)}% of the shares on offer`);
 
   // Refreshes while the tab is visible; the API decides how often a source is really asked.
   let refreshedAt = $state(Date.now());
-  let refreshing = $state(false);
-  const refresh = async () => { refreshing = true; await invalidateAll(); refreshedAt = Date.now(); refreshing = false; };
   $effect(() => {
-    const t = setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, 60_000);
+    const t = setInterval(async () => { if (document.visibilityState === "visible") { await invalidateAll(); refreshedAt = Date.now(); } }, 60_000);
     return () => clearInterval(t);
   });
   const source = $derived(d?.sources?.ipoguru);
+  const directory = $derived([
+    ["Open IPOs", rows.filter((r) => r.stage === "open" || r.stage === "closing")],
+    ["Upcoming IPOs", rows.filter((r) => r.stage === "upcoming")],
+    ["Closed IPOs", rows.filter((r) => r.stage === "closed" || r.stage === "allotted")],
+    ["Recently listed IPOs", rows.filter((r) => r.stage === "listed").sort(latest("listing")).slice(0, 10)],
+  ].filter(([, l]) => (l as any[]).length) as [string, any[]][]);
 </script>
 
 <svelte:head>
@@ -102,189 +101,229 @@
   <meta name="description" content="Grey-market premium and live subscription for every mainboard and SME IPO on NSE and BSE, with lot costs, dates and listing performance." />
 </svelte:head>
 
+{#snippet who(r: any)}
+  <span class="who">
+    <IpoLogo src={r.logo} name={r.name} size={34} />
+    <a href="/ipos/{r.slug}">{r.name}</a>
+  </span>
+{/snippet}
+
 <div class="page">
-  <div class="page-head">
+  <p class="crumbs"><a href="/">Home</a> › IPO</p>
+  <header class="head">
     <div>
-      <h1>IPOs</h1>
-      <p class="sub">Mainboard and SME issues on NSE and BSE{#if source?.fetched_at}. Premiums read {fetchedAt(source.fetched_at)}{/if}{#if d?.sources?.nse?.as_of}; exchange bids checked {fetchedAt(d.sources.nse.as_of)}{/if}.</p>
+      <h1>IPO Dashboard</h1>
+      <p class="stamp">Checked {stamp(new Date(refreshedAt).toISOString())}{#if source?.fetched_at}. Grey-market premiums read {fetchedAt(source.fetched_at)}{/if}.</p>
     </div>
-    <div class="tabs">
-      {#each VIEWS as v}<a href="?view={v.key}" class:active={data.view === v.key} data-sveltekit-noscroll>{v.label}</a>{/each}
+    <div class="controls">
+      <input class="find" type="search" placeholder="Search for any IPO" aria-label="Search for any IPO" bind:value={search} />
+      <select aria-label="Board" bind:value={board}>
+        {#each BOARDS as [k, label]}<option value={k}>{label} ({boardCount(k)})</option>{/each}
+      </select>
+      <select aria-label="Sort" value={sortKey} onchange={(e) => (sorts[tab.key] = e.currentTarget.value)}>
+        {#each SORTS[tab.key] as s}<option value={s.key}>{s.label}</option>{/each}
+      </select>
     </div>
-  </div>
+  </header>
 
   {#if !d}
     <div class="notice">IPO data is not reachable right now. Try again shortly.</div>
   {:else}
-    <section class="strip" aria-label="Issues by stage">
-      {#each [["open", "Open", d.counts.open], ["closing", "Closing today", d.counts.closing], ["upcoming", "Upcoming", d.counts.upcoming], ["closed", "Awaiting listing", d.counts.closed], ["listed", "Listed, 3 months", d.counts.listed]] as [key, label, c]}
-        <button class="stat" class:on={effectiveStage === key} onclick={() => (stageFilter = stageFilter === key ? "active" : String(key))} disabled={data.view === "listed"}>
-          <b>{c.count}</b><span>{label}</span><small>{c.size_cr ? `₹${int(c.size_cr)} Cr` : " "}</small>
-        </button>
+    <nav class="stages" aria-label="IPOs by stage">
+      {#each TABS as t}
+        <a href="?tab={t.key}" class:active={tab.key === t.key} aria-current={tab.key === t.key ? "page" : undefined} data-sveltekit-noscroll data-sveltekit-replacestate>{t.label}<b>{counts[t.key]}</b></a>
       {/each}
-    </section>
+    </nav>
 
-    <div class="controls">
-      {#if data.view !== "listed"}
-        <div class="chips" role="group" aria-label="Stage">
-          {#each FILTERS.filter((f) => f.key !== "listed") as f}
-            <button class:on={stageFilter === f.key} onclick={() => (stageFilter = f.key)}>{f.label} <em>{stageCount(f.key)}</em></button>
-          {/each}
-        </div>
-      {/if}
-      <div class="chips" role="group" aria-label="Board">
-        {#each [["all", "All boards"], ["Mainboard", "Mainboard"], ["SME", "SME"]] as [k, l]}<button class:on={boardFilter === k} onclick={() => (boardFilter = k)}>{l}</button>{/each}
-      </div>
-      {#if data.view === "gmp"}<label class="check"><input type="checkbox" bind:checked={onlyGmp} /> Only non-zero GMP</label>{/if}
-      <input class="find" type="search" placeholder="Find a company" aria-label="Find a company" bind:value={search} />
-      <label class="budget"><span>I have</span><input inputmode="numeric" placeholder="₹ 15,000" aria-label="Amount you want to invest" bind:value={budget} /></label>
-      <button class="refresh" onclick={refresh} disabled={refreshing}>{refreshing ? "Refreshing…" : "Refresh"}</button>
-      <span class="ticker">Page checked {stamp(new Date(refreshedAt).toISOString())}</span>
-    </div>
+    <section aria-labelledby="stage-heading">
+      <h2 id="stage-heading">{tab.heading}{#if tab.key === "listed" && !allListed}, last month{/if} <small>{shown.length}</small></h2>
 
-    <section class="card">
-      <div class="table-scroll">
-        <table class="board">
-          <thead>
-            <tr>
-              <th class="name-col left">Issue</th>
-              {#each cols as c}
-                <th class:wide-only={c.wide} class:left={!c.right} title={c.title} aria-sort={sort?.key === c.key ? (sort.dir === 1 ? "ascending" : "descending") : "none"}>
-                  <button class="sorter" onclick={() => toggle(c.key)}>{c.label}<i>{sort?.key === c.key ? (sort.dir === 1 ? "↑" : "↓") : ""}</i></button>
-                </th>
-              {/each}
-              {#if amount}<th class="left">With ₹{int(amount)}</th>{/if}
-            </tr>
-          </thead>
-          <tbody>
-            {#each shown as r (r.slug)}
-              {@const s = STAGE[r.stage]}
-              <tr>
-                <td class="name-col left">
-                  <div class="who">
-                    {#if r.logo}<img src={r.logo} alt="" width="28" height="28" loading="lazy" />{:else}<span class="mono">{r.name.slice(0, 1)}</span>{/if}
-                    <div>
-                      <a class="sym" href="/ipos/{r.slug}">{r.name}</a>
-                      <span class="tags"><span class="pill {s.cls}">{s.label}</span><span class="kind">{r.exchange ?? r.board}</span></span>
-                    </div>
-                  </div>
-                </td>
-                {#if data.view === "gmp"}
-                  <td class="gmp-cell {r.gmp != null ? tone(r.gmp) : ''}">
-                    {#if r.gmp == null}<span class="na">Not quoted</span>{:else}<b>{money(r.gmp)}</b> <small>{r.gmp_pct != null ? `${r.gmp_pct.toFixed(2)}%` : ""}</small>{#if r.gmp_low != null}<span class="range">{money(r.gmp_low)} – {money(r.gmp_high)}</span>{/if}{/if}
-                  </td>
-                  <td>{r.est_listing != null ? money(r.est_listing) : "—"}</td>
-                  <td class={tone(r.profit_per_lot)}>{money(r.profit_per_lot)}</td>
-                  <td class="times {heat(r.times_total)}">{x(r.times_total)}</td>
-                  <td>{r.price_high != null ? money(r.price_high) : "TBA"}</td>
-                  <td class="wide-only">{crore(r.size_cr)}</td>
-                  <td class="wide-only">{int(r.lot)}</td>
-                  <td class="left wide-only">{short(r.open)}</td>
-                  <td class="left">{short(r.close)}</td>
-                  <td class="left wide-only">{short(r.allotment)}</td>
-                  <td class="left">{short(r.listing)}</td>
-                  <td class="left wide-only stamp">{stamp(r.gmp_updated)}</td>
-                {:else if data.view === "subscription"}
-                  <td class="times {heat(r.times_total)}"><b>{x(r.times_total)}</b></td>
-                  <td class="times {heat(r.qib)}">{x(r.qib)}</td>
-                  <td class="times {heat(r.snii)}">{x(r.snii)}</td>
-                  <td class="times {heat(r.bnii)}">{x(r.bnii)}</td>
-                  <td class="times {heat(r.nii)}">{x(r.nii)}</td>
-                  <td class="times {heat(r.retail)}">{x(r.retail)}</td>
-                  <td class="wide-only">{crore(r.demand_cr)}</td>
-                  <td class="wide-only">{crore(r.size_cr)}</td>
-                  <td class="wide-only">{r.price_high != null ? money(r.price_high) : "TBA"}</td>
-                  <td class="left">{short(r.close)}</td>
-                  <td class="left stamp">{#if r.sub_from === "nse"}{stamp(r.sub_as_of)} <em>NSE</em>{:else if r.sub_from === "ipoguru"}<em>Overall only</em>{:else}—{/if}</td>
-                {:else}
+      {#if !shown.length}
+        <p class="empty">{search.trim() || board !== "all" ? "No IPO here matches this search." : tab.empty}</p>
+      {:else if tab.key === "listed"}
+        <div class="table-scroll tbl">
+          <table>
+            <thead><tr><th class="co">Company</th><th class="left">Listed</th><th>Issue price</th><th>Listing price</th><th>Listing gain</th><th>Latest</th><th>Since issue</th><th>Subscribed</th><th>Issue size</th></tr></thead>
+            <tbody>
+              {#each shown as r (r.slug)}
+                <tr>
+                  <td class="co">{@render who(r)}</td>
                   <td class="left">{short(r.listing)}</td>
                   <td>{money(r.price_high)}</td>
                   <td>{money(r.listing_price)}</td>
-                  <td class={tone(r.listing_gain)}>{signed(r.listing_gain)}</td>
+                  <td class="strong {tone(r.listing_gain)}">{signed(r.listing_gain)}</td>
                   <td>{money(r.cmp)}</td>
-                  <td class={tone(r.current_gain)}>{signed(r.current_gain)}</td>
-                  <td class="wide-only times {heat(r.times_total)}">{x(r.times_total)}</td>
-                  <td class="wide-only">{money(r.gmp)}</td>
-                  <td class="wide-only">{crore(r.size_cr)}</td>
-                {/if}
-                {#if amount}<td class="left fit">{fit(r) ?? "—"}</td>{/if}
-              </tr>
-            {:else}
-              <tr><td class="left empty-row" colspan={cols.length + 1 + (amount ? 1 : 0)}>No issues match these filters.</td></tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
+                  <td class="strong {tone(r.current_gain)}">{signed(r.current_gain)}</td>
+                  <td class:up={(r.times_total ?? 0) >= 1}>{times(r.times_total)}</td>
+                  <td>{size(r.size_cr)}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+        {#if olderListed}
+          <button class="more" onclick={() => (allListed = !allListed)}>{allListed ? "Show the last month only" : `Show ${olderListed} more from the last three months`}</button>
+        {/if}
+      {:else if tab.key === "expected"}
+        <div class="table-scroll tbl">
+          <table>
+            <thead><tr><th class="co">Company</th><th class="left">Type</th><th class="left">Exchange</th><th>GMP</th><th class="left">Status</th></tr></thead>
+            <tbody>
+              {#each shown as r (r.slug)}
+                <tr><td class="co">{@render who(r)}</td><td class="left">{r.board}</td><td class="left">{r.exchange ?? "—"}</td><td class={tone(r.gmp)}>{money(r.gmp)}</td><td class="left"><span class="badge plain">Dates awaited</span></td></tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {:else}
+        <div class="issues">
+          {#each shown as r (r.slug)}
+            {@const b = badge(r)}
+            <article class="issue">
+              <header>
+                <IpoLogo src={r.logo} name={r.name} size={48} />
+                <div class="title">
+                  <h3><a href="/ipos/{r.slug}">{r.name}</a></h3>
+                  <p class="tags"><span>{r.board}</span>{#if r.exchange}{r.exchange.replace(/\s*SME$/i, "")}{/if}</p>
+                </div>
+                <span class="badge {b.cls}">{b.text}</span>
+              </header>
+              <dl class="facts">
+                <div><dt>Open</dt><dd>{short(r.open)}</dd></div>
+                <div><dt>Close</dt><dd>{short(r.close)}</dd></div>
+                <div><dt>Listing</dt><dd>{short(r.listing)}</dd></div>
+                <div><dt>Issue size</dt><dd>{size(r.size_cr)}</dd></div>
+                <div><dt>Price band</dt><dd>{band(r)}</dd></div>
+                <div><dt>Lot size</dt><dd>{r.lot ? int(r.lot) : "TBA"}</dd></div>
+              </dl>
+              {#if r.costs}<p class="lot">One lot at the top of the band costs <b>{money(r.costs.lot_cost)}</b></p>{/if}
+              <div class="reads">
+                <div>
+                  <span class="k">Subscribed</span>
+                  <b class="fig" class:up={(r.times_total ?? 0) >= 1}>{r.stage === "upcoming" ? "—" : times(r.times_total)}</b>
+                  {#if r.qib != null || r.nii != null || r.retail != null}
+                    <span class="split">QIB <b>{times(r.qib)}</b> NII <b>{times(r.nii)}</b> Retail <b>{times(r.retail)}</b></span>
+                  {/if}
+                  <span class="plainly">{r.stage === "upcoming" ? "Bidding hasn't started" : reading(r.times_total) ?? "No figure yet"}</span>
+                </div>
+                <div>
+                  <span class="k">Grey market premium</span>
+                  {#if r.gmp == null}
+                    <b class="fig quiet">—</b><span class="plainly">Not quoted yet</span>
+                  {:else}
+                    <b class="fig {tone(r.gmp)}">{money(r.gmp)}{#if r.gmp_pct != null}<small>{signed(r.gmp_pct)}</small>{/if}</b>
+                    {#if r.est_listing != null}<span class="split">Implies <b>{money(r.est_listing)}</b></span>{/if}
+                    <span class="plainly">Unofficial{#if r.gmp_updated}, read {stamp(r.gmp_updated)}{/if}</span>
+                  {/if}
+                </div>
+              </div>
+            </article>
+          {/each}
+        </div>
+      {/if}
     </section>
+
+    {#if directory.length}
+      <section class="directory" aria-labelledby="directory-heading">
+        <h2 id="directory-heading">IPO directory</h2>
+        <div class="dir-cols">
+          {#each directory as [title, list]}
+            <div><h3>{title}</h3><ul>{#each list as r (r.slug)}<li><a href="/ipos/{r.slug}">{r.name} IPO</a></li>{/each}</ul></div>
+          {/each}
+        </div>
+      </section>
+    {/if}
 
     {#if source?.error || !source?.connected}
       <p class="sub warn">{!source?.connected ? "The IPO calendar is not connected, so only issues on NSE's board are listed." : `Showing the last stored premiums: ${source.error}.`}</p>
     {/if}
     <p class="sub source">
-      IPO data by <a href="https://www.ipoguru.in/">IPO Guru</a>; category subscription from NSE where it publishes the issue, so BSE-only issues show an overall figure. Grey-market premium is unofficial, indicative data from unregulated dealers and is not a forecast. Profit per lot assumes allotment and that the premium holds. Nothing here is investment advice; read the prospectus before applying.
+      IPO data by <a href="https://www.ipoguru.in/">IPO Guru</a>, with bids from NSE where it publishes the issue. Grey-market premium is unofficial, indicative data from unregulated dealers and is not a forecast. Nothing here is investment advice; read the prospectus before applying.
     </p>
   {/if}
 </div>
 
 <style>
-  .strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 2px; overflow: hidden; margin-bottom: 14px; }
-  .stat { display: grid; gap: 2px; padding: 12px 14px; background: var(--panel); border: 0; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
-  .stat:disabled { cursor: default; }
-  .stat:not(:disabled):hover { background: var(--panel-2); }
-  .stat.on { box-shadow: inset 0 -2px 0 var(--accent); }
-  .stat b { font-size: 22px; font-variant-numeric: tabular-nums; }
-  .stat span { color: var(--ink-2); font-size: 12.5px; }
-  .stat small { color: var(--ink-3); font-size: 12px; min-height: 16px; font-variant-numeric: tabular-nums; }
-  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 12px; font-size: 13px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
-  .chips button { padding: 5px 9px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--panel); color: var(--ink-2); font: inherit; cursor: pointer; }
-  .chips button:hover { color: var(--ink); }
-  .chips button.on { background: var(--ink); border-color: var(--ink); color: var(--panel); }
-  .chips em { font-style: normal; opacity: 0.65; margin-left: 2px; font-variant-numeric: tabular-nums; }
-  .check, .budget { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
-  .find, .budget input { padding: 5px 9px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--panel); color: var(--ink); font: inherit; }
-  .find { width: 170px; }
-  .budget input { width: 100px; }
-  .refresh { padding: 5px 9px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--panel); color: var(--ink-2); font: inherit; cursor: pointer; }
-  .ticker { color: var(--ink-3); font-size: 12px; margin-left: auto; }
-  .board th { padding: 0; white-space: nowrap; }
-  .board th.name-col { padding: 8px 12px; }
-  .sorter { display: inline-flex; gap: 3px; width: 100%; padding: 8px 10px; justify-content: flex-end; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; white-space: nowrap; }
-  th.left .sorter { justify-content: flex-start; }
-  .sorter i { font-style: normal; width: 9px; }
-  .sorter:hover { color: var(--ink); }
-  .board td { white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .name-col { position: sticky; left: 0; background: var(--panel); z-index: 1; min-width: 230px; max-width: 290px; white-space: normal !important; }
-  .who { display: flex; align-items: center; gap: 10px; }
-  .who img, .mono { width: 28px; height: 28px; flex: none; border-radius: 2px; object-fit: contain; background: var(--paper-hi); border: 1px solid var(--line); }
-  .mono { display: grid; place-items: center; font-size: 13px; font-weight: 600; color: var(--ink-2); background: var(--panel-2); }
-  a.sym { font-weight: 600; }
-  a.sym:hover { text-decoration: underline; }
-  .tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 3px; font-size: 11.5px; }
-  .kind { color: var(--ink-3); }
-  .pill { padding: 1px 6px; border-radius: 2px; background: var(--panel-2); color: var(--ink-2); font-weight: 500; }
-  .pill.open { background: var(--up-soft); color: var(--up); }
-  .pill.closing { background: var(--accent); color: var(--panel); }
-  .pill.listed { color: var(--ink-3); }
-  .gmp-cell b { font-weight: 600; }
-  .gmp-cell small { font-size: 12px; opacity: 0.85; }
-  .range { display: block; color: var(--ink-3); font-size: 11.5px; margin-top: 2px; }
-  .na { color: var(--ink-3); }
-  .times.hot { color: var(--up); font-weight: 600; }
-  .times.warm { color: var(--up); }
-  .times.cold { color: var(--ink-3); }
-  .stamp { color: var(--ink-3); font-size: 12px; }
-  .stamp em { font-style: normal; }
-  .fit { font-size: 12.5px; color: var(--ink-2); }
-  .empty-row { color: var(--ink-3); padding: 28px 12px !important; }
-  .source { font-size: 12.5px; margin-top: 14px; line-height: 1.55; }
-  .source a { text-decoration: underline; }
-  .warn { color: var(--ink-2); margin-top: 12px; font-size: 13px; }
+  .page { gap: 22px; }
+  .crumbs { margin: 0 0 -14px; color: var(--ink-3); font-size: 13px; }
+  .crumbs a:hover { color: var(--ink); }
+  .head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px 28px; }
+  .stamp { margin: 10px 0 0; color: var(--ink-3); font-size: 13px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; }
+  .controls input, .controls select { height: 38px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: var(--radius-s); background: var(--paper-hi); color: var(--ink); font: 500 14px var(--font); }
+  .controls input:hover, .controls select:hover { border-color: var(--ink); }
+  .find { width: 240px; }
+
+  .stages { display: grid; grid-template-columns: repeat(5, 1fr); border: 1.5px solid var(--ink); border-radius: var(--radius-s); }
+  .stages a { display: flex; justify-content: center; align-items: baseline; gap: 8px; padding: 12px 6px; font: 750 15px var(--font); font-stretch: 82%; color: var(--ink-2); transition: background 0.15s var(--ease), color 0.15s var(--ease); }
+  .stages a + a { border-left: 1px solid var(--line-2); }
+  .stages a b { font-weight: 600; font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .stages a:hover { background: var(--panel-2); color: var(--ink); }
+  .stages a.active { background: var(--ink); color: var(--on-ink); }
+  .stages a.active b { color: inherit; }
+
+  section > h2 { margin-bottom: 14px; font-size: 22px; font-weight: 850; font-stretch: 72%; }
+  section > h2 small { margin-left: 4px; font: 500 14px var(--font); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .empty { padding: 34px 20px; border: 1px solid var(--line-2); font-family: var(--serif); color: var(--ink-2); text-align: center; }
+
+  .issues { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); gap: 16px; }
+  .issue { position: relative; display: flex; flex-direction: column; border: 1px solid var(--line-2); border-top: 3px solid var(--ink); transition: border-color 0.15s var(--ease); }
+  .issue:hover { border-color: var(--ink); }
+  .issue:hover h3 a { text-decoration: underline; }
+  .issue header { display: flex; align-items: center; gap: 12px; padding: 16px 16px 12px; }
+  .title { min-width: 0; flex: 1; }
+  h3 { font-size: 21px; font-weight: 850; font-stretch: 72%; line-height: 1.1; }
+  h3 a::after { content: ""; position: absolute; inset: 0; } /* the whole card opens the issue */
+  .tags { display: flex; align-items: center; gap: 7px; margin: 5px 0 0; font-size: 12.5px; color: var(--ink-3); }
+  .tags span { padding: 0 6px; border: 1px solid var(--line-2); border-radius: var(--radius-s); color: var(--ink-2); font-weight: 600; }
+  .badge { flex: none; align-self: flex-start; padding: 2px 8px; border-radius: var(--radius-s); font-size: 12.5px; font-weight: 700; font-stretch: 88%; white-space: nowrap; }
+  .badge.urgent { background: var(--warn-soft); color: var(--warn); }
+  .badge.live { background: var(--up-soft); color: var(--up); }
+  .badge.plain { background: var(--panel-2); color: var(--ink-2); }
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 10px; margin: 0; padding: 4px 16px 14px; }
+  dt, .k { display: block; font-size: 11px; font-weight: 700; font-stretch: 82%; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); }
+  dd { margin: 3px 0 0; font-weight: 650; font-size: 15px; font-stretch: 88%; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .lot { margin: 0; padding: 0 16px 14px; font-size: 13px; color: var(--ink-2); }
+  .lot b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .reads { display: grid; grid-template-columns: 1fr 1fr; margin-top: auto; background: var(--panel-2); border-top: 1px solid var(--line); }
+  .reads > div { display: grid; align-content: start; gap: 4px; padding: 14px 16px; min-width: 0; }
+  .reads > div + div { border-left: 1px solid var(--line); }
+  .fig { font: 850 30px/1.05 var(--display); font-stretch: 72%; font-variant-numeric: tabular-nums; }
+  .fig small { margin-left: 6px; font: 600 14px var(--font); font-stretch: 85%; }
+  .fig.quiet { color: var(--ink-3); }
+  .split { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .split b { margin-right: 5px; color: var(--ink); font-weight: 650; }
+  .plainly { font-family: var(--serif); font-size: 13px; line-height: 1.35; color: var(--ink-2); }
   .up { color: var(--up); } .down { color: var(--down); }
-  @media (max-width: 760px) {
-    .strip { grid-template-columns: repeat(3, 1fr); }
-    .wide-only { display: none; }
-    .name-col { min-width: 170px; max-width: 190px; }
-    .ticker { margin-left: 0; width: 100%; }
+
+  .tbl { border-top: 3px solid var(--ink); }
+  .tbl table { min-width: 840px; }
+  .tbl td { height: 56px; }
+  .tbl tbody tr:hover td { background: var(--panel-2); }
+  .tbl td.strong { font-weight: 700; }
+  th.co, td.co { position: sticky; left: 0; z-index: 2; background: var(--bg); text-align: left; min-width: 240px; white-space: normal; }
+  .who { display: flex; align-items: center; gap: 10px; }
+  .who a { font-weight: 650; font-stretch: 92%; line-height: 1.2; }
+  .who a:hover { text-decoration: underline; }
+  .more { margin-top: 14px; padding: 9px 14px; border: 1px solid var(--line-2); border-radius: var(--radius-s); background: none; color: var(--ink); font: 650 14px var(--font); cursor: pointer; }
+  .more:hover { background: var(--panel-2); border-color: var(--ink); }
+
+  .directory { padding-top: 14px; border-top: 3px solid var(--ink); }
+  .dir-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 20px 28px; }
+  .directory h3 { margin-bottom: 8px; font-size: 13px; font-weight: 750; font-stretch: 82%; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); }
+  .directory ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 14px; }
+  .directory a:hover { text-decoration: underline; }
+  .source { font-size: 12.5px; line-height: 1.55; }
+  .source a { text-decoration: underline; }
+  .warn { color: var(--ink-2); font-size: 13px; }
+
+  @media (max-width: 640px) {
+    .controls, .find { width: 100%; }
+    .controls select { flex: 1; min-width: 0; }
+    .stages a { flex-direction: column; align-items: center; gap: 1px; padding: 9px 2px; font-size: 13px; }
+    .tbl table { min-width: 720px; }
+    th.co, td.co { min-width: 160px; max-width: 170px; }
+    .reads > div { padding: 12px; }
+    .fig { font-size: 26px; }
   }
 </style>

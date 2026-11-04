@@ -114,6 +114,9 @@ async function loadDashboard(env: Env) {
   const upcomingNse = board?.upcoming ?? [];
   const ranges = await env.DB.prepare("SELECT slug, MIN(gmp) AS low, MAX(gmp) AS high, COUNT(gmp) AS n FROM ipo_readings GROUP BY slug").all<{ slug: string; low: number | null; high: number | null; n: number }>();
   const rangeBy = new Map((ranges.results ?? []).map((r) => [r.slug, r]));
+  // The latest split by investor category from our own record, for issues NSE has no table for (BSE-only, or NSE's stored copy gone stale).
+  const cats = await env.DB.prepare("SELECT r.slug, r.qib, r.nii, r.snii, r.bnii, r.retail FROM ipo_category_readings r JOIN (SELECT slug, MAX(at) AS at FROM ipo_category_readings WHERE qib IS NOT NULL OR nii IS NOT NULL OR retail IS NOT NULL GROUP BY slug) l ON r.slug = l.slug AND r.at = l.at").all<{ slug: string; qib: number | null; nii: number | null; snii: number | null; bnii: number | null; retail: number | null }>();
+  const catBy = new Map((cats.results ?? []).map((r) => [r.slug, r]));
 
   const rows = cal.rows.map((r) => {
     const n: any = nse.find((x) => sameCompany(x.name, r.name)) ?? null;
@@ -126,13 +129,14 @@ async function loadDashboard(env: Env) {
     const fallback = (n?.gmp ?? null) as number | null;
     const gmp = r.gmp.price ?? fallback;
     const range = rangeBy.get(r.slug);
+    const cat = catBy.get(r.slug);
     return {
       slug: r.slug, symbol: n?.symbol ?? up?.symbol ?? null, name: r.name, board: r.board, exchange: r.exchange, stage: stageOf(r, today), logo: r.logo,
       open: r.open, close: r.close, allotment: r.allotment, listing: r.listing, price_low: r.price_low ?? n?.price_low ?? null, price_high: high, size_cr: r.size_cr, lot, costs: costs(lot, high),
       gmp, gmp_pct: r.gmp.price != null ? r.gmp.pct ?? (high ? Math.round((gmp! / high) * 10000) / 100 : null) : n?.gmp_pct ?? null,
       est_listing: gmp != null && high ? Math.round((high + gmp) * 100) / 100 : null, profit_per_lot: profitPerLot(gmp, lot), gmp_updated: r.gmp.price != null ? r.gmp.updated : n?.gmp_updated ?? null,
       gmp_low: range && range.n > 1 ? range.low : null, gmp_high: range && range.n > 1 ? range.high : null, sauda: r.gmp.sauda, kostak: r.gmp.kostak,
-      times_total: fromNse ? by.total.times : provider, qib: fromNse ? by.qib?.times ?? null : null, nii: fromNse ? by.nii?.times ?? null : null, snii: fromNse ? by.snii?.times ?? null : null, bnii: fromNse ? by.bnii?.times ?? null : null, retail: fromNse ? by.retail?.times ?? null : null,
+      times_total: fromNse ? by.total.times : provider, qib: (fromNse ? by.qib?.times : null) ?? cat?.qib ?? null, nii: (fromNse ? by.nii?.times : null) ?? cat?.nii ?? null, snii: (fromNse ? by.snii?.times : null) ?? cat?.snii ?? null, bnii: (fromNse ? by.bnii?.times : null) ?? cat?.bnii ?? null, retail: (fromNse ? by.retail?.times : null) ?? cat?.retail ?? null,
       demand_cr: fromNse ? n?.demand_cr ?? null : null, retail_odds: fromNse ? n?.retail_odds ?? null : null, sub_from: fromNse ? "nse" : provider != null ? "ipoguru" : null, sub_as_of: fromNse ? nseStamp(n?.data_as_of) : null,
       listing_price: r.listing_price, listing_gain: r.listing_gain, cmp: r.cmp, current_gain: r.current_gain,
     };
@@ -289,14 +293,15 @@ export const IPO_TOOLS: Tool[] = [
           profit_per_lot: profitPerLot(latestGmp, lot), change_24h: premium?.change_24h ?? null, range, days, sauda: g?.sauda ?? null, kostak: g?.kostak ?? null } : { latest: null, range, days, pct: null, updated: null, est_listing: null, profit_per_lot: null, change_24h: null, sauda: null, kostak: null },
         gmp_readings: guruRow || isSlug ? await readings(env, guruRow?.slug ?? raw) : [], gmp_intraday: guru?.gmp_history?.timeline ?? [],
         gmp_connected: !!(env.IPOGURU_API_KEY || env.IPOALERTS_API_KEY), gmp_error: guru?.error ?? alerts.error ?? latest.error,
-        listing: doc?.listing ? { price: toNum(doc.listing.listing_price), gain: toNum(doc.listing.listing_gain_percent), cmp: toNum(doc.listing.cmp), current_gain: toNum(doc.listing.current_gain_percent) } : guruRow?.listed ? { price: guruRow.listing_price, gain: guruRow.listing_gain, cmp: guruRow.cmp, current_gain: guruRow.current_gain } : null,
+        listing: doc?.listing ? { price: toNum(doc.listing.listing_price), gain: toNum(doc.listing.listing_gain_percent), cmp: toNum(doc.listing.cmp), current_gain: toNum(doc.listing.current_gain_percent), cmp_at: doc.listing.cmp_updated_at ?? null } : guruRow?.listed ? { price: guruRow.listing_price, gain: guruRow.listing_gain, cmp: guruRow.cmp, current_gain: guruRow.current_gain, cmp_at: null } : null,
         reservation: reserve, reservation_guru: doc?.reservation ?? [], shares_offered: doc?.shares_offered ?? null,
         application: c0 && { retail_min_lots: 1, retail_max_lots: c0.retail_max_lots, snii_min_lots: c0.snii_min_lots, snii_max_lots: c0.snii_max_lots, bnii_min_lots: c0.bnii_min_lots, lot_cost: c0.lot_cost, lot_size: c0.lot_size }, lot_calculator: doc?.lot_calculator ?? [],
         anchor, anchors: guru?.anchors ?? null,
         facts: { face_value: get("Face Value") ?? (iss?.face_value ? `₹${iss.face_value}` : null), tick_size: get("Tick Size"), bid_lot: get("Bid Lot"), registrar: info.registrar ?? doc?.contacts?.registrar?.name ?? null, lead_managers: get("Book Running Lead Managers") ?? ((doc?.contacts?.lead_managers ?? []).map?.((x: any) => x?.name ?? x).join(", ") || null), sponsor_bank: get("Sponsor Bank"),
           fresh_issue_cr: text.fresh_cr, offer_for_sale_cr: text.ofs_cr, max_retail_amount: get("Maximum Subscription Amount for Retail Investor"), type_of_issue: a?.type_of_issue ?? iss?.sale_type ?? null, listing_at: iss?.listing_on ?? null, employee_discount: iss?.employee_discount ?? null },
         about: co?.about ?? co?.description ?? a?.about ?? null, strengths: co?.strengths ?? a?.strengths ?? [], risks: co?.risks ?? a?.risks ?? [],
-        company: co ? { objects: co.objects_of_issue ?? null, financials: co.financials ?? null, kpis: co.kpis ?? [], promoters: co.promoters ?? co.promoter_profiles ?? null, holding: co.holding_pattern ?? co.promoter_holding ?? null } : null,
+        company: co ? { objects: co.objects_of_issue ?? null, financials: co.financials ?? null, kpis: co.kpis ?? [], promoters: co.promoters?.length ? co.promoters : co.promoter_profiles?.length ? co.promoter_profiles : co.promoters_text ?? null, holding: co.pre_holding || co.post_holding ? { pre: co.pre_holding ?? null, post: co.post_holding ?? null } : null } : null,
+        recent: cal.rows.filter((r) => r.listed && r.slug !== (guruRow?.slug ?? raw)).sort((x, y) => (y.listing ?? "").localeCompare(x.listing ?? "")).slice(0, 8).map((r) => ({ slug: r.slug, name: r.name, logo: r.logo, listing_gain: r.listing_gain })),
         contacts: doc?.contacts ?? null, registrar_status_url: doc?.contacts?.registrar?.status_page ?? null,
         documents, plan: guru?.plan ?? null, locked: doc?.locked?.fields ?? [], source_url: doc?.web_url ?? guruRow?.url ?? null,
       };

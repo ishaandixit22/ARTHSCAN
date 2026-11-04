@@ -1,10 +1,8 @@
 import { api } from "$lib/server/api";
 
-const VIEWS = ["gmp", "subscription", "listed"];
-
-export async function load({ url }) {
-  const view = VIEWS.includes(url.searchParams.get("view") ?? "") ? url.searchParams.get("view")! : "gmp";
+// Which tab is showing lives in the page, so moving between tabs doesn't fetch the board again.
+export async function load() {
   // Reads the dashboard only: it merges NSE's live board with the IPO Guru calendar and never fails on one source.
   const dashboard = await api("/v1/market/ipo-dashboard", { allowError: true }).catch(() => null);
-  return { view, dashboard: dashboard?.rows ? dashboard : null };
+  return { dashboard: dashboard?.rows ? dashboard : null };
 }
