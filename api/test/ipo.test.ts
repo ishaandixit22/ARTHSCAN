@@ -138,11 +138,27 @@ describe("draft filings from SEBI", () => {
     const read = vi.fn(async () => "WEBSITE www.acme.com OUR PROMOTERS");
     expect(await fillWebsites(env, read)).toEqual({ read: 3, found: 2 }); // Co0, Co1, and Co2's block page
     expect(await fillWebsites(env, read)).toEqual({ read: 2, found: 1 }); // Co2 again, and Co3
-    await fillWebsites(env, read);
+    for (let i = 0; i < 4; i++) await fillWebsites(env, read);
     expect(await fillWebsites(env, read)).toEqual({ read: 0, found: 0 }); // Co2 has run out of tries
     expect(read).toHaveBeenCalledTimes(3);
     const { filings } = await expectedFilings(env);
-    expect(filings.map((f) => f.website)).toEqual(["acme.com", "acme.com", null, "acme.com"]);
+    expect(filings.map((f) => f.website ?? null)).toEqual(["acme.com", "acme.com", null, "acme.com"]);
+    vi.restoreAllMocks();
+    await clear();
+  });
+
+  it("gives a slow PDF time, retries a filing an older limit gave up on, and doesn't re-read one with no website", async () => {
+    await clear();
+    const { fillWebsites } = await import("../src/lib/sebi.js");
+    const row = (name: string, extra: object) => ({ name, doc: "DRHP", filed: "2026-10-01", url: "u", abridged_url: `https://sebi.test/${name}.pdf`, ...extra });
+    const body = { filings: [row("GaveUp", { website: null, website_tries: 3 }), row("Waiting", {}), row("Bare", {})], moved_on: [], fetched_at: NOW, tried_at: NOW, error: null };
+    await env.DB.prepare("INSERT INTO external_cache (key, body, fetched_at) VALUES ('sebi:filings', ?, ?)").bind(JSON.stringify(body), NOW).run();
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("%PDF-1.5 x")));
+    const read = vi.fn(async () => "no address on this cover");
+    expect(await fillWebsites(env, read)).toEqual({ read: 3, found: 0 });
+    expect(timeout).toHaveBeenCalledWith(30_000);
+    expect(await fillWebsites(env, read)).toEqual({ read: 0, found: 0 });
     vi.restoreAllMocks();
     await clear();
   });

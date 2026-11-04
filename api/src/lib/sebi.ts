@@ -155,25 +155,27 @@ async function coverText(bytes: Uint8Array): Promise<string> {
 }
 
 const WEBSITES_PER_RUN = 3;
-const WEBSITE_TRIES = 3;
+const WEBSITE_TRIES = 6;
+/** A whole PDF from SEBI, which can take far longer to reach Cloudflare than the quick calls UPSTREAM_TIMEOUT_MS is for. */
+const PROSPECTUS_TIMEOUT_MS = 30_000;
 
 /** Reads a few prospectuses each cron run for filings with no website yet. A download that fails is tried again, up to a limit. */
 export async function fillWebsites(env: Env, readCover = coverText): Promise<{ read: number; found: number }> {
   const stored = await load(env);
-  const waiting = stored.filings.filter((f) => f.abridged_url && f.website === undefined && (f.website_tries ?? 0) < WEBSITE_TRIES).slice(0, WEBSITES_PER_RUN);
+  const waiting = stored.filings.filter((f) => f.abridged_url && f.website == null && (f.website_tries ?? 0) < WEBSITE_TRIES).slice(0, WEBSITES_PER_RUN);
   if (!waiting.length) return { read: 0, found: 0 };
   let found = 0;
   for (const f of waiting) { // one after another, as with the lists
     try {
-      const res = await fetch(f.abridged_url!, { headers: HEADERS, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+      const res = await fetch(f.abridged_url!, { headers: HEADERS, signal: AbortSignal.timeout(PROSPECTUS_TIMEOUT_MS) });
       const bytes = new Uint8Array(await res.arrayBuffer());
       if (!res.ok || new TextDecoder().decode(bytes.slice(0, 4)) !== "%PDF") throw new Error(`answered ${res.status} without a PDF`);
-      f.website = websiteFromCover(await readCover(bytes)); // null: read, and it names no website, so don't ask again
+      f.website = websiteFromCover(await readCover(bytes));
       if (f.website) found++;
+      else f.website_tries = WEBSITE_TRIES; // read, and it names no website, so don't ask again
     } catch (err) {
       console.error(`sebi prospectus ${f.name}:`, err instanceof Error ? err.message : err);
       f.website_tries = (f.website_tries ?? 0) + 1;
-      if (f.website_tries >= WEBSITE_TRIES) f.website = null;
     }
   }
   await save(env, stored);
