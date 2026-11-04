@@ -29,7 +29,7 @@
       <Search />
       <ThemeToggle />
       {#if data.account}
-        <a href="/settings/tokens" class="btn small">{data.account.name}</a>
+        <a href="/settings/tokens" class="btn small" data-clarity-mask="true">{data.account.name}</a>
       {:else}
         <a href="/login" class="btn small primary">Sign in</a>
       {/if}
@@ -47,7 +47,7 @@
   </div>
 </nav>
 
-<main class="wrap">
+<main class="wrap" data-clarity-mask={/^\/(settings|connect|login)(\/|$)/.test(page.url.pathname) ? "true" : undefined}>
   {@render children()}
 </main>
 
@@ -58,6 +58,7 @@
       Prices are end-of-day from NSE unless marked Live; live prices and intraday charts come from Dhan.
       {BRAND} is not a SEBI-registered research analyst or investment adviser; nothing here is investment advice.
       {#if data.logoKey}<a href="https://logo.dev" target="_blank" rel="noopener">Logos provided by Logo.dev</a>.{/if}
+      <a href="/privacy">Privacy</a>.
     </p>
   </div>
 </footer>
