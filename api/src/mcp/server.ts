@@ -15,7 +15,16 @@ import { callTool } from "../handlers/call.js";
 import { TOOLS } from "../handlers/tools.js";
 import { resourceMetadataUrl } from "../routes/oauth.js";
 
-export const SERVER_INFO = { name: "arthscan", title: "Arthscan — Indian stock research", version: "0.1.0" };
+export const SERVER_INFO = {
+  name: "arthscan",
+  title: "Arthscan — Indian stock research",
+  version: "0.1.0",
+  websiteUrl: "https://arthscan.me",
+  icons: [
+    { src: "https://arthscan.me/icon-512.png", mimeType: "image/png", sizes: ["512x512"] },
+    { src: "https://arthscan.me/favicon.svg", mimeType: "image/svg+xml", sizes: ["any"] },
+  ],
+};
 const SUPPORTED_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 const INSTRUCTIONS =
   "End-of-day research data for NSE-listed Indian stocks: search, quotes, price history, financials, shareholding, screener, sectors, market breadth and FII/DII flows. " +

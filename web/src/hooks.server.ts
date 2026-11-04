@@ -9,7 +9,7 @@ import { cachedPage } from "$lib/server/page-cache";
 const API_PATHS = /^\/(api|v1|mcp|oauth|\.well-known|health)(\/|$)/;
 
 // Reachable without signing in while the site is invite-only.
-const OPEN_PATHS = /^\/(login|robots\.txt|sitemap\.xml|favicon\.svg)$/;
+const OPEN_PATHS = /^\/(login|robots\.txt|sitemap\.xml|favicon\.(svg|ico)|apple-touch-icon\.png|icon-(192|512)\.png)$/;
 
 // Content-Security-Policy itself comes from kit.csp in svelte.config.js, which
 // adds per-request nonces for SvelteKit's inline hydration script.
