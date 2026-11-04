@@ -107,12 +107,12 @@ describe("BSE history", () => {
 });
 
 describe("BSE-only stocks stay apart", () => {
-  it("fills statements after the NSE queue, under a BSE- key, asking by BSE symbol", async () => {
+  it("fills statements after the NSE queue, under a BSE- key, asking by name first", async () => {
     const f = vi.fn(async (_url: string, _init: RequestInit) => answer({ quarter_results: { Sales: { "Sep 2026": 1 } } }));
     vi.stubGlobal("fetch", f);
     const r = await fillStatements(env, { maxRequests: 1, dailyCap: 100 });
     expect(r.asked).toBe(1);
-    expect(new URL(f.mock.calls[0]![0] as string).searchParams.get("stock_name")).toBe("BIG");
+    expect(new URL(f.mock.calls[0]![0] as string).searchParams.get("stock_name")).toBe("Big");
     expect(db.raw.prepare("SELECT symbol FROM company_statements").all()).toEqual([{ symbol: "BSE-BIG" }]);
   });
   it("adds nothing to the NSE tables", async () => {

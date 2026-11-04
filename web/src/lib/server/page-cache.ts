@@ -13,11 +13,9 @@ const NAMESPACE = "https://page-cache.arthscan.internal";
 const STOCK = { fresh: 300, stale: 14_400 };
 const MARKET = { fresh: 300, stale: 3_600 };
 const MARKET_PAGES = /^\/(stocks|screener|sectors(\/[^/]+)?|heatmap|valuations|breadth)?$/;
-// These two periods are intraday candles, which a five-minute-old copy would misreport.
-const INTRADAY = new Set(["1d", "5d"]);
 
 function ruleFor(url: URL) {
-  if (/^\/stock\/[^/]+$/.test(url.pathname)) return INTRADAY.has(url.searchParams.get("period") ?? "") ? null : STOCK;
+  if (/^\/stock\/[^/]+$/.test(url.pathname)) return STOCK;
   return MARKET_PAGES.test(url.pathname) ? MARKET : null;
 }
 

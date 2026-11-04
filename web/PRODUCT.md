@@ -22,7 +22,7 @@ Used on phones and laptops, often during or right after market hours (09:15–15
 
 ## Capabilities and Constraints
 - SvelteKit 2 (Svelte 5 runes) on Cloudflare Workers; API Worker (Hono) and D1 database behind it.
-- CSP allows Google Fonts for stylesheets/fonts and no other external hosts for scripts; charts use lightweight-charts; the 3D city is raw WebGL2.
+- CSP allows Google Fonts for stylesheets/fonts and no other external hosts for scripts; the stock page chart uses KLineCharts (Apache-2.0) and other charts use lightweight-charts; the 3D city is raw WebGL2.
 - Live data (Dhan) is shown under the LIVE_ACCESS setting and may be withdrawn.
 - Not a SEBI-registered adviser: copy describes data and never recommends buying or selling.
 

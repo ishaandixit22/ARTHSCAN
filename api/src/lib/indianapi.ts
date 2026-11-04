@@ -16,6 +16,7 @@ export async function indianApi(
   path: string,
   params: Record<string, string | undefined>,
   ttlSeconds: number,
+  opts: { store?: boolean } = {},
 ): Promise<{ fetched_at: string; cached: boolean; data: unknown }> {
   const key = env.INDIANAPI_KEY;
   if (!key) throw new ToolError("E_UNAVAILABLE", "This data source is not configured on this server.", 503);
@@ -64,7 +65,7 @@ export async function indianApi(
     throw new ToolError("E_NOT_FOUND", "The data provider found nothing for those arguments. Check the name or try a shorter one.", 404);
   }
 
-  if (text.length <= MAX_CACHE_BYTES) {
+  if (opts.store !== false && text.length <= MAX_CACHE_BYTES) {
     await env.DB.prepare("INSERT INTO external_cache (key, body, fetched_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET body = excluded.body, fetched_at = excluded.fetched_at")
       .bind(cacheKey, text, now).run();
   }
