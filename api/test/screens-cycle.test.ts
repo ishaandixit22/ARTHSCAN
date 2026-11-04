@@ -48,6 +48,14 @@ describe("screen runs", () => {
     expect(a!.freshness.as_of).toBe(day(299));
   });
 
+  it("marks a screen no stock holds the figures for, rather than reporting nothing passed", async () => {
+    const r = await runWeekly(env);
+    expect(r.screens).toBeGreaterThan(0);
+    const a = await storedAnswer(env, SCREENS.find((s) => s.id === "S091")!); // cash above market cap: no cash figure held
+    expect(a!.rows).toEqual([]);
+    expect(a!.checked).toBe(0);
+  });
+
   it("runs a daily-chart screen on the last close when the market is shut", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); })); // live prices unavailable, whatever the hour
     const a = await runLive(env, SCREENS.find((x) => x.id === "S113")!); // five higher closes
@@ -99,5 +107,12 @@ describe("screen runs", () => {
     expect(r.as_of).toBe(new Date(newest * 1000).toISOString());
     const a = await storedAnswer(env, SCREENS.filter((s) => s.kind === "intraday").find((s) => s.universe !== "fno")!);
     expect(a!.freshness.mode).toBe("intraday");
+
+    // Outside market hours: answers from stored history, without asking Dhan.
+    const asked = bodies.length;
+    const closed: any = await runIntradayCycle(env, { closed: true });
+    expect(closed.ran).toBe(true);
+    expect(bodies.length).toBe(asked);
+    expect(closed.as_of).toBe(new Date((stamps.at(-1)! + 300) * 1000).toISOString());
   }, 30000);
 });

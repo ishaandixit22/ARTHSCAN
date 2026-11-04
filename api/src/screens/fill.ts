@@ -20,6 +20,16 @@ const OLDER_MONTH_ROWS = 180;
 const SNAPSHOT_DAYS = 7;
 const DAY = 86400;
 
+/** Asks again after a pause when Dhan refuses for the rate limit, which other jobs on the account also use up. */
+async function patient<T extends { ok: boolean; upstream?: number }>(ask: () => Promise<T>): Promise<T> {
+  let r = await ask();
+  for (let tries = 1; tries <= 3 && !r.ok && r.upstream === 429; tries++) {
+    await wait(1200 * tries);
+    r = await ask();
+  }
+  return r;
+}
+
 /** Older candles from Dhan, split into recent days and older months, on our share basis. */
 export function splitHistory(rows: { date: string; o: number; h: number; l: number; c: number; v: number }[], firstLocal: string, localClose: number | null) {
   const overlap = rows.find((r) => r.date === firstLocal);
@@ -61,10 +71,10 @@ export async function fillLongHistory(env: Env, max = 120) {
   const today = istDate(Date.now());
   for (const { symbol, id } of queue) {
     const started = Date.now();
-    const r = await dhanPost(env, "/charts/historical", {
+    const r = await patient<any>(() => dhanPost(env, "/charts/historical", {
       securityId: id, exchangeSegment: "NSE_EQ", instrument: "EQUITY", expiryCode: 0, oi: false,
       fromDate: "1995-01-01", toDate: today,
-    }, "daily candles", 12_000);
+    }, "daily candles", 12_000));
     const d = r.ok ? (r.data as { timestamp?: number[]; open: number[]; high: number[]; low: number[]; close: number[]; volume: number[] }) : null;
     if (d && Array.isArray(d.timestamp)) {
       const first = await env.DB.prepare("SELECT date, close * adj AS c FROM daily_prices WHERE symbol = ? ORDER BY date LIMIT 1").bind(symbol).first<{ date: string; c: number }>();
@@ -98,7 +108,7 @@ export async function fillSnapshots(env: Env, max = 120) {
   let saved = 0, failed = 0;
   for (const { symbol, close } of queue) {
     const started = Date.now();
-    const r = await companyInfo(env, symbol);
+    const r = await patient<any>(() => companyInfo(env, symbol));
     if (r.ok) {
       const o = (r as unknown as { overview: Record<string, number | null>; ratios: Record<string, number | null> });
       await env.DB.prepare("INSERT OR REPLACE INTO company_snapshot (symbol, fetched_at, price, market_cap_cr, pe, pe_to_sector, industry_pb) VALUES (?, ?, ?, ?, ?, ?, ?)")

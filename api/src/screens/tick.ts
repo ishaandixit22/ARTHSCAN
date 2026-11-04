@@ -4,7 +4,7 @@
 import type { Env } from "../env.js";
 import { istClock, marketOpen } from "../lib/market-hours.js";
 import { fillKeyMetrics, fillLongHistory, fillSnapshots, refreshIndexMembers } from "./fill.js";
-import { refreshMinuteHistory, runWeekly } from "./run.js";
+import { refreshMinuteHistory, runIntradayCycle, runWeekly } from "./run.js";
 import { buildSeries, seriesStale } from "./series.js";
 import { blobBuild } from "./store.js";
 
@@ -53,6 +53,13 @@ export async function screensTick(env: Env) {
       const built = (await blobBuild(env, "min5_index"))?.split("|")[0] ?? null;
       const due = built === null || (c.weekday >= 1 && c.weekday <= 5 && c.minutes >= 16 * 60 && built !== c.date);
       return due ? refreshMinuteHistory(env) : null;
+    });
+    // Once per history load, so outside market hours the intraday screens show the session just ended.
+    await step("intraday-close", async () => {
+      const made = Number((await blobBuild(env, "min5_index"))?.split("|")[1] ?? 0);
+      if (!made) return null;
+      const row = await env.DB.prepare("SELECT MAX(computed_at) AS at FROM screen_results WHERE kind = 'intraday'").first<{ at: number | null }>();
+      return (row?.at ?? 0) * 1000 >= made ? null : runIntradayCycle(env, { closed: true });
     });
   }
   if (report.length) console.log(`screens: ${report.join("; ")}`);

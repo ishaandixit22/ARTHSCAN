@@ -269,3 +269,16 @@ export class StockContext {
     }
   }
 }
+
+/** Whether a stock holds every figure a rule reads. Tells "nothing passed" apart from "nothing could be tested". */
+export function hasFigures(ctx: StockContext, n: Node): boolean {
+  switch (n.k) {
+    case "num": return true;
+    case "fund": case "calc": case "ind": return ctx.value(n) !== null;
+    case "math": case "cmp": return hasFigures(ctx, n.a) && hasFigures(ctx, n.b);
+    case "fn": return n.args.every((x) => hasFigures(ctx, x));
+    case "win": return hasFigures(ctx, n.expr);
+    case "and": return n.xs.every((x) => hasFigures(ctx, x));
+    case "or": return n.xs.some((x) => hasFigures(ctx, x));
+  }
+}

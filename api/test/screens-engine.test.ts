@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { rollMinutes, rsi, sma, type Candles } from "../src/screens/calc.js";
 import { compileScreen, SCREENS } from "../src/screens/catalogue.js";
-import { StockContext } from "../src/screens/engine.js";
+import { hasFigures, StockContext } from "../src/screens/engine.js";
 import { computeFundamentals } from "../src/screens/fundamentals.js";
 import { parseIndicator, parsePlain } from "../src/screens/rules.js";
 import { base64ToFloats, BinaryWriter, floatsToBase64, PART_BYTES, readBinary } from "../src/screens/store.js";
@@ -50,6 +50,12 @@ describe("evaluating", () => {
     const fund = { shares: 10, np: 100 };
     expect(ctx([50, 90], { fund }).test(rule)).toBe(true); // 900 / 100 = 9
     expect(ctx([50, 110], { fund }).test(rule)).toBe(false); // 1100 / 100 = 11
+  });
+  it("tells a failed test from one that couldn't be run", () => {
+    const rule = parsePlain("Promoter holding > 90");
+    expect(hasFigures(ctx([1, 2], { fund: { promoter: 50 } }), rule)).toBe(true);
+    expect(hasFigures(ctx([1, 2], { fund: { promoter: null } }), rule)).toBe(false);
+    expect(hasFigures(ctx([1, 2]), parseIndicator("latest sma( close,200 ) > 1"))).toBe(false);
   });
   it("calculates a known RSI", () => {
     const up = Array.from({ length: 30 }, (_, i) => 100 + i);

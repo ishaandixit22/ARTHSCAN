@@ -7,7 +7,7 @@ import { marketOpen } from "../lib/market-hours.js";
 import type { Bundle } from "../lib/statements.js";
 import type { Candles } from "./calc.js";
 import { compileScreen, SCREENS, type Screen, usesFundamentals } from "./catalogue.js";
-import { StockContext, type StockData } from "./engine.js";
+import { hasFigures, StockContext, type StockData } from "./engine.js";
 import { computeFundamentals } from "./fundamentals.js";
 import { type Node, ruleColumns } from "./rules.js";
 import { loadSeries, stockCandles, type TodayBar } from "./series.js";
@@ -155,7 +155,18 @@ async function inUniverse(env: Env, s: Screen): Promise<((symbol: string) => boo
   return (symbol) => set.has(symbol);
 }
 
-export type Run = { rows: ResultRow[]; checked: number };
+/** `checked` counts stocks looked at. It ends up 0 when nothing passed and no stock even held the figures the rule reads. */
+export type Run = { rows: ResultRow[]; checked: number; testable?: boolean };
+
+function record(run: Run, ctx: StockContext, data: StockData, p: Prepared, name: string, sector: string | null) {
+  run.checked++;
+  if (ctx.test(p.node)) run.rows.push(rowFor(ctx, data, name, sector, p.cols));
+  else if (!run.testable && hasFigures(ctx, p.node)) run.testable = true;
+}
+function finish(run: Run) {
+  sortDefault(run.rows);
+  if (!run.rows.length && !run.testable) run.checked = 0;
+}
 
 /** Runs screens over every stock on daily data, with today's bars if given. */
 async function runDaily(env: Env, list: Screen[], today: Map<string, TodayBar> | null): Promise<Map<string, Run>> {
@@ -174,12 +185,10 @@ async function runDaily(env: Env, list: Screen[], today: Map<string, TodayBar> |
     prepared.forEach((p, i) => {
       if (!filters[i](r[0])) return;
       if (p.fund && !f) return;
-      const run = out.get(p.screen.id)!;
-      run.checked++;
-      if (ctx.test(p.node)) run.rows.push(rowFor(ctx, data, r[1], r[2], p.cols));
+      record(out.get(p.screen.id)!, ctx, data, p, r[1], r[2]);
     });
   }
-  for (const run of out.values()) sortDefault(run.rows);
+  for (const run of out.values()) finish(run);
   return out;
 }
 
@@ -324,9 +333,13 @@ function toCandles(floats: Float32Array, from: number, stored: number, base: num
   return { t, o, h, l, c, v };
 }
 
-/** One intraday pass: this session's 5-minute candles for every stock, then every intraday screen on finished candles. */
-export async function runIntradayCycle(env: Env, opts: { force?: boolean } = {}) {
-  if (!opts.force && !(await marketOpen(env))) return { ran: false as const };
+/**
+ * One intraday pass: this session's 5-minute candles for every stock, then every intraday screen on finished candles.
+ * `closed` skips asking for today's candles and answers from the stored history, so outside market hours
+ * these screens show the last session instead of nothing.
+ */
+export async function runIntradayCycle(env: Env, opts: { force?: boolean; closed?: boolean } = {}) {
+  if (!opts.force && !opts.closed && !(await marketOpen(env))) return { ran: false as const };
   const series = await loadSeries(env);
   const history = await loadMinutes(env);
   if (!series || !history) return { ran: false as const, why: "history not loaded" };
@@ -336,7 +349,7 @@ export async function runIntradayCycle(env: Env, opts: { force?: boolean } = {})
   const stocks = await intradayStocks(env, new Map(series.index.stocks.map((r) => [r[0], r[3]])));
   const minutes = new Map<string, Record<string, number[]>>();
   let failed = 0;
-  for (const s of stocks) {
+  for (const s of opts.closed ? [] : stocks) {
     const started = Date.now();
     const d = await fetchMinutes(env, s.id, today, istDate(now + 86400_000));
     if (d) {
@@ -348,7 +361,7 @@ export async function runIntradayCycle(env: Env, opts: { force?: boolean } = {})
     const rest = DHAN_GAP_MS - (Date.now() - started);
     if (rest > 0) await wait(rest);
   }
-  if (minutes.size < stocks.length * 0.5) return { ran: false as const, why: `only ${minutes.size} of ${stocks.length} answered` };
+  if (!opts.closed && minutes.size < stocks.length * 0.5) return { ran: false as const, why: `only ${minutes.size} of ${stocks.length} answered` };
 
   const list = SCREENS.filter((s) => s.kind === "intraday");
   const prepared = list.map(prepare);
@@ -361,9 +374,10 @@ export async function runIntradayCycle(env: Env, opts: { force?: boolean } = {})
     const m = minutes.get(s.symbol);
     const stored = history.at.get(s.symbol);
     if (!m && !stored) continue;
-    const all = toCandles(history.floats, stored?.[0] ?? 0, stored?.[1] ?? 0, history.base, todayNum, m ?? null);
+    // In the session, today's candles come fresh; after the close the stored ones are complete and include today.
+    const all = toCandles(history.floats, stored?.[0] ?? 0, stored?.[1] ?? 0, history.base, opts.closed ? Infinity : todayNum, m ?? null);
     const n = m?.timestamp.length ?? 0;
-    if (n) lastCandle = Math.max(lastCandle, m!.timestamp[n - 1]);
+    if (all.c.length) lastCandle = Math.max(lastCandle, Number(all.t[all.c.length - 1]));
     const bar: TodayBar | null = n ? { day: todayNum, o: m!.open[0], h: Math.max(...m!.high), l: Math.min(...m!.low), c: m!.close[n - 1], v: m!.volume.reduce((a, b) => a + (b ?? 0), 0) } : null;
     const candles = stockCandles(series, s.symbol, bar);
     if (!candles) continue;
@@ -373,14 +387,12 @@ export async function runIntradayCycle(env: Env, opts: { force?: boolean } = {})
     const row = names.get(s.symbol)!;
     prepared.forEach((p, i) => {
       if (!filters[i](s.symbol)) return;
-      const run = runs.get(p.screen.id)!;
-      run.checked++;
-      if (ctx.test(p.node)) run.rows.push(rowFor(ctx, data, row[1], row[2], p.cols));
+      record(runs.get(p.screen.id)!, ctx, data, p, row[1], row[2]);
     });
   }
   const asOf = lastCandle ? new Date((lastCandle + 300) * 1000).toISOString() : new Date(now).toISOString();
-  for (const s of list) await storeResult(env, s, asOf, { rows: sortDefault(runs.get(s.id)!.rows), checked: runs.get(s.id)!.checked });
-  return { ran: true as const, stocks: minutes.size, failed, screens: list.length, as_of: asOf };
+  for (const s of list) { const run = runs.get(s.id)!; finish(run); await storeResult(env, s, asOf, run); }
+  return { ran: true as const, stocks: opts.closed ? stocks.length : minutes.size, failed, screens: list.length, as_of: asOf };
 }
 
 // ── What the pages ask ─────────────────────────────────────────────
@@ -391,6 +403,7 @@ export async function answerFor(env: Env, screen: Screen): Promise<Answer | null
 
 /** Stored counts for the catalogue page. Live screens have none, since theirs change with the market. */
 export async function storedCounts(env: Env) {
-  const { results } = await env.DB.prepare("SELECT screen_id, total, as_of FROM screen_results").all<{ screen_id: string; total: number; as_of: string }>();
+  // A screen no stock could be tested on has no meaningful count yet.
+  const { results } = await env.DB.prepare("SELECT screen_id, total, as_of FROM screen_results WHERE checked > 0").all<{ screen_id: string; total: number; as_of: string }>();
   return new Map(results.map((r) => [r.screen_id, r]));
 }

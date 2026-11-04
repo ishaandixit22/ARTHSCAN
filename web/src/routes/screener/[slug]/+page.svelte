@@ -102,13 +102,16 @@
       {@const r = result}
         {@const f = fresh(r.freshness)}
         <div class="card-head">
-          <h2>{int(r.total)} {r.total === 1 ? "stock" : "stocks"}</h2>
+          <h2>{r.checked === 0 ? "Waiting for data" : `${int(r.total)} ${r.total === 1 ? "stock" : "stocks"}`}</h2>
           <div class="fresh">
             <span class="badge" class:live={f.live}>{f.badge}</span>
             <span class="sub">{f.text}</span>
             {#if s.kind === "live"}<button class="btn small" onclick={() => run(s.slug, data.qs)} disabled={running}>{running ? "Running…" : "Run again"}</button>{/if}
           </div>
         </div>
+        {#if r.checked === 0}
+          <div class="wait sub">We don't hold the figures these rules read for any stock yet, so this screen can't give an answer. They're being loaded in the background, and results will appear here once they are.</div>
+        {:else}
         <p class="sub checked">
           Checked {int(r.checked)} stocks{#if r.freshness.live_stocks}, {int(r.freshness.live_stocks)} with a trade today; the rest are on their last close{/if}.
           {#if s.kind !== "intraday" && s.segment === "fundamental"}Stocks without loaded company statements aren't included.{/if}
@@ -147,6 +150,7 @@
             <span class="sub">Page {r.page} of {r.pages}</span>
             {#if r.page < r.pages}<a class="btn small" href={pageHref(r.page + 1)}>Next →</a>{/if}
           </div>
+        {/if}
         {/if}
     {/if}
   </section>
