@@ -81,6 +81,8 @@ async function post(env: Env, path: string, body: unknown, what: string): Promis
   return { ok: true, data };
 }
 
+export { post as dhanPost };
+
 /** The last few sessions of intraday candles for one stock. Times are IST shown as UTC seconds, for the chart. */
 export function intradayCandles(env: Env, symbol: string, range: string) {
   return cached(`candles/${symbol}/${range}`, CANDLE_TTL_S, async () => {

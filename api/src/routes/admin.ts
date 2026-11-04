@@ -36,7 +36,7 @@ admin.post("/statements", async (c) => {
 });
 
 admin.get("/statements-status", async (c) => {
-  const row = await c.env.DB.prepare(`SELECT COUNT(*) AS stored, SUM(found) AS found, MIN(fetched_at) AS oldest, MAX(fetched_at) AS newest FROM company_statements`).first();
+  const row = await c.env.DB.prepare(`SELECT COUNT(*) AS stored, SUM(found) AS found, MIN(fetched_at) AS oldest, MAX(fetched_at) AS newest FROM company_statements WHERE symbol NOT LIKE 'BSE-%'`).first();
   const total = await c.env.DB.prepare("SELECT COUNT(DISTINCT symbol) AS n FROM daily_prices WHERE date >= date((SELECT MAX(date) FROM daily_prices), '-14 days')").first<{ n: number }>();
   return c.json({ ok: true, active_stocks: total?.n, ...row });
 });

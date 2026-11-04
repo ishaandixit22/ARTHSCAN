@@ -5,6 +5,7 @@
   let { data } = $props();
   const o = $derived(data.ipo);
   const by = $derived(Object.fromEntries(o.subscription.map((r: any) => [r.key, r])));
+  const splitNii = $derived((o.sub_days ?? []).some((d: any) => d.bnii != null || d.snii != null));
   const cr = (v: number | null | undefined) => (v == null ? "—" : `₹${Math.round(v).toLocaleString("en-IN")} Cr`);
   const times = (v: number | null | undefined) => (v == null ? "—" : `${v.toLocaleString("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}×`);
   const amt = (v: number | null | undefined) => (v == null ? "—" : v >= 1e7 ? `₹${(v / 1e7).toFixed(2)} Cr` : v >= 1e5 ? `₹${(v / 1e5).toFixed(2)} lakh` : price(v));
@@ -15,10 +16,45 @@
   const stateLabel = $derived(o.status === "open" ? "Open for bidding" : o.status === "upcoming" ? "Opens soon" : "Bidding closed");
 
   const TABS = [
-    ["overview", "Overview"], ["subscription", "Subscription"], ["gmp", "GMP"], ["bids", "Bids received"], ["details", "IPO details"],
-    ["reservation", "Reservation & lots"], ["anchor", "Anchor"], ["about", "About"], ["faq", "FAQ"],
+    ["overview", "Overview"], ["about", "Company"], ["financials", "Financials"], ["subscription", "Subscription"], ["gmp", "GMP"], ["bids", "Bids received"], ["details", "IPO details"],
+    ["reservation", "Reservation & lots"], ["anchor", "Anchor"], ["faq", "FAQ"],
   ];
-  const tabs = $derived(TABS.filter(([k]) => (k === "anchor" ? !!o.anchor : k === "about" ? !!(o.about || o.strengths.length || o.risks.length) : true)));
+  const tabs = $derived(TABS.filter(([k]) => (k === "anchor" ? !!(o.anchor || o.anchors?.anchors?.length) : k === "about" ? !!(o.about || o.strengths.length || o.risks.length) : k === "financials" ? !!fin : true)));
+
+  // Company numbers, which arrive as published text ("1,508.24"). A financials block can be prose instead of rows.
+  const n = (v: unknown) => { const x = Number(String(v ?? "").replace(/,/g, "")); return String(v ?? "").trim() !== "" && Number.isFinite(x) ? x : null; };
+  const fin = $derived(o.company?.financials ?? null);
+  const finRows = $derived<any[]>(fin?.rows ?? []);
+  // Headers come newest first; the bars read oldest to newest.
+  const bars = $derived.by(() => {
+    const wanted = [/revenue|total income/i, /profit|pat/i, /net ?worth/i, /borrow|debt/i];
+    return wanted.flatMap((re) => {
+      const row = finRows.find((r) => re.test(r.metric ?? ""));
+      if (!row) return [];
+      const vals = (fin.headers as string[]).map((h, i) => ({ h, v: n(row.data?.[i]) })).reverse();
+      const top = Math.max(...vals.map((x) => Math.abs(x.v ?? 0)), 1);
+      return [{ metric: row.metric, vals, top }];
+    });
+  });
+  const objects = $derived.by(() => { const v = o.company?.objects; return { items: (Array.isArray(v) ? v : v?.items) ?? [], text: typeof v === "string" ? v : v?.text ?? null }; });
+  const entries = (v: any) => Object.entries(v ?? {}).filter(([, x]) => x != null && typeof x !== "object");
+  const label = (k: string) => k.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+
+  // Plain answers to what someone asks before applying, each from a number on this page.
+  const verdictLines = $derived.by(() => {
+    const out: { q: string; a: string; tone?: string }[] = [];
+    if (o.costs) out.push({ q: "What do I pay?", a: `${price(o.costs.lot_cost)} for one lot of ${int(o.costs.lot_size)} shares at the top of the band. Retail can bid up to ${o.costs.retail_max_lots} lot${o.costs.retail_max_lots > 1 ? "s" : ""}.` });
+    if (o.times_total != null) out.push({ q: "How strong is demand?", a: `${times(o.times_total)} overall${by.retail?.times != null ? `, ${times(by.retail.times)} from retail` : ""}${by.qib?.times != null ? ` and ${times(by.qib.times)} from institutions` : ""}. ${o.times_total >= 1 ? "Oversubscribed, so allotment is a lottery." : "Not fully subscribed yet."}` });
+    if (o.gmp.latest != null) out.push({ q: "What is the grey market saying?", a: `${rupee(o.gmp.latest)} per share (${pct(o.gmp.pct)}), which implies about ${price(o.gmp.est_listing)}. Unofficial, and it often moves right up to listing.`, tone: tone(o.gmp.latest) });
+    if (o.retail_odds) out.push({ q: "What are my allotment odds?", a: `About ${chance(o.retail_odds.chance)} for a retail lot, assuming each applicant bids one lot.` });
+    const when = o.status === "open" ? `Bidding closes ${date(o.dates.close)}` : o.status === "upcoming" ? `Bidding opens ${date(o.dates.open)}` : "Bidding has closed";
+    out.push({ q: "When?", a: `${when}. Allotment ${date(o.dates.allotment)}, listing ${date(o.dates.listing)}. Dates can shift.` });
+    return out;
+  });
+  const readingsChart = $derived.by(() => {
+    const pts = (o.gmp_readings ?? []).filter((r: any) => r.gmp != null);
+    return pts.length >= 2 ? pts : null;
+  });
 
   // GMP chart: day-wise premium, oldest to newest.
   const days = $derived([...o.gmp.days].reverse());
@@ -57,7 +93,7 @@
       <div>
         <h1>{o.name}</h1>
         <p class="chips">
-          {#if o.issue_type}<span class="chip">{o.issue_type}</span>{/if}<span class="chip">{o.board}</span><span class="chip">{stateLabel}</span>
+          {#if o.issue_type}<span class="chip">{o.issue_type}</span>{/if}<span class="chip">{o.exchange ?? o.board}</span><span class="chip">{stateLabel}</span>
           {#if o.issue_size_cr != null}<span class="chip up">{cr(o.issue_size_cr)} issue</span>{/if}
         </p>
       </div>
@@ -75,6 +111,81 @@
     </dl>
   </section>
 
+  {#if verdictLines.length}
+    <section class="card pad">
+      <header class="sec"><h2>Before you apply</h2><span class="muted">The essentials in plain words. This is not a recommendation to apply or to stay out.</span></header>
+      <dl class="answers">
+        {#each verdictLines as l}<div><dt>{l.q}</dt><dd class={l.tone ?? ""}>{l.a}</dd></div>{/each}
+      </dl>
+    </section>
+  {/if}
+
+  {#if o.listing?.price != null}
+    <section class="card pad">
+      <header class="sec"><h2>Since listing</h2></header>
+      <dl class="grid4 tight">
+        <div><dt>Listing price</dt><dd>{price(o.listing.price)}</dd></div>
+        <div><dt>Listing gain</dt><dd class={tone(o.listing.gain)}>{pct(o.listing.gain)}</dd></div>
+        <div><dt>Current price</dt><dd>{price(o.listing.cmp)}</dd></div>
+        <div><dt>Since issue</dt><dd class={tone(o.listing.current_gain)}>{pct(o.listing.current_gain)}</dd></div>
+      </dl>
+    </section>
+  {/if}
+
+  {#if o.about || o.strengths.length || o.risks.length}
+    <section id="about" class="card pad">
+      {#if o.about}<header class="sec"><h2>What {o.name} does</h2></header><p class="prose">{o.about}</p>{/if}
+      {#if objects.items.length || objects.text}
+        <h3>What the money is for</h3>
+        {#if objects.items.length}
+          <ul class="rows objects">{#each objects.items as it}<li><span>{it.name ?? it.title ?? it.object ?? it}</span>{#if it.amount ?? it.amount_cr}<b>{it.amount_cr != null ? cr(it.amount_cr) : it.amount}</b>{/if}</li>{/each}</ul>
+        {:else}<p class="prose">{objects.text}</p>{/if}
+      {/if}
+      <div class="two">
+        {#if o.strengths.length}<div><h3>Strengths</h3><ul class="bul up">{#each o.strengths as t}<li>{t}</li>{/each}</ul></div>{/if}
+        {#if o.risks.length}<div><h3>Risk factors</h3><ul class="bul down">{#each o.risks as t}<li>{t}</li>{/each}</ul></div>{/if}
+      </div>
+      {#if o.company?.promoters || o.company?.holding}
+        <h3>Promoters</h3>
+        {#if Array.isArray(o.company.promoters)}<ul class="docs plain">{#each o.company.promoters as pr}<li>{pr.name ?? pr}</li>{/each}</ul>{:else if typeof o.company.promoters === "string"}<p class="prose">{o.company.promoters}</p>{/if}
+        {#if entries(o.company.holding).length}<dl class="kv">{#each entries(o.company.holding) as [k, v]}<div><dt>{label(k)}</dt><dd>{v}</dd></div>{/each}</dl>{/if}
+      {/if}
+      <p class="note">Summarised from the offer document by a data provider. Read the prospectus before applying.</p>
+    </section>
+  {/if}
+
+  {#if fin}
+    <section id="financials" class="card pad">
+      <header class="sec"><h2>Financials</h2><span class="muted">{fin.unit ?? "₹ crore"}, restated as published in the offer document</span></header>
+      {#if bars.length}
+        <div class="bars">
+          {#each bars as b}
+            <figure>
+              <figcaption>{b.metric}</figcaption>
+              <div class="bar-row" role="img" aria-label="{b.metric}: {b.vals.map((x) => `${x.h} ${x.v ?? 'not published'}`).join(', ')}">
+                {#each b.vals as x}
+                  <div class="bar"><span class="val">{x.v == null ? "—" : x.v.toLocaleString("en-IN")}</span><i class:neg={(x.v ?? 0) < 0} style="height: {Math.max(2, (Math.abs(x.v ?? 0) / b.top) * 72)}px"></i><span class="yr">{x.h.replace(/^\d+ \w+ /, "FY")}</span></div>
+                {/each}
+              </div>
+            </figure>
+          {/each}
+        </div>
+      {/if}
+      {#if finRows.length}
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th class="left">Period ended</th>{#each fin.headers as h}<th>{h}</th>{/each}</tr></thead>
+            <tbody>{#each finRows as r}<tr><td class="left">{r.metric}</td>{#each r.data as v}<td>{v}</td>{/each}</tr>{/each}</tbody>
+          </table>
+        </div>
+      {:else if fin.text}<p class="prose">{fin.text}</p>{/if}
+      {#if o.company?.kpis?.length}
+        <h3>Key performance indicators</h3>
+        <dl class="grid4 tight">{#each o.company.kpis as k}<div><dt>{k.label ?? k.name ?? k.metric ?? k.kpi}</dt><dd>{k.value ?? k.data ?? "—"}</dd></div>{/each}</dl>
+      {/if}
+    </section>
+  {/if}
+
   <section class="card pad">
     <header class="sec"><h2>Scheduled dates</h2><span class="muted">Tentative timetable. A past date is not confirmation the step completed.</span></header>
     <ol class="steps">
@@ -88,13 +199,26 @@
     <header class="sec"><h2>Subscription</h2><b class="total" class:up={(o.times_total ?? 0) >= 1}>{times(o.times_total)}<small>overall</small></b></header>
     {#if o.subscription.length}
       <ul class="rows">
-        {#each [["qib", "Qualified institutional", "QIB"], ["bnii", "Big non-institutional", "bNII · above ₹10 lakh"], ["snii", "Small non-institutional", "sNII · ₹2–10 lakh"], ["retail", "Retail individual", "RII · up to ₹2 lakh"]] as [k, name, tag]}
+        {#each [["qib", "Qualified institutional", "QIB"], ...(by.bnii ? [] : [["nii", "Non-institutional", "NII · above ₹2 lakh"]]), ["bnii", "Big non-institutional", "bNII · above ₹10 lakh"], ["snii", "Small non-institutional", "sNII · ₹2–10 lakh"], ["retail", "Retail individual", "RII · up to ₹2 lakh"]] as [k, name, tag]}
           {#if by[k]}<li><span>{name} <em>{tag}</em></span><b class:up={(by[k].times ?? 0) >= 1}>{times(by[k].times)}</b></li>{/if}
         {/each}
       </ul>
+      {#if o.applications != null}<p class="note"><b>{sh(o.applications)}</b> applications{o.status === "open" ? " so far" : ""}.</p>{/if}
+      {#if o.sub_updated}<p class="note">{o.sub_from === "nse" ? "NSE's figure" : "Provider's figure"} as of {fetchedAt(o.sub_updated)}. {o.sub_from === "ipoguru" && !by.total ? "This issue is not on NSE's board, so it can lag the exchange." : ""}</p>{/if}
+      {#if o.qib_interest_cost?.rates?.length}<p class="note">A fully leveraged QIB needs about <b>{o.qib_interest_cost.rates[0].cost_percent}%</b> over the price just to cover funding at {o.qib_interest_cost.rates[0].rate_percent}% a year. Arithmetic from IPO Guru, not advice.</p>{/if}
       {#if o.retail_odds}<p class="note">Retail chance of a lot is about <b>{chance(o.retail_odds.chance)}</b>: {sh(o.retail_odds.lots_offered)} lots on offer against {sh(o.retail_odds.lots_bid)} lots bid for. An estimate that assumes each applicant bids one lot.</p>{/if}
     {:else}
-      <p class="note">NSE has not published bids for this issue yet. They appear once bidding starts.</p>
+      <p class="note">{o.times_total != null ? "The split by investor category isn't available right now." : "NSE has not published bids for this issue yet. They appear once bidding starts."}</p>
+    {/if}
+    {#if o.sub_days?.length}
+      <h3>How the book built up</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th class="left">Day</th><th class="left">Date</th><th>QIB</th><th>NII</th>{#if splitNii}<th>bNII</th><th>sNII</th>{/if}<th>Retail</th><th>Total</th></tr></thead>
+          <tbody>{#each o.sub_days as day}<tr><td class="left">Day {day.day ?? "—"}</td><td class="left">{date(day.date)}</td><td>{times(n(day.qib))}</td><td>{times(n(day.nii))}</td>{#if splitNii}<td>{times(n(day.bnii))}</td><td>{times(n(day.snii))}</td>{/if}<td>{times(n(day.retail))}</td><td><b>{times(n(day.total))}</b></td></tr>{/each}</tbody>
+        </table>
+      </div>
+      {#if o.sub_days_from === "own"}<p class="note">Our own record: the last figure we read each day, so today's row is still moving. A day is missing if we weren't recording yet.</p>{/if}
     {/if}
   </section>
 
@@ -109,6 +233,8 @@
         <div><dt>Gain per lot</dt><dd class={tone(o.gmp.profit_per_lot)}>{rupee(o.gmp.profit_per_lot)}</dd></div>
         <div><dt>24-hour change</dt><dd class={tone(o.gmp.change_24h)}>{o.gmp.change_24h == null ? "—" : o.gmp.change_24h === 0 ? "unchanged" : rupee(o.gmp.change_24h)}</dd></div>
         <div><dt>Range · {days.length} days</dt><dd>{o.gmp.range ? `${rupee(o.gmp.range[0])} – ${rupee(o.gmp.range[1])}` : "—"}</dd></div>
+        {#if o.gmp.sauda != null}<div><dt>Subject to sauda</dt><dd>{rupee(o.gmp.sauda)}</dd></div>{/if}
+        {#if o.gmp.kostak != null}<div><dt>Kostak</dt><dd>{rupee(o.gmp.kostak)}</dd></div>{/if}
       </dl>
       {#if chart}
         <svg viewBox="0 0 {W} {H}" class="chart" role="img" aria-label="Grey market premium by day, {date(days[0].date)} to {date(days[days.length - 1].date)}">
@@ -131,7 +257,21 @@
           </table>
         </div>
       </details>
-      <p class="note">Gain per lot assumes the premium holds to listing and that the application is allotted. Allotment in an oversubscribed issue is a lottery, so it is indicative, not expected.</p>
+      {#if o.gmp_intraday?.length || readingsChart}
+        <details>
+          <summary>Every reading · {o.gmp_intraday?.length || readingsChart?.length}</summary>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th class="left">When</th><th>GMP</th></tr></thead>
+              <tbody>
+                {#if o.gmp_intraday?.length}{#each [...o.gmp_intraday].reverse() as p}<tr><td class="left">{p.label ?? p.recorded_at}</td><td class={tone(p.price_value)}>{rupee(p.price_value)}</td></tr>{/each}
+                {:else}{#each [...readingsChart].reverse() as p}<tr><td class="left">{fetchedAt(p.at)}</td><td class={tone(p.gmp)}>{rupee(p.gmp)}</td></tr>{/each}{/if}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      {/if}
+      <p class="note">Sauda is the rate paid for a submitted application itself. Gain per lot assumes the premium holds to listing and that the application is allotted. Allotment in an oversubscribed issue is a lottery, so it is indicative, not expected.</p>
     {:else}
       <p class="note">{!o.gmp_connected ? "Grey-market premium is not connected yet." : o.gmp_error ? `Grey-market premium is unavailable: ${o.gmp_error}.` : "No grey-market premium is reported for this issue yet."}</p>
     {/if}
@@ -220,27 +360,32 @@
     {/if}
   </section>
 
-  {#if o.anchor}
+  {#if o.anchor || o.anchors?.anchors?.length}
     <section id="anchor" class="card pad">
       <header class="sec"><h2>Anchor investors</h2><span class="muted">Institutional allocation placed a day before the issue opens, carved out of the QIB portion and locked in after listing</span></header>
-      <dl class="grid4 tight">
+      {#if o.anchors?.anchors?.length}
+        <dl class="grid4 tight">
+          <div><dt>Anchor book</dt><dd>{cr(o.anchors.summary?.total_amount_cr)}</dd></div>
+          <div><dt>Investors</dt><dd>{o.anchors.summary?.total_anchors ?? "—"}</dd></div>
+          <div><dt>Mutual funds</dt><dd>{o.anchors.summary?.mutual_fund_count ?? "—"}</dd></div>
+        </dl>
+        <details open>
+          <summary>Who took part · {o.anchors.anchors.length}</summary>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th class="left">Investor</th><th>Shares</th><th>₹ Cr</th><th>% of anchor</th></tr></thead>
+              <tbody>{#each o.anchors.anchors as x}<tr><td class="left">{x.name}</td><td>{sh(x.shares_allotted)}</td><td>{x.amount_cr ?? "—"}</td><td>{x.pct_allocated == null ? "—" : `${x.pct_allocated}%`}</td></tr>{/each}</tbody>
+            </table>
+          </div>
+        </details>
+      {/if}
+      {#if o.anchor}<dl class="grid4 tight">
         <div><dt>Shares allocated</dt><dd>{sh(o.anchor.shares)}</dd></div>
         <div><dt>Anchor portion</dt><dd>{cr(o.anchor.amount_cr)}</dd></div>
         <div><dt>Of total issue</dt><dd>{o.anchor.pct_of_total == null ? "—" : `${o.anchor.pct_of_total.toFixed(2)}%`}</dd></div>
         <div><dt>Lock-in ends (est.)</dt><dd>{date(o.anchor.lockin_50pct)} <small>50%</small><br />{date(o.anchor.lockin_rest)} <small>rest</small></dd></div>
       </dl>
-      {#if o.anchor.report_url}<p class="note"><a href={o.anchor.report_url} target="_blank" rel="noopener noreferrer">Anchor allocation report (NSE) ↗</a></p>{/if}
-    </section>
-  {/if}
-
-  {#if o.about || o.strengths.length || o.risks.length}
-    <section id="about" class="card pad">
-      {#if o.about}<header class="sec"><h2>About {o.name}</h2></header><p class="prose">{o.about}</p>{/if}
-      <div class="two">
-        {#if o.strengths.length}<div><h3>Strengths</h3><ul class="bul up">{#each o.strengths as t}<li>{t}</li>{/each}</ul></div>{/if}
-        {#if o.risks.length}<div><h3>Risk factors</h3><ul class="bul down">{#each o.risks as t}<li>{t}</li>{/each}</ul></div>{/if}
-      </div>
-      <p class="note">Summarised from the offer document by a data provider. Read the prospectus before applying.</p>
+      {#if o.anchor.report_url}<p class="note"><a href={o.anchor.report_url} target="_blank" rel="noopener noreferrer">Anchor allocation report (NSE) ↗</a></p>{/if}{/if}
     </section>
   {/if}
 
@@ -250,7 +395,7 @@
   </section>
 
   <p class="sub source">
-    Figures are compiled from NSE's published bidding data{#if o.gmp.latest != null}; grey-market premium from ipoalerts.in{/if}. Subscription changes until the issue closes, and the final basis of allotment is published by the registrar. Dates, chances and bracket sizes are estimates. Grey-market premium is unofficial, indicative data from unregulated dealers, not published by NSE, BSE, SEBI or the issuer, and not a forecast. Nothing here is investment advice; read the offer document and consult a SEBI-registered adviser before applying.
+    IPO data by <a href="https://www.ipoguru.in/">IPO Guru</a>; bids from NSE's published data where it carries the issue. Subscription changes until the issue closes, and the final basis of allotment is published by the registrar. Dates, chances and bracket sizes are estimates. Grey-market premium is unofficial, indicative data from unregulated dealers, not published by NSE, BSE, SEBI or the issuer, and not a forecast. Nothing here is investment advice; read the offer document and consult a SEBI-registered adviser before applying.
   </p>
 </div>
 
@@ -316,6 +461,24 @@
   .kv dt { text-transform: none; letter-spacing: 0; font-size: 13px; } .kv dd { margin: 0; text-align: right; }
   .docs { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px 18px; }
   .docs a { text-decoration: underline; font-size: 14px; }
+  .answers { margin: 0; display: grid; }
+  .answers > div { display: grid; grid-template-columns: 190px 1fr; gap: 16px; padding: 11px 0; border-top: 1px solid var(--line); }
+  .answers > div:first-child { border-top: 0; padding-top: 0; }
+  .answers dt { text-transform: none; letter-spacing: 0; font-size: 13.5px; color: var(--ink-2); }
+  .answers dd { margin: 0; font-weight: 400; line-height: 1.5; color: var(--ink); }
+  .objects li span { font-size: 14px; }
+  .docs.plain { font-size: 14px; color: var(--ink-2); }
+  .bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 18px; margin-bottom: 18px; }
+  figure { margin: 0; }
+  figcaption { font-size: 12.5px; color: var(--ink-2); margin-bottom: 8px; }
+  .bar-row { display: flex; gap: 8px; align-items: flex-end; min-height: 120px; }
+  .bar { flex: 1; display: grid; justify-items: center; gap: 4px; align-content: end; }
+  .bar i { display: block; width: 100%; max-width: 34px; background: var(--ink-3); border-radius: 2px 2px 0 0; }
+  .bar:last-child i { background: var(--up); }
+  .bar i.neg { background: var(--down); }
+  .bar .val { font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .bar .yr { font-size: 11px; color: var(--ink-3); }
+  .source a { text-decoration: underline; }
   .prose { margin: 0 0 16px; line-height: 1.65; color: var(--ink-2); }
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
   .bul { margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
@@ -325,7 +488,7 @@
     .hero { grid-template-columns: 1fr; } .big { text-align: left; }
     .grid4 { grid-template-columns: repeat(2, 1fr); }
     .steps { grid-template-columns: repeat(3, 1fr); row-gap: 14px; } .steps li:nth-child(4)::before { display: none; }
-    .kv, .two { grid-template-columns: 1fr; }
+    .kv, .two, .answers > div { grid-template-columns: 1fr; gap: 3px; }
     .subnav { top: 49px; }
   }
 </style>

@@ -4,7 +4,9 @@
 
 import { app } from "./app.js";
 import type { Env } from "./env.js";
+import { fillBseHistory, refreshBse } from "./jobs/bse.js";
 import { runDaily } from "./jobs/daily.js";
+import { recordIpoCategories } from "./jobs/ipo-readings.js";
 import { fillStatements } from "./lib/statements.js";
 import { setBackground } from "./lib/nse.js";
 
@@ -21,9 +23,13 @@ export default {
   scheduled: (event: { cron: string }, env: Env, ctx: Ctx) => {
     // Every ten minutes: one small batch of the statement store fill (the daily cap keeps it within the provider plan).
     if (event.cron === "*/10 * * * *") {
+      setBackground((p) => ctx.waitUntil(p)); // the IPO readings read NSE's stored copies, which refresh behind the answer
       ctx.waitUntil(fillStatements(env).then((r) => r.asked && console.log(`statements: asked ${r.asked}, stored ${r.stored}, unknown ${r.unknown}${r.skipped ? ` (${r.skipped})` : ""}`)));
+      ctx.waitUntil(fillBseHistory(env).then((r) => r.asked && console.log(`bse history: asked ${r.asked}, loaded ${r.loaded}, failed ${r.failed}`)));
+      ctx.waitUntil(recordIpoCategories(env).then((r) => r.saved && console.log(`ipo readings: saved ${r.saved} of ${r.issues}`)).catch((err) => console.error("ipo readings:", err)));
       return;
     }
+    ctx.waitUntil(refreshBse(env).then((r) => console.log(`bse prices: saved ${r.saved} of ${r.stocks}, corrected ${r.corrected}, failed calls ${r.failedCalls}`)));
     ctx.waitUntil(runDaily(env).then((r) => console.log(`daily ${r.date}: ${r.steps.map((s) => `${s.step}=${s.status}${s.rows != null ? `(${s.rows})` : ""}`).join(" ")} in ${r.ms} ms`)));
   },
 };

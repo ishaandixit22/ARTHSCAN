@@ -19,6 +19,9 @@ const env: Env = {
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   INDIANAPI_KEY: process.env.INDIANAPI_KEY,
   INDIANAPI_BASE_URL: process.env.INDIANAPI_BASE_URL,
+  IPOGURU_API_KEY: process.env.IPOGURU_API_KEY,
+  IPOALERTS_API_KEY: process.env.IPOALERTS_API_KEY,
+  IPOALERTS_TTL: process.env.IPOALERTS_TTL,
 };
 
 const port = Number(process.env.API_PORT ?? 8787);

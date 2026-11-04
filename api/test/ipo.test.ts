@@ -225,3 +225,203 @@ describe("get_ipo_detail, checked against BLS Polymers' published page", () => {
     expect((await ask("symbol=ZZZZZ")).status).toBe(404);
   });
 });
+
+describe("IPO Guru", () => {
+  const ROW = { slug: "maxwell-engineering-solutions-sme-ipo", name: "Maxwell Engineering Solutions", display_name: "Maxwell Engineering Solutions", type: "SME", sub_type: "NSE SME", status: "Open", stage: "live", dates_tba: false, is_listed: false, logo: "https://x/l.webp", open_date: "2026-10-30", close_date: "2026-11-03", allotment_date: "2026-11-04", listing_date: "2026-11-06", price_min: 150, price_max: 158, issue_price: "158", issue_size: "57.64", lot_size: 800, min_investment: 126400, gmp: { price: "80", percentage: "50.63", kostak: null, subject_to_sauda: "48600", estimated_listing_price: 238, updated_at: "2026-11-02T19:06:14.000000Z" }, subscription_total: "72.97", listing_price: null, listing_gain_percent: null, cmp: null, current_gain_percent: null, web_url: "https://www.ipoguru.in/ipo/x" };
+  const ok = (data: unknown, plan = "free", remaining = "9") => new Response(JSON.stringify({ success: true, plan, data }), { headers: { "x-plan": plan, "x-ratelimit-limit": "10", "x-ratelimit-remaining": remaining } });
+  const keyed = { ...env, IPOGURU_API_KEY: "k" } as Env;
+  const clean = async () => { await db.prepare("DELETE FROM external_cache").run(); await db.prepare("DELETE FROM ipo_readings").run(); };
+
+  it("treats a premium of 0 as a reading and null as unknown, and reads messy sauda figures", async () => {
+    const { parseGmp, sameCompany, toNum } = await import("../src/lib/ipoguru.js");
+    expect(parseGmp({ price: "0", percentage: "0" })).toMatchObject({ price: 0, pct: 0 });
+    expect(parseGmp({ price: null }).price).toBeNull();
+    expect(parseGmp({ subject_to_sauda: "700,,9800" }).sauda).toBe(700);
+    expect(parseGmp({ subject_to_sauda: "13,700" }).sauda).toBe(13700);
+    expect(toNum("")).toBeNull();
+    expect(sameCompany("M.K.Sons Fine Jewels", "M K Sons Fine Jewels Limited")).toBe(true);
+    expect(sameCompany("HGS (India)", "HGS India Limited")).toBe(true);
+    expect(sameCompany("Maxwell Engineering", "Vectras Enprocon")).toBe(false);
+  });
+
+  it("works out each stage from the dates", async () => {
+    const { stageOf } = await import("../src/handlers/ipo.js");
+    const r = { pre_rhp: false, listed: false, open: "2026-10-30", close: "2026-11-03", allotment: "2026-11-04", listing: "2026-11-06" };
+    expect(stageOf(r, "2026-10-29")).toBe("upcoming");
+    expect(stageOf(r, "2026-11-02")).toBe("open");
+    expect(stageOf(r, "2026-11-03")).toBe("closing");
+    expect(stageOf(r, "2026-11-05")).toBe("allotted");
+    expect(stageOf(r, "2026-11-06")).toBe("listed");
+    expect(stageOf({ ...r, pre_rhp: true, open: null }, "2026-11-02")).toBe("expected");
+  });
+
+  it("spends one request per window, keeps a free key's reserve, and serves the stored copy when it is refused", async () => {
+    const { calendar, quota } = await import("../src/lib/ipoguru.js");
+    await clean();
+    let answer = () => ok([ROW]);
+    const fetchMock = vi.fn(async () => answer());
+    vi.stubGlobal("fetch", fetchMock);
+    expect((await calendar(keyed)).rows[0]).toMatchObject({ slug: ROW.slug, times_total: 72.97, price_high: 158 });
+    await calendar(keyed);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect((await quota(keyed)).remaining).toBe(9);
+    // Stale, but inside the minute: no second request.
+    await db.prepare("UPDATE external_cache SET fetched_at = fetched_at - 99999 WHERE key LIKE 'ipoguru:/%'").run();
+    expect((await calendar(keyed)).rows).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // A minute on, a 429 still shows the stored rows.
+    await db.prepare("UPDATE external_cache SET body = json_set(body, '$.retry_at', 0) WHERE key = 'ipoguru:quota'").run();
+    answer = () => new Response("{}", { status: 429, headers: { "retry-after": "30" } });
+    const r = await calendar(keyed);
+    expect(r.rows).toHaveLength(1);
+    expect(r.error).toMatch(/limit/);
+    // Down to the reserve: a stored copy is good enough, so nothing is spent.
+    await db.prepare("UPDATE external_cache SET body = json_set(body, '$.retry_at', 0, '$.remaining', 2) WHERE key = 'ipoguru:quota'").run();
+    const before = fetchMock.mock.calls.length;
+    expect((await calendar(keyed)).error).toMatch(/quota/);
+    expect(fetchMock.mock.calls.length).toBe(before);
+  });
+
+  it("takes the higher subscription figure, and treats a provider zero after day one as unknown", async () => {
+    const { creditedTimes, useExchange } = await import("../src/handlers/ipo.js");
+    expect(useExchange(80.34, 72.97)).toBe(true);
+    expect(useExchange(2.67, 60.77)).toBe(false); // a stored NSE copy from days ago
+    expect(useExchange(0, 72.97)).toBe(false);
+    expect(useExchange(null, 1)).toBe(false);
+    expect(creditedTimes(0, "2026-10-30", "2026-11-03")).toBeNull();
+    expect(creditedTimes(0, "2026-11-03", "2026-11-03")).toBe(0); // the first morning really can be zero
+    expect(creditedTimes(1.29, "2026-10-30", "2026-11-03")).toBe(1.29);
+  });
+
+  it("records a reading only when the premium or subscription changes", async () => {
+    const { recordReadings, readings, parseCalendarRow } = await import("../src/lib/ipoguru.js");
+    await clean();
+    const row = parseCalendarRow(ROW);
+    await recordReadings(keyed, [row], 1_000_000);
+    await recordReadings(keyed, [row], 2_000_000);
+    await recordReadings(keyed, [{ ...row, gmp: { ...row.gmp, price: 90 } }], 3_000_000);
+    expect((await readings(keyed, ROW.slug)).map((x) => x.gmp)).toEqual([80, 90]);
+  });
+
+  describe("day-wise build-up by category", () => {
+    const IST = (s: string) => Date.parse(`${s}+05:30`);
+    const times = (total: number, qib: number) => ({ total, qib, nii: 2, snii: null, bnii: null, retail: 3 });
+    const wipe = async () => { await clean(); await db.prepare("DELETE FROM ipo_category_readings").run(); };
+    const count = async () => (await db.prepare("SELECT COUNT(*) AS n FROM ipo_category_readings").first<{ n: number }>())!.n;
+
+    it("keeps a reading only when a category changes, and passes over a lower total as a stale copy", async () => {
+      const { recordCategories } = await import("../src/lib/ipoguru.js");
+      await wipe();
+      expect(await recordCategories(keyed, "a", "nse", times(10, 1), 1_000_000)).toBe(true);
+      expect(await recordCategories(keyed, "a", "nse", times(10, 1), 2_000_000)).toBe(false);
+      expect(await recordCategories(keyed, "a", "nse", times(10, 5), 3_000_000)).toBe(true);
+      expect(await recordCategories(keyed, "a", "nse", times(2, 9), 4_000_000)).toBe(false);
+      expect(await recordCategories(keyed, "a", "nse", { total: null, qib: null, nii: null, snii: null, bnii: null, retail: null }, 5_000_000)).toBe(false);
+      expect(await count()).toBe(2);
+    });
+
+    it("gives each bidding day its last reading in India time, numbered across a weekend", async () => {
+      const { categoryDays, recordCategories } = await import("../src/lib/ipoguru.js");
+      await wipe();
+      await recordCategories(keyed, "a", "nse", times(1, 1), IST("2026-10-30T11:00:00"));
+      await recordCategories(keyed, "a", "nse", times(2, 1), IST("2026-10-30T23:50:00")); // still the 30th in India, the next day nowhere else matters
+      await recordCategories(keyed, "a", "nse", times(5, 2), IST("2026-11-02T17:00:00"));
+      await recordCategories(keyed, "a", "nse", times(9, 3), IST("2026-11-04T10:00:00")); // after the close
+      const days = await categoryDays(keyed, "a", "2026-10-30", "2026-11-03");
+      expect(days.map((d) => [d.day, d.date, d.total, d.time])).toEqual([[1, "2026-10-30", 2, "23:50"], [2, "2026-11-02", 5, "17:00"]]);
+    });
+
+    it("reads the provider's category tree, with sNII and bNII nested under NII", async () => {
+      const { parseLiveCategories } = await import("../src/lib/ipoguru.js");
+      const body = { categories: [{ key: "QIB", times: "139.69", times_value: 139.69 }, { key: "NII", times_value: 87.24, sub_categories: [{ key: "BNII_CORP", times_value: 1 }, { key: "BNII", times_value: 90 }, { key: "SNII_IND", times_value: 2 }, { key: "SNII", times: "80.5", times_value: null }] }, { key: "Retail", times_value: 25.4 }, { key: "Total", times_value: 71.25 }] };
+      expect(parseLiveCategories(body)).toEqual({ total: 71.25, qib: 139.69, nii: 87.24, snii: 80.5, bnii: 90, retail: 25.4 });
+      expect(parseLiveCategories({ categories: [] })).toBeNull();
+      expect(parseLiveCategories(null)).toBeNull();
+    });
+
+    const stub = (plan: string, spent: string[]) => vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("/subscription")) { spent.push(url); return ok({ categories: [{ key: "QIB", times_value: 4 }, { key: "Total", times_value: 7 }] }, plan); }
+      if (url.includes("ipoguru.in")) return ok([ROW, { ...ROW, slug: "vectras-enprocon-sme-ipo", name: "Vectras Enprocon", display_name: "Vectras Enprocon", subscription_total: "1.29" }], plan);
+      if (url.includes("ipo-current-issue")) return new Response(JSON.stringify([{ companyName: "Maxwell Engineering Solutions Limited", issueEndDate: "03-Nov-2026", issuePrice: "Rs.150 to Rs.158", issueStartDate: "30-Oct-2026", series: "SME", status: "Active", symbol: "MAXWELL" }]));
+      if (url.includes("symbol=MAXWELL")) return new Response(JSON.stringify({ activeCat: { dataList: [{ category: "Qualified Institutional Buyers(QIBs)", srNo: "1", noOfShareOffered: "0", noOfSharesBid: "177255200", noOfTotalMeant: "0.00" }, { category: "Retail", srNo: "3", noOfTotalMeant: "110.21" }, { category: "Total", srNo: null, noOfTotalMeant: "80.34" }] }, issueInfo: { dataList: [] } }));
+      return new Response("nope", { status: 403 });
+    }));
+
+    it("takes NSE's figure, and asks the provider only for what NSE lacks: an issue or its unpublished QIB", async () => {
+      const { recordIpoCategories } = await import("../src/jobs/ipo-readings.js");
+      await wipe();
+      const spent: string[] = [];
+      stub("standard", spent);
+      await db.prepare("INSERT INTO external_cache (key, body, fetched_at) VALUES ('ipoguru:quota', ?, 0)").bind(JSON.stringify({ plan: "standard", remaining: 900, limit: 1000, retry_at: 0, day: "2026-11-03" })).run();
+      expect(await recordIpoCategories(keyed, IST("2026-11-03T12:00:00"))).toEqual({ issues: 2, saved: 2 });
+      const rows = await db.prepare("SELECT slug, source, total, qib, retail FROM ipo_category_readings ORDER BY slug").all<any>();
+      expect(rows.results).toEqual([
+        { slug: ROW.slug, source: "nse", total: 80.34, qib: 4, retail: 110.21 },
+        { slug: "vectras-enprocon-sme-ipo", source: "ipoguru", total: 7, qib: 4, retail: null },
+      ]);
+      expect(spent).toHaveLength(2);
+    });
+
+    it("leaves QIB unknown rather than zero when NSE writes 0.00 against real bids and the plan can't fill it", async () => {
+      const { recordIpoCategories } = await import("../src/jobs/ipo-readings.js");
+      await wipe();
+      stub("free", []);
+      await recordIpoCategories(keyed, IST("2026-11-03T12:00:00"));
+      expect(await db.prepare("SELECT qib, retail FROM ipo_category_readings WHERE source = 'nse'").first()).toEqual({ qib: null, retail: 110.21 });
+    });
+
+    it("spends nothing outside bidding hours or at weekends, and doesn't ask a free key for categories", async () => {
+      const { recordIpoCategories } = await import("../src/jobs/ipo-readings.js");
+      await wipe();
+      const spent: string[] = [];
+      stub("free", spent);
+      expect(await recordIpoCategories(keyed, IST("2026-11-03T20:00:00"))).toEqual({ issues: 0, saved: 0 });
+      expect(await recordIpoCategories(keyed, IST("2026-11-01T12:00:00"))).toEqual({ issues: 0, saved: 0 });
+      expect(fetch).not.toHaveBeenCalled();
+      expect((await recordIpoCategories(keyed, IST("2026-11-03T12:00:00"))).saved).toBe(1);
+      expect(spent).toHaveLength(0);
+    });
+  });
+
+  it("merges the exchange's fresher subscription into the dashboard and keeps BSE-only issues", async () => {
+    await clean();
+    const BSE = { ...ROW, slug: "vectras-enprocon-sme-ipo", name: "Vectras Enprocon", display_name: "Vectras Enprocon", sub_type: "BSE SME", subscription_total: "1.29", gmp: { price: "0", percentage: "0" } };
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("ipoguru.in")) return ok([ROW, BSE]);
+      if (url.includes("ipo-current-issue")) return new Response(JSON.stringify([{ companyName: "Maxwell Engineering Solutions Limited", issueEndDate: "03-Nov-2026", issuePrice: "Rs.150 to Rs.158", issueStartDate: "30-Oct-2026", series: "SME", status: "Active", symbol: "MAXWELL" }]));
+      if (url.includes("all-upcoming-issues")) return new Response("[]");
+      if (url.includes("symbol=MAXWELL")) return new Response(JSON.stringify({ activeCat: { updateTime: "Updated as on 02-Nov-2026 17:56:00", dataList: [{ category: "Retail", srNo: "3", noOfShareOffered: "1200000", noOfSharesBid: "132251200", noOfTotalMeant: "110.21" }, { category: "Total", srNo: null, noOfShareOffered: "2401600", noOfSharesBid: "192949600", noOfTotalMeant: "80.34" }] }, issueInfo: { dataList: [] } }));
+      if (url.includes("holiday-master")) return new Response(JSON.stringify({ CM: [] }));
+      return new Response("nope", { status: 403 });
+    }));
+    const res = await app.fetch(new Request("https://x/v1/market/ipo-dashboard", { headers: { "x-internal-key": "i" } }), keyed);
+    const d = ((await res.json()) as any).data;
+    const [maxwell, vectras] = d.rows;
+    expect(maxwell).toMatchObject({ symbol: "MAXWELL", times_total: 80.34, retail: 110.21, sub_from: "nse", gmp: 80, profit_per_lot: 64000, sub_as_of: "2026-11-02T17:56:00+05:30" });
+    expect(vectras).toMatchObject({ symbol: null, times_total: 1.29, sub_from: "ipoguru", gmp: 0, est_listing: 158 });
+    expect(d.sources.ipoguru).toMatchObject({ connected: true, plan: "free" });
+  });
+
+  it("opens a BSE-only issue by slug on a free key, and names what the plan withholds", async () => {
+    await clean();
+    const BSE = { ...ROW, slug: "vectras-enprocon-sme-ipo", name: "Vectras Enprocon", display_name: "Vectras Enprocon", sub_type: "BSE SME", subscription_total: "1.29", price_min: 99, price_max: 105, lot_size: 1200 };
+    const DOC = { ...BSE, images: { logo: "https://x/l.webp" }, timeline: { open_date: "2026-10-30", close_date: "2026-11-03", allotment_date: "2026-11-04", refund_date: "2026-11-05", credit_to_demat_date: "2026-11-05", listing_date: "2026-11-06" }, issue: { issue_size: "53.05", price_min: 99, price_max: 105, lot_size: 1200, face_value: "10", sale_type: "Fresh capital", listing_on: "BSE SME", nse_symbol: null }, subscription_summary: { total: "1.29", qib: "1.4", nii: "1.1", retail: "1.3", applications: "278", updated_at: "2026-11-02T14:00:15.000000Z" }, locked: { fields: ["company", "documents"] } };
+    const get = vi.fn(async (url: string) => {
+      if (url.endsWith("/ipos?months=3")) return ok([BSE]);
+      if (url.endsWith("/vectras-enprocon-sme-ipo")) return ok(DOC);
+      if (url.includes("ipoguru.in")) throw new Error(`free plan must not ask for ${url}`);
+      if (url.includes("ipo-current-issue") || url.includes("all-upcoming")) return new Response("[]");
+      if (url.includes("holiday-master")) return new Response(JSON.stringify({ CM: [] }));
+      return new Response("nope", { status: 403 });
+    });
+    vi.stubGlobal("fetch", get);
+    await db.prepare("INSERT INTO external_cache (key, body, fetched_at) VALUES ('ipoguru:/ipos?months=3', ?, ?)").bind(JSON.stringify([BSE]), Math.floor(Date.now() / 1000)).run();
+    const res = await app.fetch(new Request("https://x/v1/market/ipo-detail?symbol=vectras-enprocon-sme-ipo", { headers: { "x-internal-key": "i" } }), keyed);
+    expect(res.status).toBe(200);
+    const d = ((await res.json()) as any).data;
+    expect(d).toMatchObject({ name: "Vectras Enprocon", board: "SME", price_high: 105, issue_size_cr: 53.05, sub_from: "ipoguru", applications: 278, locked: ["company", "documents"], company: null });
+    expect(d.subscription.map((r: any) => r.key)).toEqual(["qib", "nii", "retail", "total"]);
+    expect(d.costs.lot_cost).toBe(126000);
+    expect(d.gmp.latest).toBe(80);
+  });
+});

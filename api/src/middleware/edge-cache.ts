@@ -10,6 +10,8 @@ import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "../env.js";
 
 const TTL_SECONDS = 300;
+// IPO bids and premiums move through the day, and those pages refresh themselves every minute.
+const ttlFor = (path: string) => (path.startsWith("/v1/market/ipo-") ? 60 : TTL_SECONDS);
 
 export function edgeCache(): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
@@ -28,7 +30,7 @@ export function edgeCache(): MiddlewareHandler<AppEnv> {
     await next();
     if (c.res.status === 200 && c.req.path.startsWith("/v1/")) {
       const copy = new Response(c.res.clone().body, c.res);
-      copy.headers.set("cache-control", `public, max-age=${TTL_SECONDS}`);
+      copy.headers.set("cache-control", `public, max-age=${ttlFor(c.req.path)}`);
       copy.headers.delete("set-cookie");
       try {
         c.executionCtx.waitUntil(cache.put(key, copy));

@@ -91,11 +91,19 @@ export async function fillStatements(env: Env, opts: { maxRequests?: number; dai
     ORDER BY (c.symbol IS NULL) DESC, COALESCE(m.turnover, 0) DESC LIMIT ?`)
     .bind(now - FRESH_DAYS * DAY, now - RETRY_UNKNOWN_DAYS * DAY, room).all<{ symbol: string; name: string }>();
 
+  // BSE-only stocks wait until the NSE queue has room. Stored as BSE-<symbol>, since a BSE symbol can match a different NSE company.
+  const bse = queue.length < room ? (await env.DB.prepare(`
+    SELECT 'BSE-' || b.symbol AS symbol, b.symbol AS term, b.name FROM bse_stocks b
+    LEFT JOIN company_statements c ON c.symbol = 'BSE-' || b.symbol
+    WHERE c.symbol IS NULL OR (c.found = 1 AND c.fetched_at < ?) OR (c.found = 0 AND c.fetched_at < ?)
+    ORDER BY (c.symbol IS NULL) DESC, COALESCE(b.median_turnover, 0) DESC LIMIT ?`)
+    .bind(now - FRESH_DAYS * DAY, now - RETRY_UNKNOWN_DAYS * DAY, room - queue.length).all<{ symbol: string; term: string; name: string }>()).results : [];
+
   let asked = 0, stored = 0, unknown = 0, skipped: string | null = null;
   try {
-    for (const { symbol, name } of queue) {
+    for (const { symbol, term, name } of [...queue.map((q) => ({ ...q, term: q.symbol })), ...bse]) {
       asked++;
-      const bundle = await askProvider(env, [symbol, providerName(name)]);
+      const bundle = await askProvider(env, [term, providerName(name)]);
       await save(env, symbol, bundle, Math.floor(Date.now() / 1000));
       if (bundle) stored++; else unknown++;
     }
