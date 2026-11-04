@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test": "node --test test/*.test.ts",
     "cf:build": "vite build",
     "cf:dev": "vite build && wrangler dev",
     "cf:deploy": "vite build && wrangler deploy --secrets-file .prod-secrets.env"

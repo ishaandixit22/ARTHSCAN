@@ -1,0 +1,202 @@
+Priority,Directory,URL,Submit page,Kind,Checked 5 Nov 2026,Mentions badges,Shows prices,MCP mentioned,Copy to use,Status,Submitted on,Live listing URL,Link rel seen,Badge required?,Notes
+A,AgentHunter,https://agenthunter.io,https://www.agenthunter.io/submit,Launch or software,HTTP 200,No,Yes,No,Copy A,To do,,,,,
+A,AI Agent Marketplace & Directory,https://aiagentsdirectory.com,https://aiagentsdirectory.com/submit-agent,AI tools,HTTP 200,No,Yes,Yes,Copy D,To do,,,,,
+A,alternativeto.net,https://alternativeto.net,,Launch or software,HTTP 403,No,No,No,Copy B,To do,,,,,Blocks automated checks (HTTP 403); open it in a browser.
+A,BetaList,https://betalist.com,https://betalist.com/submit,Launch,Not checked,,,,Copy A,To do,,,,,
+A,Crunchbase,https://www.crunchbase.com,Create a company profile,Profile,Not checked,,,,Copy C,To do,,,,,Feeds AI answers. Needs real company details.
+A,Daily Product Launches,https://uneed.best,https://www.uneed.best/submit-a-tool,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+A,Dev Hunt – The best new Dev Tools every ,https://devhunt.org,,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+A,Fazier – Find your next favourite produc,https://fazier.com,,Launch or software,HTTP 200,No,Yes,Yes,Copy B,To do,,,,,
+A,Glama MCP,https://glama.ai/mcp/servers,Add from a GitHub repo,MCP,Not checked,,,,Copy D,To do,,,,,"Needs a public GitHub repo; the main repo is private, so publish arthscan-mcp on its own."
+A,Hacker News (Show HN),https://news.ycombinator.com/submit,https://news.ycombinator.com/submit,Launch,Not checked,,,,Write fresh,To do,,,,,"Only with a technical angle, such as the MCP server."
+A,Inc42 startup directory,https://inc42.com,Check the site,India,Not checked,,,,Copy C,To do,,,,,Indian audience. Not on Tapetide's footer.
+A,LinkedIn company page,https://www.linkedin.com,Create a company page,Profile,Not checked,,,,Copy C,To do,,,,,Then add it to SOCIALS in web/src/lib/footer.ts.
+A,MCP Market,https://mcpmarket.com,https://mcpmarket.com/submit,MCP,Not checked,,,,Copy D,To do,,,,,Free queue 4-6 weeks.
+A,MCP.so,https://mcp.so,https://mcp.so/submit,MCP,Not checked,,,,Copy D,To do,,,,,Free queue.
+A,mcpservers.org,https://mcpservers.org,https://mcpservers.org/submit,MCP,Not checked,,,,Copy D,To do,,,,,Free review; link is only unqualified on the paid tier.
+A,Official MCP Registry,https://registry.modelcontextprotocol.io,Publish with the mcp-publisher CLI,MCP,Not listed yet (searched),,,,Copy D,To do,,,,,Do first. server.json exists in arthscan-mcp; proving me.arthscan needs a DNS TXT record or a key at /.well-known/mcp-registry-auth. Not on Tapetide's footer.
+A,OpenHunts,https://openhunts.com,https://openhunts.com/projects/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+A,Product Hunt,https://www.producthunt.com,https://www.producthunt.com/posts/new,Launch,Not checked,,,,Copy A,To do,,,,,Save for a planned launch day. Needs screenshots and an account with some history.
+A,SaaSHub,https://www.saashub.com,https://www.saashub.com/submit,Software,Not checked,,,,Copy B,To do,,,,,
+A,Smithery,https://smithery.ai,https://smithery.ai/new,MCP,Not checked,,,,Copy D,To do,,,,,
+A,startupfa.me,https://startupfa.me,,Launch or software,HTTP 429,No,No,No,Copy A,To do,,,,,Blocks automated checks (HTTP 429); open it in a browser.
+A,TinyShelf,https://tinyshelf.co,https://www.tinyshelf.co/submit,Launch or software,HTTP 200,No,No,No,Copy B,To do,,,,,
+A,Turbo0,https://turbo0.com,https://turbo0.com/submit,Launch or software,HTTP 200,No,Yes,No,Copy B,To do,,,,,
+A,twelve.tools,https://twelve.tools,https://twelve.tools/submit,Launch or software,HTTP 200,Yes,No,No,Copy B,To do,,,,,
+B,AI Tools Directory,https://dang.ai,https://dang.ai/new,AI tools,HTTP 200,No,Yes,No,Copy D,To do,,,,,
+B,BuildVoyage,https://buildvoyage.com,https://buildvoyage.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+B,CodeHype,https://codehype.ai,https://www.codehype.ai/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+B,directree – the honest SaaS & software d,https://directree.io,https://www.directree.io/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+B,Discover the Best AI Tools to Boost Your,https://goodaitools.com,,AI tools,HTTP 200,No,Yes,No,Copy D,To do,,,,,
+B,Findly.tools,https://findly.tools,https://findly.tools/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+B,Get your best AI Tools November 2026,https://toolsify.ai,https://toolsify.ai/submit,AI tools,HTTP 200,No,Yes,No,Copy D,To do,,,,,
+B,Human-reviewed SaaS tools,https://listmaro.com,https://listmaro.com/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy B,To do,,,,,
+B,HUNT0,https://hunt0.com,https://hunt0.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+B,Launch Streak,https://launchstreak.dev,,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+B,Launch Vault,https://launchvault.dev,https://www.launchvault.dev/projects/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+B,LaunchIgniter,https://launchigniter.com,https://launchigniter.com/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+B,LaunchPanda,https://launchpanda.dev,,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+B,ListBulb,https://listbulb.com,https://listbulb.com/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+B,PitchWall,https://pitchwall.co,https://pitchwall.co/submit,AI tools,HTTP 200,Yes,Yes,No,Copy D,To do,,,,,
+B,SaaS Directory & Launch Platform,https://saascity.io,https://saascity.io/saascity?submit=1,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+B,ScrollLaunch,https://scrolllaunch.com,https://www.scrolllaunch.com/dashboard/products/new,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+B,See what people just shipped,https://marketingdb.live,https://marketingdb.live/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+B,StartupBase,https://startupbase.io,https://startupbase.io/launch,Launch or software,HTTP 200,Yes,No,No,Copy A,To do,,,,,
+B,The #1 Startup Launch Platform & Product,https://tinystartups.com,https://www.tinystartups.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+B,TheSaaSDir,https://thesaasdir.com,https://thesaasdir.com/submit/,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+B,TinyLaunch,https://tinylaunch.com,,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+B,ToolPilot AI,https://toolpilot.ai,https://www.toolpilot.ai/pages/submit-your-ai-tool,AI tools,HTTP 200,Yes,Yes,No,Copy D,To do,,,,,
+C,5 New Tools for Founders Every Tuesday,https://launchllama.co,https://launchllama.co/submit-my-product-for-review--free---25-places-to-get-honest-feedback-fast,Launch or software,HTTP 200,Yes,No,Yes,Copy A,To do,,,,,
+C,AI Directory Submission,https://aidirectori.es,https://www.aidirectori.es/submit-ai-tool,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,AI Launch Space,https://ailaunch.space,https://ailaunch.space/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,AI Tools,https://zplatform.ai,https://zplatform.ai/submit-ai-tool/,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,AI Tools Directory,https://aifinderplus.com,https://aifinderplus.com/submit,AI tools,HTTP 200,Yes,Yes,No,Copy D,To do,,,,,
+C,AI Tools Directory,https://aitrustlist.com,https://aitrustlist.com/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,AI Tools Directory,https://toolrain.com,https://toolrain.com/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,AI Tools Directory & Submission Platform,https://submitaitools.org,,AI tools,HTTP 200,Yes,No,Yes,Copy D,To do,,,,,
+C,"AI Tools Directory, SaaS Products & Prod",https://aitoolslist.tools,https://aitoolslist.tools/submit/,AI tools,HTTP 200,Yes,No,Yes,Copy D,To do,,,,,
+C,AI Toolz Dir,https://aitoolzdir.com,https://www.aitoolzdir.com/submit,AI tools,HTTP 200,Yes,No,No,Copy D,To do,,,,,
+C,aibesttop.com,https://aibesttop.com,,Launch or software,HTTP 523,No,No,No,Copy B,To do,,,,,Blocks automated checks (HTTP 523); open it in a browser.
+C,AIBoom.Tools,https://aiboom.tools,https://aiboom.tools/submit,AI tools,HTTP 200,No,Yes,No,Copy D,To do,,,,,
+C,aidirs.org,https://aidirs.org,,Launch or software,HTTP 403,No,No,No,Copy B,To do,,,,,Blocks automated checks (HTTP 403); open it in a browser.
+C,AIFinder.site,https://aifinder.site,https://www.aifinder.site/submit,Launch or software,HTTP 200,No,Yes,No,Copy B,To do,,,,,
+C,AINewTool,https://ainewtool.site,,AI tools,HTTP 200,Yes,Yes,No,Copy D,To do,,,,,
+C,AIToolFame,https://aitoolfame.com,https://aitoolfame.com/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,Aura++,https://auraplusplus.com,https://auraplusplus.com/projects/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy B,To do,,,,,
+C,Best AI Products Directory & AI Tools Li,https://aihuntlist.com,https://aihuntlist.com/submission/new,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,Best AI Tools Directory & AI Tools List,https://whatisaitools.com,https://whatisaitools.com/submit,AI tools,HTTP 200,Yes,Yes,No,Copy D,To do,,,,,
+C,Best AI Tools Directory to Discover Tool,https://toollisted.com,https://www.toollisted.com/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,BestskyTools,https://bestsky.tools,https://bestsky.tools/submit,AI tools,HTTP 200,Yes,Yes,No,Copy D,To do,,,,,
+C,Better Launch,https://betterlaunch.co,https://betterlaunch.co/submit,Launch or software,HTTP 000,Yes,Yes,Yes,Copy A,To do,,,,,Blocks automated checks (HTTP 000); open it in a browser.
+C,Buildrship,https://buildrship.xyz,https://buildrship.xyz/submitv2,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,dailypings.com,https://dailypings.com,,Launch or software,HTTP 403,No,No,No,Copy B,To do,,,,,Blocks automated checks (HTTP 403); open it in a browser.
+C,DanielLaunches,https://daniellaunches.com,https://daniellaunches.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,Days Launch,https://dayslaunch.com,https://dayslaunch.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,DealMyApp,https://dealmyapp.com,https://dealmyapp.com/listings/submitium,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,DeepLaunch.io,https://deeplaunch.io,https://deeplaunch.io/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,Discover and Compare AI and Software Too,https://toolindex.net,https://toolindex.net/submit,AI tools,HTTP 200,Yes,No,Yes,Copy D,To do,,,,,
+C,"Discover Best Tools, Products and Websit",https://dirs.cc,https://dirs.cc/submit,Launch or software,HTTP 200,No,Yes,No,Copy B,To do,,,,,
+C,"Discover Real Products, Not Ghost Listin",https://indiefa.me,https://indiefa.me/dashboard/products/new,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,Discover Software for Your Next Big Idea,https://direct2app.com,https://www.direct2app.com/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy B,To do,,,,,
+C,Discover Startups Weekly,https://launchpadly.co,https://launchpadly.co/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,Discover the Best New Product Launches D,https://shinylaunch.com,,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,Discover the latest and most popular Pro,https://curateclick.com,,Launch or software,HTTP 200,Yes,Yes,No,Copy B,To do,,,,,
+C,Discover Tools,https://yo.directory,https://yo.directory/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,DivvLaunches,https://divvlaunches.com,https://www.divvlaunches.com/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,EarlyHunt,https://earlyhunt.com,https://earlyhunt.com/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,EasyLaunch,https://easylaunch.dev,,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,Explore AI Tool Trek – The Ultimate AI T,https://aitooltrek.com,https://aitooltrek.com/submit,AI tools,HTTP 200,No,Yes,No,Copy D,To do,,,,,
+C,FastLaunch,https://fastlaunch.io,https://fastlaunch.io/projects/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,findasaas,https://findasaas.com,https://findasaas.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,First Look,https://firstlook.tools,https://firstlook.tools/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,Founder.best,https://founder.best,https://www.founder.best/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,Free product launch directory for SaaS,https://letslaunch.today,https://letslaunch.today/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,Get your tool found,https://verifiedtools.info,https://www.verifiedtools.info/submit,AI tools,HTTP 200,Yes,Yes,No,Copy D,To do,,,,,
+C,Gets.Tools,https://gets.tools,https://gets.tools/submit,AI tools,HTTP 200,Yes,Yes,No,Copy D,To do,,,,,
+C,HoTools,https://hotools.com,https://hotools.com/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy B,To do,,,,,
+C,IndexOf.AI,https://indexof.ai,https://indexof.ai/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,Indie Launch,https://indielaunch.site,https://indielaunch.site/projects/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,IndieTools,https://indietools.app,https://www.indietools.app/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,JustTools,https://justsimple.tools,https://www.justsimple.tools/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,Kick Product,https://kickproduct.com,,Launch or software,HTTP 200,No,Yes,No,Copy A,To do,,,,,
+C,KittyLaunch,https://kittylaunch.com,,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,Launch begin,https://launchbegin.com,https://launchbegin.com/projects/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,Launch platform for indie products,https://debutpin.com,https://debutpin.com/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,Launch Your Product Weekly,https://smollaunch.com,https://smollaunch.com/best-of/directories-to-submit-startup-2026,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,LaunchAF,https://launchaf.com,https://launchaf.com/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,LaunchandLoop – Beyond the Launch,https://launchandloop.com,https://launchandloop.com/dashboard/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,LaunchBoard,https://launchboard.dev,,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,LaunchIt,https://launchit.fast,https://launchit.fast/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,Launchit,https://launchit.site,https://www.launchit.site/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,LaunchKiwi,https://launchkiwi.com,https://launchkiwi.com/launch,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,launchsoar.com,https://launchsoar.com,https://launchsoar.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,Launchstag,https://launchstag.com,,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,LaunchVoid,https://launchvoid.com,https://www.launchvoid.com/submit,Launch or software,HTTP 200,Yes,No,No,Copy A,To do,,,,,
+C,LiftOff,https://lift-off.sh,https://lift-off.sh/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,ListMySaaS,https://listmysaas.xyz,https://listmysaas.xyz/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,ListPitch,https://listpitch.com,https://listpitch.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,Maidensail,https://maidensail.com,https://maidensail.com/submit/basics,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,Neeed Directory,https://neeed.directory,https://neeed.directory/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,NewTool,https://newtool.site,https://newtool.site/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,Next Launch,https://nextlaunch.io,https://nextlaunch.io/projects/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,Nick Launches,https://nicklaunches.com,https://nicklaunches.com/signin/?callbackUrl=/submit/,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,Noonlaunch,https://noonlaunch.com,https://noonlaunch.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,OkeiAI,https://okeiai.com,https://okeiai.com/submit,AI tools,HTTP 200,No,Yes,No,Copy D,To do,,,,,
+C,PaveLaunch,https://pavelaunch.com,,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,"Practical AI Tools for Automation, Writi",https://acidtools.com,,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,Product Hot,https://producthot.com,https://producthot.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,Product Launch Platform for Startups & S,https://prolaunch.net,https://prolaunch.net/projects/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,Product Launchify,https://productlaunchify.com,,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,Product Watch,https://productwatch.io,,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,ProductFame,https://productfame.com,https://productfame.com/products/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,PublishYourSaaS,https://publishyoursaas.com,https://publishyoursaas.com/dashboard/listings/new,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,Recommended Software Tools Worth Serious,https://weliketools.com,,Launch or software,HTTP 200,Yes,No,No,Copy B,To do,,,,,
+C,SaaS Cubes,https://saascubes.com,https://saascubes.com/saas/submit-your-startup,Launch or software,HTTP 200,Yes,Yes,No,Copy B,To do,,,,,
+C,SaaS Products Directory,https://saasrove.com,https://saasrove.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,SaaSFame,https://saasfame.com,https://saasfame.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,SaaSGrave Launches,https://ls.saasgrave.org,https://ls.saasgrave.org/launch,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,SaaSGrow,https://saasgrow.app,https://saasgrow.app/login?callbackUrl=/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,Saaspa.ge,https://saaspa.ge,https://www.saaspa.ge/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,Same Product,https://sameproduct.com,https://sameproduct.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,ShipBoost,https://shipboost.io,https://shipboost.io/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,ShipGrowth,https://shipgrowth.dev,,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,Shipstry,https://shipstry.com,https://shipstry.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,shipycorn,https://shipycorn.com,https://shipycorn.com/projects/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,So Product,https://soproduct.com,https://soproduct.com/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy B,To do,,,,,
+C,Software Products for Connected Teams an,https://unitelist.com,,Launch or software,HTTP 200,Yes,Yes,No,Copy B,To do,,,,,
+C,StackLedge,https://stackledge.com,https://www.stackledge.com/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,Starter Best,https://starterbest.com,https://starterbest.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,starthub.zip,https://starthub.zip,https://starthub.zip/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy B,To do,,,,,
+C,Startup Directory,https://earlylaunch.co,,Launch or software,HTTP 200,Yes,No,No,Copy A,To do,,,,,
+C,Startup inspiration,https://startupinspire.com,,Launch or software,HTTP 200,No,No,No,Copy A,To do,,,,,
+C,Startup Launch Platform and SaaS Directo,https://foundrlist.com,,Launch or software,HTTP 200,No,Yes,Yes,Copy A,To do,,,,,
+C,Startup Software to Compare for Operatio,https://startupbenchmarks.com,,Launch or software,HTTP 200,Yes,No,Yes,Copy A,To do,,,,,
+C,Startup To Startup,https://startuptostartup.com,https://startuptostartup.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,Startups Lab,https://startupslab.site,https://startupslab.site/submit-product,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,StartupTrusted,https://startuptrusted.com,https://startuptrusted.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,Submit Your Startup,https://submithunt.com,https://www.submithunt.com/,Launch or software,HTTP 200,No,No,No,Copy A,To do,,,,,
+C,SubmitMySaas,https://submitmysaas.com,,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,SumoDir,https://sumodir.com,https://sumodir.com/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,Super Launch,https://super-launch.app,https://super-launch.app/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,SwipeToLaunch,https://swipetolaunch.com,https://swipetolaunch.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,T0 AI Directory,https://t0ai.com,https://t0ai.com/submit,AI tools,HTTP 200,No,Yes,No,Copy D,To do,,,,,
+C,Tech Trendin,https://techtrendin.com,,Launch or software,HTTP 200,No,Yes,No,Copy A,To do,,,,,
+C,The Best SaaS Directory for Builders,https://buildlist.io,https://buildlist.io/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy B,To do,,,,,
+C,The One Startup,https://theonestartup.com,https://theonestartup.com/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy A,To do,,,,,
+C,thistools,https://thistools.app,https://thistools.app/projects/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,ToolDirs,https://tooldirs.com,https://tooldirs.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,ToolDisk.com,https://tooldisk.com,https://tooldisk.com/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,ToolFame,https://toolfame.com,https://toolfame.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,To do,,,,,
+C,toolsroller.com,https://toolsroller.com,,Launch or software,HTTP 525,No,No,No,Copy B,To do,,,,,Blocks automated checks (HTTP 525); open it in a browser.
+C,Top AI Tools & SaaS Directory 2026,https://aiindex.tools,https://aiindex.tools/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,TopFreeAITools,https://topfreeaitools.com,,Launch or software,HTTP 200,No,No,No,Copy B,To do,,,,,
+C,"Trusted Software Products for Work, Team",https://trustiner.com,,Launch or software,HTTP 200,Yes,No,No,Copy B,To do,,,,,
+C,trylaunch.ai,https://trylaunch.ai,,Launch or software,HTTP 200,No,No,No,Copy A,To do,,,,,
+C,ufind.best – Discover and Launch the Bes,https://ufind.best,,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,Uno Directory,https://uno.directory,https://uno.directory/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,UppLaunch,https://upplaunch.com,https://www.upplaunch.com/launch,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,To do,,,,,
+C,Wayfindio,https://wayfindio.com,https://wayfindio.com/submit,AI tools,HTTP 200,No,Yes,No,Copy D,To do,,,,,
+C,Wired Business,https://wired.business,https://wired.business/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy B,To do,,,,,
+C,Your AI Hunt,https://youraihunt.com,,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,To do,,,,,
+C,Your One-Stop Directory for Generation T,https://genify.dev,https://genify.dev/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy B,To do,,,,,
+Skip,AgentWork.Tools,https://agentwork.tools,https://agentwork.tools/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,CurlShip,https://curlship.com,,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,Discover Startups,https://sellwithboost.com,https://sellwithboost.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,DodoDirectory,https://dododirectory.com,https://dododirectory.com/submit,Launch or software,HTTP 000,Yes,Yes,No,Copy B,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,Dofollow.Tools,https://dofollow.tools,https://dofollow.tools/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,doforai,https://doforai.tools,https://doforai.tools/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,EasyDoFollow,https://easydofollow.dev,,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,founder.page,https://founder.page,https://founder.page/new,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,Free Startup Launch Platform,https://spotstartups.com,https://spotstartups.com/submit.php,Launch or software,HTTP 200,Yes,Yes,No,Copy A,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,IndieHunt,https://indiehunt.io,https://indiehunt.io/submit,AI tools,HTTP 200,Yes,Yes,Yes,Copy D,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,InstantLaunch,https://instantlaunch.xyz,https://www.instantlaunch.xyz/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,Inuidea.com by Inu Etc,https://inuidea.com,https://inuidea.com/hunt/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy B,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,Launch List,https://launch-list.org,,Launch or software,HTTP 200,No,Yes,Yes,Copy A,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,Launch Your Startup Tool & Get DR Backli,https://nxgntools.com,,Launch or software,HTTP 200,Yes,Yes,No,Copy A,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,LaunchPact,https://launchpact.io,,Launch or software,HTTP 200,Yes,Yes,No,Copy A,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,LemonLaunch,https://lemonlaunch.dev,,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,RankCert,https://rankcert.com,https://rankcert.com/home/products/new,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,SaaS Backlink Directory,https://submitforbacklinks.com,https://submitforbacklinks.com/llms.txt,Launch or software,HTTP 200,Yes,Yes,No,Copy B,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,SaaSBison,https://saasbison.com,https://saasbison.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy B,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,Startup Fast,https://startupfa.st,https://www.startupfa.st/submit,Launch or software,HTTP 200,Yes,Yes,No,Copy A,Skip,,,,,"Sells links or launch votes on its face, or is off topic."
+Skip,Submit your app free,https://spacerrapps.com,https://spacerrapps.com/submit,Launch or software,HTTP 200,Yes,Yes,Yes,Copy A,Skip,,,,,"Sells links or launch votes on its face, or is off topic."

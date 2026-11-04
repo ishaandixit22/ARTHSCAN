@@ -3,6 +3,7 @@
   import { page } from "$app/state";
   import MarketsMenu from "$lib/components/MarketsMenu.svelte";
   import Search from "$lib/components/Search.svelte";
+  import SiteFooter from "$lib/components/SiteFooter.svelte";
   import ThemeToggle from "$lib/components/ThemeToggle.svelte";
   import TickerTape from "$lib/components/TickerTape.svelte";
   import { BRAND } from "$lib/brand";
@@ -47,21 +48,11 @@
   </div>
 </nav>
 
-<main class="wrap" data-clarity-mask={/^\/(settings|connect|login)(\/|$)/.test(page.url.pathname) ? "true" : undefined}>
+<main class="wrap" data-clarity-mask={/^\/(settings|connect|login|calculators)(\/|$)/.test(page.url.pathname) ? "true" : undefined}>
   {@render children()}
 </main>
 
-<footer>
-  <div class="wrap foot">
-    <a class="logo small" href="/" aria-label="{BRAND} home"><span class="deva" aria-hidden="true">अर्थ</span><span class="word">{BRAND.toUpperCase()}</span></a>
-    <p>
-      Prices are end-of-day from NSE unless marked Live; live prices and intraday charts come from Dhan.
-      {BRAND} is not a SEBI-registered research analyst or investment adviser; nothing here is investment advice.
-      {#if data.logoKey}<a href="https://logo.dev" target="_blank" rel="noopener">Logos provided by Logo.dev</a>.{/if}
-      <a href="/privacy">Privacy</a>.
-    </p>
-  </div>
-</footer>
+<SiteFooter logoKey={data.logoKey} />
 
 <style>
   /* The masthead: edition line, the name, tools. Full size on the front page, compact inside. */
@@ -86,13 +77,6 @@
   .link.current::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--ink); }
   .tagline { margin-left: auto; font: italic 400 14px var(--serif); color: var(--ink-2); white-space: nowrap; }
 
-  footer { margin-top: 48px; border-top: 4px double var(--ink); padding: 26px 0 48px; color: var(--ink-2); font: 13.5px/1.65 var(--serif); }
-  .foot { display: flex; gap: 40px; align-items: flex-start; }
-  .foot p { max-width: 760px; }
-  .foot a:not(.logo) { text-decoration: underline; text-underline-offset: 3px; }
-  .logo.small .word { font-size: 30px; }
-  .logo.small .deva { font-size: 20px; }
-
   @media (max-width: 1080px) { .tagline { display: none; } }
   @media (max-width: 860px) {
     .top { grid-template-columns: auto 1fr; }
@@ -107,6 +91,5 @@
     .word, .front .word { font-size: 44px; }
     .deva, .front .deva { font-size: 28px; }
     .tools :global(.btn.small) { padding: 0 9px; }
-    .foot { flex-direction: column; gap: 14px; }
   }
 </style>

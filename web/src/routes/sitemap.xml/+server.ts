@@ -1,5 +1,6 @@
 import { error } from "@sveltejs/kit";
 import { env } from "$env/dynamic/private";
+import { META } from "$lib/calculators/catalog";
 import { api } from "$lib/server/api";
 import { siteOrigin } from "$lib/server/origin";
 
@@ -28,6 +29,9 @@ export async function GET({ url }) {
   const urls = [
     entry("/", latest, "1.0"),
     ...["/stocks", "/sectors", "/screener", "/fii-dii", "/fo-ban", "/events", "/breadth", "/earnings", "/filings", "/corporate-actions", "/board-meetings", "/deals", "/commodities", "/news", "/ipos", "/mutual-funds", "/developers"].map((p) => entry(p, latest, "0.8")),
+    ...["/about", "/pricing", "/contact", "/terms", "/privacy"].map((p) => entry(p, undefined, "0.3")),
+    entry("/calculators", undefined, "0.8"),
+    ...META.map((m) => entry(`/calculators/${m.slug}`, undefined, "0.7")),
     ...sectors.map((s: { sector: string }) => entry(`/sectors/${esc(s.sector)}`, latest, "0.6")),
     ...stocks.map((s) => entry(`/stock/${esc(s.symbol)}`, s.as_of, "0.5")),
     ...bseOnly.map((s) => entry(`/stock/${esc(s)}`, latest, "0.4")),

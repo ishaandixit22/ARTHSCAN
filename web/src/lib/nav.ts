@@ -28,6 +28,7 @@ const ICON = {
   meetings: "M4 6.5h16v13.5H4zM4 10.5h16M8.5 4v4M15.5 4v4M8 14h1M11.5 14h1M15 14h1M8 17h1M11.5 17h1", // calendar grid
   filings: "M6 3.5h8.5L19 8v12.5H6zM14 3.5V8h5M9 12h7M9 15h7M9 18h4",               // document with lines
   events: "M4 6.5h16v13.5H4zM4 10.5h16M8.5 4v4M15.5 4v4M12 13v3.2l2 1.3",            // calendar with a clock hand                          // code brackets
+  calculators: "M5.5 3h13v18h-13zM8.5 6h7v3.5h-7zM8.5 13h.5M12 13h.5M15.5 13h.5M8.5 17h.5M12 17h.5M15.5 17h.5", // a pocket calculator
 };
 
 export type NavGroup = { title: string; items: NavItem[] };
@@ -79,6 +80,7 @@ export const TOP_LINKS: NavItem[] = [
   { href: "/ipos", label: "IPOs", about: "Open, upcoming and recently listed issues", icon: ICON.ipos },
   { href: "/mutual-funds", label: "Mutual funds", about: "Categories, returns and fund details", icon: ICON.funds },
   { href: "/news", label: "News", about: "Market and company headlines", icon: ICON.news },
+  { href: "/calculators", label: "Calculators", about: "SIP, EMI, tax, FD, PPF and more", icon: ICON.calculators },
   { href: "/developers", label: "API", about: "REST and MCP for your AI assistant", icon: ICON.api },
 ];
 
