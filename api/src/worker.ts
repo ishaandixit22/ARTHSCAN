@@ -7,6 +7,7 @@ import type { Env } from "./env.js";
 import { fillBseHistory, refreshBse } from "./jobs/bse.js";
 import { runDaily } from "./jobs/daily.js";
 import { recordIpoCategories } from "./jobs/ipo-readings.js";
+import { refreshFilings } from "./lib/sebi.js";
 import { fillStatements } from "./lib/statements.js";
 import { setBackground } from "./lib/nse.js";
 
@@ -27,6 +28,7 @@ export default {
       ctx.waitUntil(fillStatements(env).then((r) => r.asked && console.log(`statements: asked ${r.asked}, stored ${r.stored}, unknown ${r.unknown}${r.skipped ? ` (${r.skipped})` : ""}`)));
       ctx.waitUntil(fillBseHistory(env).then((r) => r.asked && console.log(`bse history: asked ${r.asked}, loaded ${r.loaded}, failed ${r.failed}`)));
       ctx.waitUntil(recordIpoCategories(env).then((r) => r.saved && console.log(`ipo readings: saved ${r.saved} of ${r.issues}`)).catch((err) => console.error("ipo readings:", err)));
+      ctx.waitUntil(refreshFilings(env).then((r) => r.read && console.log(`sebi filings: ${r.filings} stored${r.error ? ` (${r.error})` : ""}`)).catch((err) => console.error("sebi filings:", err)));
       return;
     }
     ctx.waitUntil(refreshBse(env).then((r) => console.log(`bse prices: saved ${r.saved} of ${r.stocks}, corrected ${r.corrected}, failed calls ${r.failedCalls}`)));

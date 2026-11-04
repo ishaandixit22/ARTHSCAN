@@ -7,8 +7,9 @@
 import { anchorDates, costs, isoDate, parseCategories, parseIssueInfo, priceBand, profitPerLot, retailOdds } from "../lib/ipo.js";
 import { bidRows, gmpRows, ipoMarkdown, parseIssueText, reservation, timelineSteps } from "../lib/ipo-detail.js";
 import { detail as alertsDetail, premiums } from "../lib/ipoalerts.js";
-import { calendar, categoryDays, issue, parseGmp, parseSummary, readings, sameCompany, toNum, type CalendarRow } from "../lib/ipoguru.js";
+import { calendar, categoryDays, issue, nameKey, parseGmp, parseSummary, readings, sameCompany, toNum, type CalendarRow } from "../lib/ipoguru.js";
 import { tradingHolidays } from "../lib/market-hours.js";
+import { expectedFilings } from "../lib/sebi.js";
 import type { Env } from "../env.js";
 import { ToolError } from "./errors.js";
 import { nseFetch, todayIST } from "../lib/nse.js";
@@ -108,7 +109,7 @@ export const creditedTimes = (times: number | null, open: string | null, today: 
 export const useExchange = (nse: number | null | undefined, provider: number | null | undefined) => nse != null && nse > 0 && nse >= (provider ?? 0);
 
 async function loadDashboard(env: Env) {
-  const [board, cal] = await Promise.all([loadBoard(env).catch(() => null), calendar(env)]);
+  const [board, cal, sebi] = await Promise.all([loadBoard(env).catch(() => null), calendar(env), expectedFilings(env).catch(() => ({ filings: [], fetched_at: null, error: "SEBI's filing list could not be read" }))]);
   const today = todayIST();
   const nse = [...(board?.open ?? [])];
   const upcomingNse = board?.upcoming ?? [];
@@ -153,13 +154,20 @@ async function loadDashboard(env: Env) {
       demand_cr: x.demand_cr ?? null, retail_odds: x.retail_odds ?? null, sub_from: by.total ? "nse" : null, sub_as_of: nseStamp(x.data_as_of), listing_price: null, listing_gain: null, cmp: null, current_gain: null,
     };
   });
-  const all = [...rows, ...nseOnly];
-  const live = (s: string) => all.filter((r) => r.stage === s);
+  // Companies with a draft on file at SEBI that neither the calendar nor NSE carries. SEBI gives the name, the date and the filing, so everything else stays empty.
+  const filed = sebi.filings.filter((f) => !known(f.name) && ![...nse, ...upcomingNse].some((x: any) => sameCompany(f.name, x.name))).map((f) => ({
+    slug: `sebi-${nameKey(f.name)}`, symbol: null, name: f.name, board: "Mainboard", exchange: null, stage: "expected" as Stage, logo: null, open: null, close: null, allotment: null, listing: null,
+    price_low: null, price_high: null, size_cr: null, lot: null, costs: null, gmp: null, gmp_pct: null, est_listing: null, profit_per_lot: null, gmp_updated: null, gmp_low: null, gmp_high: null, sauda: null, kostak: null,
+    times_total: null, qib: null, nii: null, snii: null, bnii: null, retail: null, demand_cr: null, retail_odds: null, sub_from: null, sub_as_of: null, listing_price: null, listing_gain: null, cmp: null, current_gain: null,
+    filing: { doc: f.doc, filed: f.filed, url: f.url },
+  }));
+  const all = [...rows, ...nseOnly, ...filed];
+  const live =(s: string) => all.filter((r) => r.stage === s);
   const summary = (l: typeof all) => ({ count: l.length, size_cr: Math.round(l.reduce((a, r) => a + (r.size_cr ?? 0), 0)) });
   return {
     as_of: board?.as_of ?? cal.fetched_at, rows: all,
     counts: { open: summary([...live("open"), ...live("closing")]), closing: summary(live("closing")), upcoming: summary(live("upcoming")), expected: summary(live("expected")), closed: summary([...live("closed"), ...live("allotted")]), listed: summary(live("listed")) },
-    sources: { ipoguru: { connected: cal.connected, plan: cal.plan, fetched_at: cal.fetched_at, error: cal.error }, nse: { connected: !!board, as_of: board?.as_of ?? null } },
+    sources: { ipoguru: { connected: cal.connected, plan: cal.plan, fetched_at: cal.fetched_at, error: cal.error }, nse: { connected: !!board, as_of: board?.as_of ?? null }, sebi: { fetched_at: sebi.fetched_at, error: sebi.error } },
   };
 }
 
@@ -177,7 +185,7 @@ export const IPO_TOOLS: Tool[] = [
     name: "get_ipo_dashboard",
     route: "/market/ipo-dashboard",
     title: "IPO dashboard",
-    description: "Every mainboard and SME IPO from the last three months on NSE and BSE, one row each: stage (expected, upcoming, open, closing, closed, allotted, listed), dates, price band, lot, issue size, grey-market premium with its percentage, implied listing price, profit per lot and when it was read, subscription overall and by QIB, NII, sNII, bNII and retail where the exchange publishes it, and listing and current performance. Includes counts per stage and the freshness of each source. Grey-market premium is unofficial and is not a forecast.",
+    description: "Every mainboard and SME IPO from the last three months on NSE and BSE, one row each: stage (expected, upcoming, open, closing, closed, allotted, listed), dates, price band, lot, issue size, grey-market premium with its percentage, implied listing price, profit per lot and when it was read, subscription overall and by QIB, NII, sNII, bNII and retail where the exchange publishes it, and listing and current performance. Rows at the expected stage may come from draft offer documents filed with SEBI: those carry `filing` (document, date filed, link to SEBI's page) and no dates or prices, and a filing does not mean an issue will follow. Includes counts per stage and the freshness of each source. Grey-market premium is unofficial and is not a forecast.",
     inputSchema: { type: "object", properties: {} },
     metered: true,
     handler: async (_db, _args, env) => loadDashboard(env),

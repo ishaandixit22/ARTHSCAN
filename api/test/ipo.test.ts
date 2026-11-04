@@ -79,6 +79,88 @@ const DETAIL = {
   ] },
 };
 
+const sebiRow = (date: string, slug: string, title: string) => `<tr role='row' class='odd'>\n<td>${date}</td>\n\n<td><a href="https://www.sebi.gov.in/filings/public-issues/${slug}.html"  target="_blank" title="${title}" class="points"> ${title}</a>\n</tr>`;
+const SEBI_DRAFT = [
+  sebiRow("Oct 29, 2026", "carlsberg_1", "Carlsberg India Limited- UDRHP-1 <br><a href='https://www.sebi.gov.in/sebi_data/x.pdf' style=color:#000000>Carlsberg India Limited - Draft Abridged Prospectus</a>"),
+  sebiRow("Oct 27, 2026", "intellius_2", "INTELLIUS RECODE LIMITED - Notice to Investors"),
+  sebiRow("Oct 26, 2026", "oravel_3", "Oravel Stays Limited - Addendum to DRHP"),
+  sebiRow("Oct 21, 2026", "hunger_4", "Hunger Pangs Limited – DRHP "),
+  sebiRow("Oct 06, 2026", "pmcona_5", "PM CONA INDUSTRIES LIMITED"),
+  sebiRow("Oct 05, 2026", "baanganga_6", "Baanganga Gold &amp; Diamond (I) Limited- DRHP <br><a href= 'https://www.sebi.gov.in/x.pdf'>y</a>"),
+  sebiRow("Oct 05, 2026", "jio_7", "Jio Platforms Limited - DRHP"),
+  sebiRow("Oct 05, 2026", "maxwell_8", "Maxwell Industries Limited - DRHP"),
+].join("\n");
+const SEBI_RHP = sebiRow("Oct 15, 2026", "jio_rhp", "Jio Platforms Limited – RHP ");
+const SEBI_FINAL = sebiRow("Oct 26, 2026", "jio_final", "Jio Platforms Ltd.- Prospectus");
+
+describe("draft filings from SEBI", () => {
+  const NOW = Date.parse("2026-11-04T10:00:00Z");
+  const answer = (url: string) => new Response(url.endsWith("smid=10") ? SEBI_DRAFT : url.endsWith("smid=11") ? SEBI_RHP : SEBI_FINAL);
+  const clear = () => db.prepare("DELETE FROM external_cache WHERE key = 'sebi:filings'").run();
+
+  it("keeps only rows that are a draft filing, and never guesses at the others", async () => {
+    const { parseDraft, parseList, movedOnName } = await import("../src/lib/sebi.js");
+    const rows = parseList(SEBI_DRAFT);
+    expect(rows).toHaveLength(8);
+    expect(rows[0]).toEqual({ filed: "2026-10-29", url: "https://www.sebi.gov.in/filings/public-issues/carlsberg_1.html", title: "Carlsberg India Limited- UDRHP-1" });
+    expect(rows.map(parseDraft).filter(Boolean).map((f) => [f!.name, f!.doc])).toEqual([
+      ["Carlsberg India Limited", "UDRHP"], ["Hunger Pangs Limited", "DRHP"], ["Baanganga Gold & Diamond (I) Limited", "DRHP"], ["Jio Platforms Limited", "DRHP"], ["Maxwell Industries Limited", "DRHP"],
+    ]);
+    expect(movedOnName("Moneyview Limited - Corrigendum to RHP and Price Band")).toBe("Moneyview Limited");
+    expect(movedOnName("A One Steel Limited")).toBe("A One Steel Limited");
+  });
+
+  it("takes a company off once a later prospectus is filed, but not when it files a new draft afterwards", async () => {
+    const { stillExpected } = await import("../src/lib/sebi.js");
+    const draft = { name: "Jio Platforms Limited", doc: "DRHP" as const, filed: "2026-10-05", url: "u" };
+    expect(stillExpected([draft], [{ name: "Jio Platforms Ltd.", filed: "2026-10-26" }])).toEqual([]);
+    expect(stillExpected([draft], [{ name: "Jio Platforms Ltd.", filed: "2025-01-01" }])).toEqual([draft]);
+  });
+
+  it("adds each read to the list, keeps a company's newest filing, and drops drafts over a year old", async () => {
+    const { merge } = await import("../src/lib/sebi.js");
+    const f = (name: string, filed: string) => ({ name, doc: "DRHP" as const, filed, url: `u-${filed}` });
+    const out = merge({ filings: [f("Old Co Limited", "2025-10-01"), f("Kept Co Limited", "2026-09-01"), f("Same Co Limited", "2026-01-01")], moved_on: [] }, { filings: [f("Same Co Ltd.", "2026-10-01")], moved_on: [] }, "2026-11-04");
+    expect(out.filings.map((x) => [x.name, x.filed])).toEqual([["Same Co Ltd.", "2026-10-01"], ["Kept Co Limited", "2026-09-01"]]);
+  });
+
+  it("reads at most twice a day, and a block page keeps what is stored", async () => {
+    await clear();
+    const { refreshFilings } = await import("../src/lib/sebi.js");
+    const get = vi.fn(async (url: string) => answer(url));
+    vi.stubGlobal("fetch", get);
+    expect(await refreshFilings(env, NOW)).toEqual({ read: true, filings: 5, error: null });
+    expect(get.mock.calls.map(([u]) => u.slice(-7))).toEqual(["smid=10", "smid=11", "smid=12"]);
+    expect((await refreshFilings(env, NOW + 3600_000)).read).toBe(false);
+    expect(get).toHaveBeenCalledTimes(3);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<TITLE>Unauthorized Request Blocked</TITLE>")));
+    vi.spyOn(console, "error").mockImplementationOnce(() => {});
+    expect(await refreshFilings(env, NOW + 13 * 3600_000)).toEqual({ read: true, filings: 5, error: "SEBI's filing list could not be read" });
+  });
+
+  it("puts them in the dashboard as expected, with the filing and nothing invented, leaving out names already listed elsewhere", async () => {
+    await clear();
+    const { refreshFilings } = await import("../src/lib/sebi.js");
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => answer(url)));
+    await refreshFilings(env, NOW);
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("ipo-current-issue")) return new Response(JSON.stringify([{ companyName: "Maxwell Industries Limited", issueEndDate: "04-Nov-2026", issuePrice: "Rs.78 to Rs.82", issueStartDate: "30-Oct-2026", series: "EQ", status: "Active", symbol: "MAXWELL" }]));
+      if (url.includes("all-upcoming")) return new Response("[]");
+      if (url.includes("holiday-master")) return new Response(JSON.stringify({ CM: [] }));
+      return new Response("nope", { status: 403 });
+    }));
+    const res = await app.fetch(new Request("https://x/v1/market/ipo-dashboard", { headers: { "x-internal-key": "i" } }), env);
+    const d = ((await res.json()) as any).data;
+    const expected = d.rows.filter((r: any) => r.stage === "expected");
+    expect(expected.map((r: any) => r.name)).toEqual(["Carlsberg India Limited", "Hunger Pangs Limited", "Baanganga Gold & Diamond (I) Limited"]);
+    expect(expected[0]).toMatchObject({ slug: "sebi-carlsbergindia", board: "Mainboard", exchange: null, logo: null, open: null, close: null, listing: null, price_high: null, size_cr: null, gmp: null, filing: { doc: "UDRHP", filed: "2026-10-29", url: "https://www.sebi.gov.in/filings/public-issues/carlsberg_1.html" } });
+    expect(d.counts.expected.count).toBe(3);
+    expect(d.sources.sebi).toMatchObject({ error: null });
+    await clear();
+    await db.prepare("DELETE FROM external_cache WHERE key LIKE 'nse:%'").run(); // the tests after this one read their own NSE answers
+  });
+});
+
 describe("get_ipo_board over the API", () => {
   it("joins the live issues with their category tables and lists the ones still to open", async () => {
     const fetchMock = vi.fn(async (url: string) => {
