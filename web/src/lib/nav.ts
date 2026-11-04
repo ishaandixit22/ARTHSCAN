@@ -1,6 +1,6 @@
-// Site navigation. Every market tool lives behind one "Markets" menu, grouped
-// as Market, Flows and Companies, so the top bar carries three links instead of
-// fourteen.
+// Site navigation. Most market tools live behind one "Markets" menu, grouped as
+// Market, Flows and Companies, so the top bar carries a few links instead of
+// fourteen. The Screener is a link of its own.
 
 export type NavItem = { href: string; label: string; about: string; icon: string; match?: string[] };
 
@@ -68,7 +68,6 @@ export function navGroups(live: boolean): NavGroup[] {
         { href: "/board-meetings", label: "Board meetings", about: "Upcoming board meetings and their purpose", icon: ICON.meetings },
         { href: "/filings", label: "Company filings", about: "Every NSE filing with its PDF", icon: ICON.filings },
         { href: "/stocks", label: "All stocks", about: "Every NSE stock, A to Z", icon: ICON.stocks, match: ["/stock/"] },
-        { href: "/screener", label: "Screener", about: "Filter by price, returns and fundamentals", icon: ICON.screener },
       ],
     },
   ];
@@ -76,6 +75,7 @@ export function navGroups(live: boolean): NavGroup[] {
 
 /** Plain links beside the Markets menu in the top bar. */
 export const TOP_LINKS: NavItem[] = [
+  { href: "/screener", label: "Screener", about: "Filter by price, returns and fundamentals", icon: ICON.screener },
   { href: "/ipos", label: "IPOs", about: "Open, upcoming and recently listed issues", icon: ICON.ipos },
   { href: "/mutual-funds", label: "Mutual funds", about: "Categories, returns and fund details", icon: ICON.funds },
   { href: "/news", label: "News", about: "Market and company headlines", icon: ICON.news },
