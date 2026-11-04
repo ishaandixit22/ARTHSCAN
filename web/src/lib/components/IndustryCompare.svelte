@@ -15,12 +15,15 @@
   const sh = $derived(info.shareholding);
   const group = $derived((o.industry as string | null) ?? industry ?? "its industry");
 
+  // Both ratios divide by net worth, so they mean nothing once it is below zero.
+  const positiveWorth = $derived(!(typeof o.book_value === "number" && o.book_value <= 0));
+
   type Row = { label: string; value: number; avg: number; unit: string; means: string; low: string; high: string };
   type MaybeRow = Omit<Row, "value" | "avg"> & { value: number | null; avg: number | null };
   const rows = $derived(
     (<MaybeRow[]>[
-      { label: "Price to book", value: r.pb, avg: r.industry_pb, unit: "x", means: "What you pay for each ₹1 of the company's net assets.", low: "cheaper than", high: "pricier than" },
-      { label: "Debt to equity", value: r.debt_to_equity, avg: r.industry_debt_to_equity, unit: "x", means: "Borrowed money for each ₹1 the owners have put in. Higher means more fixed interest to pay.", low: "less borrowed than", high: "more borrowed than" },
+      { label: "Price to book", value: positiveWorth ? r.pb : null, avg: r.industry_pb, unit: "x", means: "What you pay for each ₹1 of the company's net assets.", low: "cheaper than", high: "pricier than" },
+      { label: "Debt to equity", value: positiveWorth ? r.debt_to_equity : null, avg: r.industry_debt_to_equity, unit: "x", means: "Borrowed money for each ₹1 the owners have put in. Higher means more fixed interest to pay.", low: "less borrowed than", high: "more borrowed than" },
       { label: "Dividend yield", value: o.dividend_yield as number | null, avg: r.industry_dividend_yield, unit: "%", means: "Cash paid out each year as dividends, as a share of today's price.", low: "pays less than", high: "pays more than" },
     ]).filter((x): x is Row => x.value != null && x.avg != null),
   );

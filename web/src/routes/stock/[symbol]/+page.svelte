@@ -1,7 +1,14 @@
 <script lang="ts">
   import { page } from "$app/state";
   import { onMount, untrack } from "svelte";
-  import PriceChart from "$lib/components/PriceChart.svelte";
+  import ProChart from "$lib/components/ProChart.svelte";
+  import StockReading from "$lib/components/StockReading.svelte";
+  import StockOverview from "$lib/components/StockOverview.svelte";
+  import StockForecast from "$lib/components/StockForecast.svelte";
+  import StockNews from "$lib/components/StockNews.svelte";
+  import TechnicalPanel from "$lib/components/TechnicalPanel.svelte";
+  import PriceVolume from "$lib/components/PriceVolume.svelte";
+  import SeasonalityPanel from "$lib/components/SeasonalityPanel.svelte";
   import IndustryCompare from "$lib/components/IndustryCompare.svelte";
   import StatementTable from "$lib/components/StatementTable.svelte";
   import StockTable from "$lib/components/StockTable.svelte";
@@ -10,24 +17,31 @@
   import Logo from "$lib/components/Logo.svelte";
   import { BRAND } from "$lib/brand";
   import { compact, crore, date, num, pct, price, tone } from "$lib/format";
+  import { readStock } from "$lib/stock-reading";
   import { live, tradeTime, watch } from "$lib/live.svelte";
   import { session } from "$lib/session.svelte";
 
   let { data } = $props();
   const c = $derived(data.company);
   const m = $derived(c.metrics ?? {});
-  let mode = $state<"line" | "candles">("line");
+  const bseOnly = $derived(data.bseOnly);
+  const shortSymbol = $derived(c.bse_symbol ?? c.symbol);
 
   // Live price from Dhan when this account has live access; end-of-day close otherwise.
   // Live only while the market is open; otherwise NSE's closing price.
-  const liveNow = $derived(!!data.live && session.open);
+  const liveNow = $derived(!!data.live && session.open && !bseOnly);
   $effect(() => (liveNow ? watch([c.symbol]) : undefined));
   const lq = $derived(liveNow ? live.quotes[c.symbol] : undefined);
 
   // ── Sections: one long page; the rail jumps to each and marks the one being read ──
   const SECTIONS = [
     { key: "overview", label: "Overview" },
+    { key: "chart", label: "Chart" },
+    { key: "forecast", label: "Forecast" },
     { key: "technicals", label: "Technicals" },
+    { key: "price-volume", label: "Price & Volume" },
+    { key: "seasonality", label: "Seasonality" },
+    { key: "news", label: "News" },
     { key: "financials", label: "Financials" },
     { key: "shareholding", label: "Shareholding" },
     { key: "filings", label: "Filings" },
@@ -100,6 +114,51 @@
     if (link) rail!.scrollTo({ left: link.offsetLeft - 16, behavior: "instant" });
   });
 
+  // ── About, news, long-history figures and the session's quote ──
+  // Loaded in the browser for people, not during the server render, so crawlers don't spend the plans.
+  type Desk = { quote: any | null; stats: any | null; digest: any | null };
+  let desk = $state<Desk>({ quote: null, stats: null, digest: null });
+  let deskLoading = $state(true);
+  const isBot = () => typeof navigator !== "undefined" && (navigator.webdriver || /bot|crawl|spider|slurp|lighthouse|headless/i.test(navigator.userAgent));
+  $effect(() => {
+    const sym = c.symbol;
+    desk = { quote: null, stats: null, digest: null };
+    deskLoading = true;
+    if (isBot()) {
+      deskLoading = false;
+      return;
+    }
+    let stale = false;
+    fetch(`/stock/${encodeURIComponent(sym)}/desk`)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null)
+      .then((d) => {
+        if (stale) return;
+        if (d) desk = { quote: d.quote, stats: d.stats, digest: d.digest };
+        deskLoading = false;
+      });
+    return () => (stale = true);
+  });
+  // While the market is open, a BSE stock's price is polled: the live feed carries NSE only. NSE's limits and VWAP refresh with it.
+  $effect(() => {
+    const sym = c.symbol;
+    if (!session.open || isBot()) return;
+    const timer = setInterval(() => {
+      if (document.hidden) return;
+      fetch(`/stock/${encodeURIComponent(sym)}/desk?only=quote`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d?.quote && sym === c.symbol) desk.quote = d.quote;
+        })
+        .catch(() => {});
+    }, 20_000);
+    return () => clearInterval(timer);
+  });
+  const digest = $derived(desk.digest);
+  const chartTick = $derived(lq ? { ltp: lq.ltp, volume: lq.volume } : session.open && desk.quote?.ltp ? { ltp: desk.quote.ltp, volume: desk.quote.volume } : null);
+  const headPrice = $derived(bseOnly && desk.quote?.ltp && session.open ? desk.quote.ltp : m.close);
+  const headChange = $derived(bseOnly && desk.quote?.ltp && desk.quote?.prev_close && session.open ? ((desk.quote.ltp - desk.quote.prev_close) / desk.quote.prev_close) * 100 : m.change_pct);
+
   // ── Quarterly results + shareholding (imported, or from the provider in the browser) ──
   let extFund = $state<{ periods: any[]; quarters: any[]; fetched_at: string | null } | null>(null);
   let extLoading = $state(false);
@@ -124,6 +183,7 @@
   const sh = $derived(data.shareholding.quarters.length ? data.shareholding.quarters : (extFund?.quarters ?? []));
   const latestSh = $derived(sh[0]);
   const hasPledge = $derived(sh.some((q: any) => q.pledged_pct != null));
+  const reading = $derived(readStock({ m, quote: desk.quote, info: data.industryInfo, stats: desk.stats, digest, quarters, holding: sh, bseOnly }));
 
   // ── Full statements, fetched ahead of the Financials section ──
   const STATEMENTS = [
@@ -179,6 +239,11 @@
   $effect(() => {
     if (!engaged || filingsData !== undefined) return;
     const sym = c.symbol;
+    // Filings come from NSE's site, which has nothing for a stock listed only on BSE.
+    if (bseOnly) {
+      filingsData = null;
+      return;
+    }
     filingsData = "loading";
     fetch(`/stock/${encodeURIComponent(sym)}/filings`)
       .then((r) => (r.ok ? r.json() : null))
@@ -196,8 +261,8 @@
   const moved = (v: number) => (v >= 0 ? "rose" : "fell");
   const summary = $derived.by(() => {
     if (m.close == null) return "";
-    const parts = [`${c.name} (${c.symbol}) closed at ${price(m.close)} on ${date(m.as_of)}${m.change_pct != null ? `, ${m.change_pct >= 0 ? "up" : "down"} ${Math.abs(m.change_pct).toFixed(2)}% on the day` : ""}.`];
-    if (m.ret_1y != null) parts.push(`The share price ${moved(m.ret_1y)} ${Math.abs(m.ret_1y).toFixed(1)}% over the past year (adjusted for splits and bonuses)${m.pct_from_high != null && m.pct_from_high < -0.5 ? ` and sits ${Math.abs(m.pct_from_high).toFixed(1)}% below its 52-week high of ${price(m.high_52w)}` : m.pct_from_high != null ? " and trades at its 52-week high" : ""}.`);
+    const parts = [`${c.name} (${shortSymbol}) closed at ${price(m.close)} on ${date(m.as_of)}${m.change_pct != null ? `, ${m.change_pct >= 0 ? "up" : "down"} ${Math.abs(m.change_pct).toFixed(2)}% on the day` : ""}.`];
+    if (m.ret_1y != null) parts.push(`The share price ${moved(m.ret_1y)} ${Math.abs(m.ret_1y).toFixed(1)}% over the past year (adjusted for splits and bonuses)${m.pct_from_high != null && m.pct_from_high < -0.5 ? ` and sits ${Math.abs(m.pct_from_high).toFixed(1)}% below its highest close of the past year, ${price(m.high_52w)}` : m.pct_from_high != null ? " and trades at its 52-week high" : ""}.`);
     const [q0, , , , q4] = quarters;
     if (q0 && q4 && q0.revenue != null && q4.revenue && q0.net_profit != null && q4.net_profit) {
       const rg = ((q0.revenue - q4.revenue) / Math.abs(q4.revenue)) * 100;
@@ -214,7 +279,6 @@
     return parts.join(" ");
   });
 
-  const range = $derived(m.high_52w && m.low_52w ? (m.close - m.low_52w) / (m.high_52w - m.low_52w) : null);
   const SH_PARTS = [
     { key: "promoter", label: "Promoters", color: "var(--brand)" },
     { key: "fii", label: "FII / FPI", color: "var(--series)" },
@@ -225,7 +289,7 @@
   ];
 </script>
 
-<svelte:head><title>{c.symbol} · {c.name} — {BRAND}</title></svelte:head>
+<svelte:head><title>{shortSymbol} · {c.name} — {BRAND}</title></svelte:head>
 
 <div class="page" bind:this={root}>
   <!-- Identity and price -->
@@ -235,7 +299,7 @@
       <div>
         <h1>{c.name}</h1>
         <p class="ids">
-          <span class="mono">NSE: {c.symbol}</span>
+          <span class="mono">{bseOnly ? "BSE" : "NSE"}: {shortSymbol}</span>
           {#if c.isin}<span class="mono">{c.isin}</span>{/if}
           {#if c.sector}<a class="chip" href="/sectors/{encodeURIComponent(c.sector)}">{c.sector}</a>{/if}
         </p>
@@ -247,22 +311,40 @@
         <div class="chg {tone(lq.change)}">{lq.change != null && lq.change > 0 ? "+" : ""}{num(lq.change)} ({pct(lq.changePct)}) <LiveBadge /></div>
         <div class="sub dayline">O {num(lq.open)} · H {num(lq.high)} · L {num(lq.low)} · Vol {compact(lq.volume)} · {tradeTime(lq.ltt)} IST</div>
       {:else}
-        <div class="px">{price(m.close)}</div>
-        <div class="chg {tone(m.change_pct)}">{pct(m.change_pct)} <span class="sub">· close {date(m.as_of)}</span>{#if liveNow} <LiveBadge />{/if}</div>
+        <div class="px">{price(headPrice)}</div>
+        <div class="chg {tone(headChange)}">{pct(headChange)} <span class="sub">· {bseOnly && session.open && desk.quote?.ltp ? "BSE, about 20 seconds old" : `close ${date(m.as_of)}`}</span>{#if liveNow} <LiveBadge />{/if}</div>
       {/if}
     </div>
-    <dl class="keys">
-      {#if m.pe != null}<div><dt>P/E (TTM)</dt><dd>{num(m.pe, 1)}</dd></div>{/if}
-      <div><dt>52W high</dt><dd>{price(m.high_52w)}</dd></div>
-      <div><dt>52W low</dt><dd>{price(m.low_52w)}</dd></div>
-      <div><dt>1Y return</dt><dd class={tone(m.ret_1y)}>{pct(m.ret_1y)}</dd></div>
-      <div><dt>Turnover</dt><dd>{crore(m.turnover)}</dd></div>
-    </dl>
   </header>
 
-  {#if summary}
-    <p class="summary">{summary}{#if extLoading && !data.financials.periods.length}<span class="sub"> Loading quarterly figures…</span>{/if}</p>
-  {/if}
+  <section class="about" aria-label="About the company">
+    <div class="biz">
+      <h2>About {c.name}</h2>
+      {#if digest?.about}
+        <p class="story">{digest.about}</p>
+      {:else if deskLoading}
+        <p class="story waiting" role="status">Loading what this company does…</p>
+      {:else}
+        <p class="story waiting">A description of this company isn't available from our source right now.{#if digest?.industry ?? c.sector}{" "}It is classed under {digest?.industry ?? c.sector}.{/if}</p>
+      {/if}
+      {#if digest?.officers?.length}
+        <ul class="people">
+          {#each digest.officers.slice(0, 3) as o}<li><b>{o.name}</b>{#if o.title} · {o.title}{/if}</li>{/each}
+        </ul>
+      {/if}
+    </div>
+    {#if summary}
+      <div class="moving">
+        <h2>How the stock has moved</h2>
+        <p>{summary}{#if extLoading && !data.financials.periods.length}<span class="sub"> Loading quarterly figures…</span>{/if}</p>
+        {#if digest?.news?.[0]}
+          <p class="latest"><b>In the news:</b> <a href={digest.news[0].url} target="_blank" rel="noopener noreferrer">{digest.news[0].headline}</a></p>
+        {/if}
+      </div>
+    {/if}
+  </section>
+
+  <StockReading {reading} />
 
   <!-- Section rail: jumps down this one page -->
   <nav class="sections" aria-label="Stock sections" bind:this={rail}>
@@ -274,90 +356,54 @@
   </nav>
 
   <div id="overview" class="block">
-    <section class="card">
-      <div class="card-head">
-        <div class="tabs">
-          {#each data.periods as p}
-            <a href="?period={p}" class:active={p === data.period} data-sveltekit-noscroll>{p.toUpperCase()}</a>
-          {/each}
-        </div>
-        <div class="tabs">
-          <button class:active={mode === "line"} onclick={() => (mode = "line")}>Line</button>
-          <button class:active={mode === "candles"} onclick={() => (mode = "candles")}>Candles</button>
-        </div>
-      </div>
-      <div class="card-body">
-        {#if data.history?.candles.length}
-          <PriceChart candles={data.history.candles} {mode} base={data.period === "1d" ? data.history.prevClose : null} />
-          {#if data.history.intraday}
-            <p class="sub note">{data.history.interval}-minute candles{data.period === "1d" ? ` for ${date(data.history.sessions?.at(-1))}` : ` over the last ${data.history.sessions?.length ?? 5} sessions`}, times in IST.{data.period === "1d" && data.history.prevClose != null ? " The dashed line is yesterday's close." : ""}</p>
-          {/if}
-          {#if data.history.adjustments?.length}
-            <p class="sub note">Prices before {data.history.adjustments.map((a: any) => date(a.ex_date)).join(", ")} are adjusted for a split, bonus or consolidation.</p>
-          {/if}
-        {:else}
-          <div class="empty">{data.period === "1d" || data.period === "5d" ? "Intraday prices aren't available right now. Try a longer range." : "No price history yet."}</div>
-        {/if}
-      </div>
+    <StockOverview f={reading.figures} {m} quote={desk.quote} stats={desk.stats} faceValue={c.face_value ?? null} {bseOnly} />
+  </div>
+
+  <div id="chart" class="block">
+    <h2>Chart</h2>
+    <section class="chart-card">
+      <ProChart symbol={c.symbol} name={c.name} tick={chartTick} actions={digest?.actions ?? []} />
+      <p class="sub note">Candles from Dhan, {bseOnly ? "BSE" : "NSE"} prices, times in IST. Past prices are adjusted for splits and bonuses. Your drawings and settings stay in this browser.</p>
     </section>
+  </div>
 
-    <div class="grid grid-4">
-      <div class="card stat"><div class="label">52-week range</div>
-        <div class="value small">{price(m.low_52w)} – {price(m.high_52w)}</div>
-        {#if range !== null}<div class="range" aria-hidden="true"><span style="left: {Math.min(100, Math.max(0, range * 100))}%"></span></div>{/if}
-      </div>
-      <div class="card stat"><div class="label">From 52W high</div><div class="value {tone(m.pct_from_high)}">{pct(m.pct_from_high)}</div></div>
-      <div class="card stat"><div class="label">Volume · 20-day avg</div><div class="value small">{compact(m.volume)} · {compact(m.avg_volume_20d)}</div></div>
-      <div class="card stat"><div class="label">Delivery · 20-day avg</div><div class="value small">{pct(m.deliv_pct, false)} · {pct(m.deliv_pct_avg_20, false)}</div></div>
-    </div>
-
-    {#if data.industryInfo}
-      <IndustryCompare info={data.industryInfo} industry={c.sector} />
-    {/if}
-
-    <section class="card">
-      <div class="card-head"><h2>Profile</h2></div>
-      <dl class="profile">
-        <div><dt>Symbol</dt><dd class="mono">{c.symbol}</dd></div>
-        <div><dt>ISIN</dt><dd class="mono">{c.isin ?? "—"}</dd></div>
-        <div><dt>Sector</dt><dd>{c.sector ?? "Unclassified"}</dd></div>
-        <div><dt>Listed on NSE</dt><dd>{date(c.listing_date)}</dd></div>
-        <div><dt>Face value</dt><dd>{c.face_value != null ? `₹${c.face_value}` : "—"}</dd></div>
-        <div><dt>Series</dt><dd>{c.series ?? "—"}</dd></div>
-      </dl>
-    </section>
+  <div id="forecast" class="block">
+    <h2>Forecast</h2>
+    <StockForecast analysts={digest?.analysts ?? null} loading={deskLoading} />
   </div>
 
   <div id="technicals" class="block">
     <h2>Technicals</h2>
-    <section class="card">
-      <div class="card-head"><h2>Returns</h2><span class="sub">adjusted for splits and bonuses</span></div>
-      <div class="returns">
-        {#each [["1 week", m.ret_1w], ["1 month", m.ret_1m], ["3 months", m.ret_3m], ["6 months", m.ret_6m], ["1 year", m.ret_1y]] as [label, v]}
-          <div><span class="sub">{label}</span><b class={tone(v)}>{pct(v)}</b></div>
-        {/each}
-      </div>
-    </section>
-    <section class="card">
-      <div class="card-head"><h2>Indicators</h2><span class="sub">as of the close of {date(m.as_of)}</span></div>
-      <table class="kv">
-        <tbody>
-          <tr><td>50-day average</td><td>{price(m.sma_50)} {#if m.sma_50}<span class="chip {tone(m.close - m.sma_50)}">{m.close > m.sma_50 ? "above" : "below"}</span>{/if}</td></tr>
-          <tr><td>200-day average</td><td>{price(m.sma_200)} {#if m.sma_200}<span class="chip {tone(m.close - m.sma_200)}">{m.close > m.sma_200 ? "above" : "below"}</span>{/if}</td></tr>
-          <tr><td>RSI (14)</td><td>{num(m.rsi_14, 1)} {#if m.rsi_14 != null && (m.rsi_14 < 30 || m.rsi_14 > 70)}<span class="chip {m.rsi_14 < 30 ? 'down' : 'up'}">{m.rsi_14 < 30 ? "oversold" : "overbought"}</span>{/if}</td></tr>
-          <tr><td>MACD histogram (12, 26, 9)</td><td class={tone(m.macd_hist)}>{num(m.macd_hist)}</td></tr>
-          <tr><td>Volatility (1 year, annualised)</td><td>{pct(m.volatility_1y, false)}</td></tr>
-          <tr><td>Volume vs 20-day average</td><td>{m.vol_ratio != null ? `${num(m.vol_ratio, 1)}x` : "—"}</td></tr>
-          <tr><td>Signals</td><td>
-            {#if m.cross_signal}<span class="chip {m.cross_signal === 'golden' ? 'up' : 'down'}">{m.cross_signal} cross · {date(m.cross_date)}</span>{/if}
-            {#if m.breakout}<span class="chip {m.breakout === 'high' ? 'up' : 'down'}">52W {m.breakout === "high" ? "breakout" : "breakdown"}</span>{/if}
-            {#if (m.vol_ratio ?? 0) >= 3}<span class="chip">volume spike</span>{/if}
-            {#if !m.cross_signal && !m.breakout && (m.vol_ratio ?? 0) < 3}<span class="sub">None today</span>{/if}
-          </td></tr>
-        </tbody>
-      </table>
-    </section>
+    <TechnicalPanel technicals={desk.stats?.technicals ?? null} loading={deskLoading} />
+    {#if m.cross_signal || m.breakout || (m.vol_ratio ?? 0) >= 3}
+      <p class="signals">
+        {#if m.cross_signal}<span class="chip {m.cross_signal === 'golden' ? 'up' : 'down'}">{m.cross_signal} cross · {date(m.cross_date)}</span>{/if}
+        {#if m.breakout}<span class="chip {m.breakout === 'high' ? 'up' : 'down'}">52W {m.breakout === "high" ? "breakout" : "breakdown"}</span>{/if}
+        {#if (m.vol_ratio ?? 0) >= 3}<span class="chip">volume spike · {num(m.vol_ratio, 1)}x</span>{/if}
+      </p>
+    {/if}
   </div>
+
+  <div id="price-volume" class="block">
+    <h2>Price &amp; Volume</h2>
+    <PriceVolume stats={desk.stats} loading={deskLoading} />
+  </div>
+
+  <div id="seasonality" class="block">
+    <h2>Seasonality</h2>
+    <SeasonalityPanel stats={desk.stats} name={c.name} loading={deskLoading} />
+  </div>
+
+  <div id="news" class="block">
+    <h2>News</h2>
+    <StockNews news={digest?.news ?? []} name={c.name} loading={deskLoading} />
+  </div>
+
+  {#if data.industryInfo}
+    <div class="block">
+      <IndustryCompare info={data.industryInfo} industry={c.sector} />
+    </div>
+  {/if}
 
   <div id="financials" class="block">
     <h2>Financials</h2>
@@ -406,18 +452,33 @@
           </table>
         </div>
       {:else}
-        <div class="empty">{extLoading || !engaged ? `Loading shareholding for ${c.symbol}…` : `Shareholding for ${c.symbol} isn't available right now.`}</div>
+        <div class="empty">{bseOnly ? "Shareholding isn't available here for stocks listed only on BSE yet." : extLoading || !engaged ? `Loading shareholding for ${c.symbol}…` : `Shareholding for ${c.symbol} isn't available right now.`}</div>
       {/if}
     </section>
   </div>
 
   <div id="filings" class="block">
     <h2>Filings</h2>
-    {#if filingsData === "loading" || filingsData === undefined}
+    {#if !bseOnly && (filingsData === "loading" || filingsData === undefined)}
       <!-- Holds roughly the lists' height, so the page doesn't jump when they arrive. -->
       <div class="card empty filings-loading">Loading {c.symbol}'s filings from NSE…</div>
     {:else if !fd}
-      <div class="card empty">{c.symbol}'s filings aren't available from NSE right now.</div>
+      {#if bseOnly}
+        <div class="card empty">Exchange filings aren't available here for stocks listed only on BSE yet.</div>
+        {#if digest?.actions?.length}
+          <section class="card">
+            <div class="card-head"><h2>Corporate actions</h2><span class="sub">dividends, bonuses, splits</span></div>
+            <div class="table-scroll">
+              <table>
+                <thead><tr><th>Ex-date</th><th class="left">Action</th></tr></thead>
+                <tbody>{#each digest.actions.slice(0, SHORT_LIST) as a}<tr><td>{date(a.date)}</td><td class="left">{a.text}</td></tr>{/each}</tbody>
+              </table>
+            </div>
+          </section>
+        {/if}
+      {:else}
+        <div class="card empty">{c.symbol}'s filings aren't available from NSE right now.</div>
+      {/if}
     {:else}
       {#if fd.events?.length}
         <div class="notice next">
@@ -463,10 +524,21 @@
   </div>
 
   <div id="peers" class="block">
-    <h2>Peers in {c.sector ?? "this sector"}</h2>
+    <h2>Peers{c.sector ?? digest?.industry ? ` in ${c.sector ?? digest?.industry}` : ""}</h2>
     <section class="card">
       {#if c.peers?.length}
         <StockTable rows={c.peers} cols={["close", "change_pct", "ret_1m", "ret_1y", "pe"]} logos />
+      {:else if digest?.peers?.length}
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th class="left">Company</th><th>Price</th><th>Change</th><th>P/E</th><th>P/B</th><th>Market cap</th></tr></thead>
+            <tbody>
+              {#each digest.peers as p}
+                <tr><td class="left">{p.name}</td><td>{price(p.price)}</td><td class={tone(p.change_pct)}>{pct(p.change_pct)}</td><td>{num(p.pe, 1)}</td><td>{num(p.pb, 2)}</td><td>{p.market_cap_cr != null ? `₹${num(p.market_cap_cr, 0)} Cr` : "—"}</td></tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
       {:else}
         <div class="empty">No sector peers for {c.symbol}.</div>
       {/if}
@@ -491,12 +563,18 @@
   .chg { font: 700 15px var(--font); font-stretch: 85%; display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 4px; }
   .chg .sub { font-family: var(--font); }
   .dayline { font-size: 12px; margin-top: 4px; font-stretch: 85%; }
-  .keys { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px 0; margin: 0; padding-top: 12px; border-top: var(--rule-heavy); }
-  .keys div { padding: 0 28px; border-left: 1px solid var(--line-2); }
-  .keys div:first-child { padding-left: 0; border-left: 0; }
-  .keys dt { font-size: 11.5px; font-weight: 700; font-stretch: 80%; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
-  .keys dd { margin: 2px 0 0; font: 800 22px var(--display); font-stretch: 72%; }
-  .summary { font: 17px/1.55 var(--serif); color: var(--ink); max-width: 72ch; }
+  .about { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px 44px; padding-top: 12px; border-top: var(--rule-heavy); }
+  .about h2 { margin: 0 0 6px; font: 800 18px var(--display); font-stretch: 78%; }
+  .story { margin: 0; font: 16.5px/1.55 var(--serif); color: var(--ink); max-width: 72ch; }
+  .story.waiting { color: var(--ink-3); }
+  .people { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 10px 0 0; padding: 0; list-style: none; color: var(--ink-2); font-size: 13px; }
+  .people b { font-weight: 700; color: var(--ink); }
+  .moving p { margin: 0; font: 15.5px/1.5 var(--serif); color: var(--ink-2); }
+  .moving .latest { margin-top: 10px; font: 14px/1.45 var(--font); }
+  .moving a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+  .moving a:hover { text-decoration-color: currentColor; }
+  .chart-card .note { margin-top: 8px; }
+  .signals { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
 
   /* Section rail under the stock's name: printed section heads, the one being read underlined in ink. */
   .sections { position: sticky; top: 49px; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--ink); }
@@ -512,18 +590,6 @@
   }
 
   .note { margin-top: 8px; font-size: 12.5px; }
-  .value.small { font-size: 16px; }
-  .range { position: relative; height: 3px; margin-top: 12px; border-radius: 2px; background: color-mix(in srgb, var(--ink-3) 30%, transparent); }
-  .range span { position: absolute; top: -4px; width: 3px; height: 11px; margin-left: -1px; border-radius: 2px; background: var(--ink); }
-  .profile { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; }
-  .profile div { padding: 14px 18px; border-bottom: 1px solid var(--line); }
-  .profile dt { font-size: 12px; color: var(--ink-3); }
-  .profile dd { margin: 3px 0 0; font-size: 14px; }
-  .returns { display: grid; grid-template-columns: repeat(5, 1fr); }
-  .returns div { padding: 16px 18px; display: grid; gap: 4px; }
-  .returns b { font: 800 22px var(--display); font-stretch: 72%; }
-  .kv td:first-child { color: var(--ink-2); }
-  .kv td:last-child { display: flex; gap: 8px; align-items: center; justify-content: flex-end; height: 42px; }
   .stack { display: flex; height: 12px; border-radius: 2px; overflow: hidden; background: var(--panel-2); gap: 2px; }
   .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; }
   .small { font-size: 12.5px; }
@@ -533,8 +599,6 @@
     .head { grid-template-columns: 1fr; }
     .quote { text-align: left; }
     .chg { justify-content: flex-start; }
-    .profile { grid-template-columns: repeat(2, 1fr); }
-    .returns { grid-template-columns: repeat(3, 1fr); }
-    .keys { gap: 10px 24px; }
+    .about { grid-template-columns: minmax(0, 1fr); }
   }
 </style>

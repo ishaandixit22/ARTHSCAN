@@ -27,7 +27,7 @@ Worker through a service binding, with no public hop in between.
 | Source | Key / cost | What we use it for | How often | Stored where |
 |---|---|---|---|---|
 | NSE (`nseindia.com/api`, `nsearchives.nseindia.com`) | none, public | End-of-day prices (bhavcopy), delivery %, index closes, FII/DII, F&O ban and open interest, results filings and PDFs, board meetings, corporate actions, bulk/block deals, holidays, event calendar, **IPO subscription by category**, IPO details, index member lists, stock master | daily cron (18:15, 19:30, 22:00 IST, catch-up 08:30), plus on demand with stored copies | `daily_prices`, `index_daily`, `fii_dii`, `fo_*`, `financials`, `external_cache` |
-| Dhan | access token (renewed every 20 h) | **Live prices only**: WebSocket feed for 3,533 instruments, the live heatmap, breadth, ticker and /live. The public scrip master CSV maps symbols to Dhan ids. Dhan has **no** financials, fundamentals or news. | live while the market is open and someone is watching | memory in the `LiveFeed` Durable Object, not stored |
+| Dhan | access token (renewed every 20 h) | WebSocket feed for 3,533 instruments, the live heatmap, breadth, ticker and /live. On the stock page: chart candles (1m to monthly), the session quote and long-history figures (`api/src/lib/chart.ts`), for NSE and BSE-only stocks. The public scrip master CSV maps symbols to Dhan ids. Dhan has **no** financial statements or news; About, news and analyst counts come from Indian Stock API (`api/src/lib/digest.ts`). | live while the market is open and someone is watching | memory in the `LiveFeed` Durable Object, not stored |
 | Indian Stock API (indianapi.in) | paid key | Company profile and intraday price, **financial statements**, news, mutual funds, commodities, trending lists, analyst forecasts, valuation history, per-company corporate actions and announcements, IPO list, quarterly results loader | on demand (5-min to 24-h reuse); statements stored per company, background fill every 10 min | `company_statements`, `financials`, `external_cache` |
 | IPO Alerts (ipoalerts.in) | trial key, 1 week | **Grey-market premium** (hourly series), IPO logo, about, strengths, risks, prospectus link | 15-min reuse | `external_cache` |
 | Logo.dev | publishable key | Company logos, looked up by ISIN | per page view, cached by their CDN | not stored |
@@ -134,6 +134,7 @@ mostly network. "Server" is time spent in our Workers on the first visit.
 
 ## 6. Known gaps
 
+- Stocks listed only on BSE have pages at `/stock/BSE-<symbol>`, found through search and the sitemap. They are absent from A-Z, the screener, sectors and the MCP lists, and have no filings, shareholding or delivery figures. Setting `BSE_PAGES` to anything but `public` in `api/wrangler.jsonc` hides them.
 - Financial statements are stored for the 60 largest companies so far; the background job fills the
   rest at up to 300 provider requests a day. Raise `STATEMENTS_DAILY_MAX` once the plan's real
   limit is known.

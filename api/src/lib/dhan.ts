@@ -26,14 +26,14 @@ const COMPANY_FIELDS = {
 } as const;
 const SECTION_KEYS = { overview: "CO", ratios: "RATIOS", shareholding: "SHP" } as const;
 
-type Fail = { ok: false; status: number; error: string };
-const fail = (status: number, error: string): Fail => ({ ok: false, status, error });
+export type Fail = { ok: false; status: number; error: string };
+export const fail = (status: number, error: string): Fail => ({ ok: false, status, error });
 
 // The Workers edge cache, when there is one (absent under plain Node).
 const edge = (): Cache | null => (typeof caches !== "undefined" ? (caches as unknown as { default: Cache }).default : null);
 
 /** Serve from the edge cache, or compute and keep successful answers for ttl seconds. */
-async function cached<T extends { ok: boolean }>(key: string, ttl: number, run: () => Promise<T | Fail>): Promise<T | Fail> {
+export async function cached<T extends { ok: boolean }>(key: string, ttl: number, run: () => Promise<T | Fail>): Promise<T | Fail> {
   const cache = edge();
   const req = new Request(`https://dhan.cache/${key}`);
   const hit = await cache?.match(req).catch(() => undefined);
@@ -53,9 +53,13 @@ async function credentials(env: Env): Promise<{ token: string; clientId: string 
   return env.DHAN_ACCESS_TOKEN && env.DHAN_CLIENT_ID ? { token: env.DHAN_ACCESS_TOKEN, clientId: env.DHAN_CLIENT_ID } : null;
 }
 
-async function securityId(env: Env, symbol: string): Promise<string | null> {
-  const row = await env.DB.prepare("SELECT dhan_security_id AS id FROM stocks WHERE symbol = ?").bind(symbol).first<{ id: string | null }>();
-  return row?.id ? String(row.id) : null;
+/** Where Dhan lists a stock. BSE-only stocks carry a BSE- prefix, since a BSE symbol can be another company's NSE symbol. */
+export async function instrument(env: Env, symbol: string): Promise<{ id: string; segment: "NSE_EQ" | "BSE_EQ" } | null> {
+  const bse = symbol.startsWith("BSE-");
+  const row = bse
+    ? await env.DB.prepare("SELECT dhan_security_id AS id FROM bse_stocks WHERE symbol = ?").bind(symbol.slice(4)).first<{ id: string | null }>()
+    : await env.DB.prepare("SELECT dhan_security_id AS id FROM stocks WHERE symbol = ?").bind(symbol).first<{ id: string | null }>();
+  return row?.id ? { id: String(row.id), segment: bse ? "BSE_EQ" : "NSE_EQ" } : null;
 }
 
 /** POST to a Dhan data endpoint. Returns the parsed body, or a failure to show. */
@@ -86,14 +90,14 @@ export { post as dhanPost };
 /** The last few sessions of intraday candles for one stock. Times are IST shown as UTC seconds, for the chart. */
 export function intradayCandles(env: Env, symbol: string, range: string) {
   return cached(`candles/${symbol}/${range}`, CANDLE_TTL_S, async () => {
-    const id = await securityId(env, symbol);
-    if (!id) return fail(404, `No Dhan instrument for ${symbol}`);
+    const inst = await instrument(env, symbol);
+    if (!inst) return fail(404, `No Dhan instrument for ${symbol}`);
     const { interval, sessions } = CANDLE_RANGES[range];
     // Ask for two weeks so holidays and weekends still leave enough sessions.
     const ist = (ms: number) => new Date(ms + IST_MS).toISOString().slice(0, 10);
     const now = Date.now();
     const r = await post(env, "/charts/intraday", {
-      securityId: id, exchangeSegment: "NSE_EQ", instrument: "EQUITY", interval, oi: false,
+      securityId: inst.id, exchangeSegment: inst.segment, instrument: "EQUITY", interval, oi: false,
       fromDate: `${ist(now - 14 * 86400_000)} 09:15:00`, toDate: `${ist(now + 86400_000)} 00:00:00`,
     }, "candles");
     if (!r.ok) return r;
@@ -144,9 +148,9 @@ export function liveIndices(env: Env) {
 /** Dhan's company snapshot: overview, ratios with industry averages, latest shareholding. `raw` skips parsing and the cache. */
 export async function companyInfo(env: Env, symbol: string, raw = false) {
   const run = async () => {
-    const id = await securityId(env, symbol);
-    if (!id) return fail(404, `No Dhan instrument for ${symbol}`);
-    const r = await post(env, "/data/companyinfo", { securityId: id, exchangeSegment: "NSE_EQ", instrument: "EQUITY", metrics: ["CO", "RATIOS", "SHP"] }, "company info");
+    const inst = await instrument(env, symbol);
+    if (!inst) return fail(404, `No Dhan instrument for ${symbol}`);
+    const r = await post(env, "/data/companyinfo", { securityId: inst.id, exchangeSegment: inst.segment, instrument: "EQUITY", metrics: ["CO", "RATIOS", "SHP"] }, "company info");
     if (!r.ok) return r;
     if (raw) return { ok: true as const, symbol, raw: r.data };
     // The sections sit in a one-element array somewhere under `data`; find the object that holds them.

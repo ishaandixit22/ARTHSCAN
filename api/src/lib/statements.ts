@@ -43,9 +43,14 @@ async function save(env: Env, symbol: string, bundle: Bundle | null, now: number
  */
 export async function statementsFor(env: Env, rawSymbol: string): Promise<{ bundle: Bundle; fetched_at: string; stored: boolean } | null | undefined> {
   // One round trip for both the stock and its stored statements: each D1 query costs a network hop.
-  const row = await env.DB.prepare(`SELECT s.symbol, s.name, c.body, c.fetched_at, c.found FROM stocks s
-    LEFT JOIN company_statements c ON c.symbol = s.symbol WHERE s.symbol = ?`)
-    .bind(rawSymbol.trim().toUpperCase()).first<{ symbol: string; name: string; body: string | null; fetched_at: number | null; found: number | null }>();
+  const wanted = rawSymbol.trim().toUpperCase();
+  const isBse = wanted.startsWith("BSE-");
+  const row = await env.DB.prepare(isBse
+    ? `SELECT 'BSE-' || s.symbol AS symbol, s.name, c.body, c.fetched_at, c.found FROM bse_stocks s
+       LEFT JOIN company_statements c ON c.symbol = 'BSE-' || s.symbol WHERE s.symbol = ?`
+    : `SELECT s.symbol, s.name, c.body, c.fetched_at, c.found FROM stocks s
+       LEFT JOIN company_statements c ON c.symbol = s.symbol WHERE s.symbol = ?`)
+    .bind(isBse ? wanted.slice(4) : wanted).first<{ symbol: string; name: string; body: string | null; fetched_at: number | null; found: number | null }>();
   if (!row) return undefined;
   const stock = { symbol: row.symbol, name: row.name };
   const now = Math.floor(Date.now() / 1000);
@@ -58,7 +63,8 @@ export async function statementsFor(env: Env, rawSymbol: string): Promise<{ bund
     throw new ToolError("E_UNAVAILABLE", "This data source is not configured on this server.", 503);
   }
   try {
-    const bundle = await askProvider(env, [stock.symbol, providerName(stock.name)]);
+    // The name first for BSE-only stocks: a BSE symbol can be another company's NSE symbol.
+    const bundle = await askProvider(env, isBse ? [providerName(stock.name), stock.symbol.slice(4)] : [stock.symbol, providerName(stock.name)]);
     await save(env, stock.symbol, bundle, now);
     return bundle ? { bundle, fetched_at: new Date(now * 1000).toISOString(), stored: false } : null;
   } catch (err) {
@@ -103,7 +109,7 @@ export async function fillStatements(env: Env, opts: { maxRequests?: number; dai
   try {
     for (const { symbol, term, name } of [...queue.map((q) => ({ ...q, term: q.symbol })), ...bse]) {
       asked++;
-      const bundle = await askProvider(env, [term, providerName(name)]);
+      const bundle = await askProvider(env, symbol.startsWith("BSE-") ? [providerName(name), term] : [term, providerName(name)]);
       await save(env, symbol, bundle, Math.floor(Date.now() / 1000));
       if (bundle) stored++; else unknown++;
     }

@@ -11,6 +11,7 @@
 
 import { Hono, type Context } from "hono";
 import type { Account, AppEnv, Env, Principal } from "../env.js";
+import { chartCandles, isTimeframe, priceStats, quote } from "../lib/chart.js";
 import { CANDLE_RANGES, companyInfo, intradayCandles } from "../lib/dhan.js";
 import { jsonError } from "../lib/http.js";
 import { type BreadthShow, liteMarket, liveBreadth, liveMarket } from "../live/market.js";
@@ -64,6 +65,29 @@ live.get("/company", async (c) => {
   const symbol = (c.req.query("symbol") ?? "").trim().toUpperCase();
   if (!symbol) return jsonError(c, 400, "E_BAD_ARGS", "symbol is required");
   const r = await companyInfo(c.env, symbol, c.req.query("raw") != null);
+  return c.json(r, r.ok ? 200 : (r.status as 404));
+});
+// Candles for the stock page's chart: 1, 3, 5, 15, 30 or 60 minutes, or D, W or M. `before` (ms) pages older intraday stretches.
+live.get("/chart", async (c) => {
+  const symbol = (c.req.query("symbol") ?? "").trim().toUpperCase();
+  const tf = c.req.query("tf") ?? "D";
+  const before = Number(c.req.query("before")) || undefined;
+  if (!symbol || !isTimeframe(tf)) return jsonError(c, 400, "E_BAD_ARGS", "symbol and tf (1, 3, 5, 15, 30, 60, D, W or M) are required");
+  const r = await chartCandles(c.env, symbol, tf, before);
+  return c.json(r, r.ok ? 200 : (r.status as 404));
+});
+// The session's open, high, low, volume, average price and circuit limits.
+live.get("/quote", async (c) => {
+  const symbol = (c.req.query("symbol") ?? "").trim().toUpperCase();
+  if (!symbol) return jsonError(c, 400, "E_BAD_ARGS", "symbol is required");
+  const r = await quote(c.env, symbol);
+  return c.json(r, r.ok ? 200 : (r.status as 404));
+});
+// Returns, seasonality, all-time extremes, beta, volume and technicals from the full daily history.
+live.get("/stats", async (c) => {
+  const symbol = (c.req.query("symbol") ?? "").trim().toUpperCase();
+  if (!symbol) return jsonError(c, 400, "E_BAD_ARGS", "symbol is required");
+  const r = await priceStats(c.env, symbol);
   return c.json(r, r.ok ? 200 : (r.status as 404));
 });
 // Movers, breadth, sector moves and intraday signals over every live stock.

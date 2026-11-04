@@ -13,6 +13,8 @@ export interface Env {
   INVITE_ONLY?: string;
   /** Who sees Dhan live prices: "off", "owner" (OWNER_EMAILS only) or "invited" (every signed-in user). */
   LIVE_ACCESS?: string;
+  /** "public" shows stocks listed only on BSE (pages, search, sitemap). Anything else hides them at once. */
+  BSE_PAGES?: string;
   /** Comma-separated owner emails, for LIVE_ACCESS="owner" and owner-only settings. */
   OWNER_EMAILS?: string;
   /** Dhan live feed. Client id and token are secrets; the URL can point at a test server. */

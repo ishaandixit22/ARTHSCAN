@@ -7,6 +7,7 @@ import type { Database } from "../db/types.js";
 import type { Env } from "../env.js";
 import { statementsFor } from "../lib/statements.js";
 import { indianApi } from "../lib/indianapi.js";
+import { stockDigest } from "../lib/digest.js";
 import { ToolError } from "./errors.js";
 import type { Tool } from "./tools.js";
 
@@ -22,6 +23,11 @@ const HOUR = 3600;
 async function providerNames(db: Database, raw: unknown): Promise<string[]> {
   const q = String(raw ?? "").trim();
   if (!q) throw new ToolError("E_BAD_ARGS", "stock is required.");
+  // BSE-only stocks: the name first, since a BSE symbol can be another company's NSE symbol.
+  if (/^BSE-/i.test(q)) {
+    const bse = await db.prepare("SELECT symbol, name FROM bse_stocks WHERE symbol = ?").bind(q.slice(4).toUpperCase()).first<{ symbol: string; name: string }>();
+    return bse ? [bse.name.replace(/\s+(limited|ltd\.?)$/i, "").trim(), bse.symbol] : [q];
+  }
   const row = await db.prepare("SELECT symbol, name FROM stocks WHERE symbol = ?").bind(q.toUpperCase()).first<{ symbol: string; name: string }>();
   if (!row) return [q];
   const name = row.name?.replace(/\s+(limited|ltd\.?)$/i, "").trim();
@@ -59,6 +65,15 @@ export const MARKET_DATA_TOOLS: Tool[] = [
     inputSchema: { type: "object", properties: { stock: stockArg }, required: ["stock"] },
     metered: true,
     handler: async (db, { stock }, env) => fetchForStock(env, db, "/stock", "name", stock, {}, 5 * MIN),
+  },
+  {
+    name: "get_stock_digest",
+    route: "/ext/digest",
+    title: "Company digest",
+    description: "What a company does, its leadership, recent news about it, the analyst rating mix and its corporate actions, trimmed from the Indian Stock API and refreshed every few hours.",
+    inputSchema: { type: "object", properties: { stock: { type: "string", description: "Symbol, e.g. TATASTEEL, or BSE-<symbol> for a stock listed only on BSE" } }, required: ["stock"] },
+    metered: true,
+    handler: async (_db, { stock }, env) => stockDigest(env, String(stock ?? "")),
   },
   {
     name: "get_trending",

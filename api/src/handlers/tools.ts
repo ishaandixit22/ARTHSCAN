@@ -3,6 +3,7 @@
 // website reads through the same REST routes. Add a tool here and it appears on
 // all three surfaces.
 
+import { type Bar, METRIC_COLUMNS, metricsRow } from "../lib/indicators.js";
 import type { Database } from "../db/types.js";
 import type { Env } from "../env.js";
 import { nseFetch } from "../lib/nse.js";
@@ -97,6 +98,22 @@ async function requireStock(db: Database, symbol: unknown) {
   return row;
 }
 
+/** A BSE-only stock in the shape get_company gives an NSE one, with its metrics worked out from its own prices. */
+async function bseCompany(db: Database, symbol: string) {
+  const code = symbol.slice(4);
+  const stock = await db.prepare("SELECT symbol, name, isin, bse_group FROM bse_stocks WHERE symbol = ?").bind(code).first<{ symbol: string; name: string; isin: string; bse_group: string | null }>();
+  if (!stock) return null;
+  const { results } = await db.prepare(`SELECT date, open, high, low, close, prev_close, volume, turnover FROM bse_daily_prices
+    WHERE symbol = ? ORDER BY date DESC LIMIT 400`).bind(code).all<{ date: string; open: number | null; high: number | null; low: number | null; close: number; prev_close: number | null; volume: number | null; turnover: number | null }>();
+  const series = results.reverse();
+  const bars: Bar[] = series.map((r) => ({ symbol, date: r.date, close: r.close, prev_close: r.prev_close, volume: r.volume, turnover: r.turnover, deliv_pct: null }));
+  const row = bars.length ? metricsRow(bars, bars[bars.length - 1].date, null, null) : null;
+  const metrics: Record<string, unknown> | null = row ? Object.fromEntries(METRIC_COLUMNS.map((c, i) => [c, row[i]])) : null;
+  const last = series[series.length - 1];
+  if (metrics && last) Object.assign(metrics, { open: last.open, high: last.high, low: last.low, prev_close: last.prev_close });
+  return { symbol, exchange: "BSE", bse_symbol: code, name: stock.name, isin: stock.isin, sector: null, series: stock.bse_group, listing_date: null, face_value: null, metrics, peers: [] };
+}
+
 function clampLimit(v: unknown, def: number, max: number): number {
   const n = Number(v ?? def);
   return Number.isFinite(n) ? Math.max(1, Math.min(max, Math.floor(n))) : def;
@@ -171,7 +188,12 @@ export const TOOLS: Tool[] = [
     description: "Profile for one stock: name, ISIN, sector, listing date, face value, plus the latest price snapshot and computed metrics.",
     inputSchema: { type: "object", properties: { symbol: symbolArg }, required: ["symbol"] },
     metered: true,
-    handler: async (db, { symbol }) => {
+    handler: async (db, { symbol }, env) => {
+      if (/^BSE-/i.test(String(symbol ?? ""))) {
+        const company = env.BSE_PAGES === "public" ? await bseCompany(db, String(symbol).trim().toUpperCase()) : null;
+        if (!company) throw new ToolError("E_NOT_FOUND", `No stock with symbol ${symbol}. Try search_stocks first.`, 404);
+        return company;
+      }
       const stock = await requireStock(db, symbol);
       const metrics = await db.prepare("SELECT * FROM stock_metrics WHERE symbol = ?").bind(stock.symbol).first();
       const peers = stock.sector

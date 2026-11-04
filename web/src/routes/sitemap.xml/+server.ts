@@ -16,6 +16,9 @@ export async function GET({ url }) {
     if (stocks.length >= page.total || !page.results.length) break;
   }
   const { sectors } = await api("/v1/sectors");
+  // Stocks listed only on BSE aren't in the /v1/stocks list; the search table carries them.
+  const { rows } = await api<{ rows: unknown[][] }>("/api/search-index");
+  const bseOnly = rows.map((r) => String(r[0])).filter((s) => s.startsWith("BSE-"));
   const latest = stocks.reduce((d, s) => (s.as_of > d ? s.as_of : d), "");
 
   const entry = (path: string, lastmod?: string, priority?: string) =>
@@ -27,6 +30,7 @@ export async function GET({ url }) {
     ...["/stocks", "/sectors", "/screener", "/fii-dii", "/fo-ban", "/events", "/breadth", "/earnings", "/filings", "/corporate-actions", "/board-meetings", "/deals", "/commodities", "/news", "/ipos", "/mutual-funds", "/developers"].map((p) => entry(p, latest, "0.8")),
     ...sectors.map((s: { sector: string }) => entry(`/sectors/${esc(s.sector)}`, latest, "0.6")),
     ...stocks.map((s) => entry(`/stock/${esc(s.symbol)}`, s.as_of, "0.5")),
+    ...bseOnly.map((s) => entry(`/stock/${esc(s)}`, latest, "0.4")),
   ];
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join("\n")}\n</urlset>\n`;
   return new Response(xml, { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=21600" } });
