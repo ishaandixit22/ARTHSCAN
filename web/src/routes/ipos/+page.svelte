@@ -3,7 +3,8 @@
   import { page } from "$app/state";
   import { BRAND } from "$lib/brand";
   import IpoLogo from "$lib/components/IpoLogo.svelte";
-  import { date, fetchedAt, int, todayIST, tone } from "$lib/format";
+  import { fetchedAt, int, todayIST, tone } from "$lib/format";
+  import { DOC_NAME } from "$lib/ipo-filing";
 
   let { data } = $props();
   const d = $derived(data.dashboard);
@@ -27,7 +28,7 @@
   const SORTS: Record<Tab, { key: string; label: string; by: ((a: any, b: any) => number) | null }[]> = {
     open: [{ key: "close", label: "Closing soon", by: soonest("close") }, { key: "sub", label: "Most subscribed", by: num("times_total") }, { key: "gmp", label: "Highest GMP", by: num("gmp_pct") }, { key: "size", label: "Largest issue", by: num("size_cr") }],
     upcoming: [{ key: "open", label: "Opening soon", by: soonest("open") }, { key: "gmp", label: "Highest GMP", by: num("gmp_pct") }, { key: "size", label: "Largest issue", by: num("size_cr") }],
-    expected: [{ key: "provider", label: "Newest first", by: null }, { key: "name", label: "A to Z", by: (a, b) => a.name.localeCompare(b.name) }, { key: "gmp", label: "Highest GMP", by: num("gmp") }],
+    expected: [{ key: "newest", label: "Newest first", by: (a, b) => (b.filing?.filed ?? "").localeCompare(a.filing?.filed ?? "") }, { key: "name", label: "A to Z", by: (a, b) => a.name.localeCompare(b.name) }, { key: "gmp", label: "Highest GMP", by: num("gmp") }],
     closed: [{ key: "listing", label: "Listing soon", by: soonest("listing") }, { key: "sub", label: "Most subscribed", by: num("times_total") }, { key: "gmp", label: "Highest GMP", by: num("gmp_pct") }, { key: "size", label: "Largest issue", by: num("size_cr") }],
     listed: [{ key: "listing", label: "Recently listed", by: latest("listing") }, { key: "gain", label: "Best listing gain", by: num("listing_gain") }, { key: "since", label: "Best since issue", by: num("current_gain") }, { key: "sub", label: "Most subscribed", by: num("times_total") }, { key: "size", label: "Largest issue", by: num("size_cr") }],
   };
@@ -89,6 +90,9 @@
   });
   const source = $derived(d?.sources?.ipoguru);
   const sebi = $derived(d?.sources?.sebi);
+  const quoted = $derived(rows.some((r) => r.stage === "expected" && r.gmp != null));
+  const monthOf = (r: any) => new Date(`${r.filing.filed.slice(0, 7)}-01T00:00:00Z`).toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
+  const ago = (iso: string) => { const n = -daysTo(iso); return n <= 0 ? "today" : n === 1 ? "yesterday" : `${n} days ago`; };
   const directory = $derived([
     ["Open IPOs", rows.filter((r) => r.stage === "open" || r.stage === "closing")],
     ["Upcoming IPOs", rows.filter((r) => r.stage === "upcoming")],
@@ -105,7 +109,7 @@
 {#snippet who(r: any)}
   <span class="who">
     <IpoLogo src={r.logo} name={r.name} size={34} />
-    {#if r.filing}<a href={r.filing.url} target="_blank" rel="noopener">{r.name}</a>{:else}<a href="/ipos/{r.slug}">{r.name}</a>{/if}
+    {#if r.filing}<a href="/ipos/expected/{r.slug}">{r.name}</a>{:else}<a href="/ipos/{r.slug}">{r.name}</a>{/if}
   </span>
 {/snippet}
 
@@ -122,7 +126,7 @@
         {#each BOARDS as [k, label]}<option value={k}>{label} ({boardCount(k)})</option>{/each}
       </select>
       <select aria-label="Sort" value={sortKey} onchange={(e) => (sorts[tab.key] = e.currentTarget.value)}>
-        {#each SORTS[tab.key] as s}<option value={s.key}>{s.label}</option>{/each}
+        {#each SORTS[tab.key].filter((s) => tab.key !== "expected" || s.key !== "gmp" || quoted) as s}<option value={s.key}>{s.label}</option>{/each}
       </select>
     </div>
   </header>
@@ -166,18 +170,30 @@
           <button class="more" onclick={() => (allListed = !allListed)}>{allListed ? "Show the last month only" : `Show ${olderListed} more from the last three months`}</button>
         {/if}
       {:else if tab.key === "expected"}
-        <div class="table-scroll tbl">
+        {#if shown.some((r) => r.filing)}
+          <p class="explain">These companies have filed a draft offer document with SEBI, an early step towards an IPO. A draft sets no dates or price, and it can be returned, withdrawn or left to lapse, so an IPO may not follow.</p>
+        {/if}
+        <div class="table-scroll tbl expected">
           <table>
-            <thead><tr><th class="co">Company</th><th class="left">Draft filed with SEBI</th><th class="left">Type</th><th class="left">Exchange</th><th>GMP</th><th class="left">Status</th></tr></thead>
+            <thead><tr><th class="co">Company</th><th class="left">Document</th><th class="left">Filed</th>{#if quoted}<th>GMP</th>{/if}<th class="left status">Status</th></tr></thead>
             <tbody>
-              {#each shown as r (r.slug)}
-                <tr><td class="co">{@render who(r)}</td><td class="left">{#if r.filing}<a class="filing" href={r.filing.url} target="_blank" rel="noopener">{r.filing.doc}, {date(r.filing.filed)}</a>{:else}—{/if}</td><td class="left">{r.board}</td><td class="left">{r.exchange ?? "—"}</td><td class={tone(r.gmp)}>{money(r.gmp)}</td><td class="left"><span class="badge plain">Dates awaited</span></td></tr>
+              {#each shown as r, i (r.slug)}
+                {#if sortKey === "newest" && r.filing && monthOf(r) !== (shown[i - 1]?.filing ? monthOf(shown[i - 1]) : null)}
+                  <tr class="month"><th colspan={quoted ? 5 : 4} scope="colgroup" class="left">{monthOf(r)}</th></tr>
+                {/if}
+                <tr>
+                  <td class="co">{@render who(r)}</td>
+                  <td class="left">{#if r.filing}<a class="filing" href={r.filing.url} target="_blank" rel="noopener" title={DOC_NAME[r.filing.doc]}>{r.filing.doc}</a>{:else}—{/if}</td>
+                  <td class="left">{#if r.filing}{short(r.filing.filed)}<span class="ago">{ago(r.filing.filed)}</span>{:else}—{/if}</td>
+                  {#if quoted}<td class={tone(r.gmp)}>{money(r.gmp)}</td>{/if}
+                  <td class="left status"><span class="badge plain">Dates awaited</span></td>
+                </tr>
               {/each}
             </tbody>
           </table>
         </div>
         {#if shown.some((r) => r.filing)}
-          <p class="sub source">Companies with a draft offer document on <a href="https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=3&ssid=15&smid=10" target="_blank" rel="noopener">SEBI's public issue filings</a>{#if sebi?.fetched_at}, read {fetchedAt(sebi.fetched_at)}{/if}. A draft does not mean an IPO will follow: it can be returned, withdrawn or left to lapse, and this list can't always show that. The list starts from recent filings, so it isn't every company with a draft on file.</p>
+          <p class="sub source">From <a href="https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=3&ssid=15&smid=10" target="_blank" rel="noopener">SEBI's public issue filings</a>{#if sebi?.fetched_at}, read {fetchedAt(sebi.fetched_at)}{/if}. A company leaves this list once SEBI shows its red herring or final prospectus, or our IPO data carries it. The list starts from recent filings, so it isn't every company with a draft on file.</p>
         {/if}
       {:else}
         <div class="issues">
@@ -319,6 +335,11 @@
   .directory a:hover { text-decoration: underline; }
   .source { font-size: 12.5px; line-height: 1.55; }
   .filing { text-decoration: underline; }
+  .explain { max-width: 68ch; margin: 0 0 16px; font-family: var(--serif); font-size: 15.5px; line-height: 1.5; color: var(--ink-2); }
+  .expected table { min-width: 0; }
+  .expected .ago { display: block; color: var(--ink-3); font-size: 12.5px; }
+  .expected .month th { height: auto; padding: 16px 12px 6px; font-size: 12.5px; color: var(--ink-3); background: none; }
+  .expected tbody tr.month:hover th { background: none; }
   .source a { text-decoration: underline; }
   .warn { color: var(--ink-2); font-size: 13px; }
 
@@ -327,6 +348,8 @@
     .controls select { flex: 1; min-width: 0; }
     .stages a { flex-direction: column; align-items: center; gap: 1px; padding: 9px 2px; font-size: 13px; }
     .tbl table { min-width: 720px; }
+    .expected table { min-width: 0; }
+    .expected .status { display: none; }
     th.co, td.co { min-width: 160px; max-width: 170px; }
     .reads > div { padding: 12px; }
     .fig { font-size: 26px; }

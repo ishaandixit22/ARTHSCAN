@@ -102,7 +102,10 @@ describe("draft filings from SEBI", () => {
     const { parseDraft, parseList, movedOnName } = await import("../src/lib/sebi.js");
     const rows = parseList(SEBI_DRAFT);
     expect(rows).toHaveLength(8);
-    expect(rows[0]).toEqual({ filed: "2026-10-29", url: "https://www.sebi.gov.in/filings/public-issues/carlsberg_1.html", title: "Carlsberg India Limited- UDRHP-1" });
+    expect(rows[0]).toEqual({ filed: "2026-10-29", url: "https://www.sebi.gov.in/filings/public-issues/carlsberg_1.html", title: "Carlsberg India Limited- UDRHP-1", abridged_url: "https://www.sebi.gov.in/sebi_data/x.pdf" });
+    expect(rows[1].abridged_url).toBeNull();
+    // A second link SEBI doesn't label as the abridged prospectus is left out.
+    expect(parseList(sebiRow("Oct 05, 2026", "y_1", "Y Limited - DRHP <br><a href= 'https://www.sebi.gov.in/sebi_data/y.pdf'>Other</a>"))[0].abridged_url).toBeNull();
     expect(rows.map(parseDraft).filter(Boolean).map((f) => [f!.name, f!.doc])).toEqual([
       ["Carlsberg India Limited", "UDRHP"], ["Hunger Pangs Limited", "DRHP"], ["Baanganga Gold & Diamond (I) Limited", "DRHP"], ["Jio Platforms Limited", "DRHP"], ["Maxwell Industries Limited", "DRHP"],
     ]);
@@ -153,7 +156,7 @@ describe("draft filings from SEBI", () => {
     const d = ((await res.json()) as any).data;
     const expected = d.rows.filter((r: any) => r.stage === "expected");
     expect(expected.map((r: any) => r.name)).toEqual(["Carlsberg India Limited", "Hunger Pangs Limited", "Baanganga Gold & Diamond (I) Limited"]);
-    expect(expected[0]).toMatchObject({ slug: "sebi-carlsbergindia", board: "Mainboard", exchange: null, logo: null, open: null, close: null, listing: null, price_high: null, size_cr: null, gmp: null, filing: { doc: "UDRHP", filed: "2026-10-29", url: "https://www.sebi.gov.in/filings/public-issues/carlsberg_1.html" } });
+    expect(expected[0]).toMatchObject({ slug: "sebi-carlsbergindia", board: "Mainboard", exchange: null, logo: null, open: null, close: null, listing: null, price_high: null, size_cr: null, gmp: null, filing: { doc: "UDRHP", filed: "2026-10-29", url: "https://www.sebi.gov.in/filings/public-issues/carlsberg_1.html", abridged_url: "https://www.sebi.gov.in/sebi_data/x.pdf" } });
     expect(d.counts.expected.count).toBe(3);
     expect(d.sources.sebi).toMatchObject({ error: null });
     await clear();

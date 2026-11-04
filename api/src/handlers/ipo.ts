@@ -159,7 +159,7 @@ async function loadDashboard(env: Env) {
     slug: `sebi-${nameKey(f.name)}`, symbol: null, name: f.name, board: "Mainboard", exchange: null, stage: "expected" as Stage, logo: null, open: null, close: null, allotment: null, listing: null,
     price_low: null, price_high: null, size_cr: null, lot: null, costs: null, gmp: null, gmp_pct: null, est_listing: null, profit_per_lot: null, gmp_updated: null, gmp_low: null, gmp_high: null, sauda: null, kostak: null,
     times_total: null, qib: null, nii: null, snii: null, bnii: null, retail: null, demand_cr: null, retail_odds: null, sub_from: null, sub_as_of: null, listing_price: null, listing_gain: null, cmp: null, current_gain: null,
-    filing: { doc: f.doc, filed: f.filed, url: f.url },
+    filing: { doc: f.doc, filed: f.filed, url: f.url, abridged_url: f.abridged_url ?? null },
   }));
   const all = [...rows, ...nseOnly, ...filed];
   const live =(s: string) => all.filter((r) => r.stage === s);

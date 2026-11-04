@@ -25,20 +25,23 @@ const KEEP_MOVED_ON_MONTHS = 36;
 /** At most two reads a day, including after a failure, whatever the ten-minute cron does. */
 const READ_EVERY_SECONDS = 12 * 3600;
 
-export type ListRow = { filed: string; url: string; title: string };
-export type Filing = { name: string; doc: "DRHP" | "UDRHP"; filed: string; url: string };
+export type ListRow = { filed: string; url: string; title: string; abridged_url: string | null };
+export type Filing = { name: string; doc: "DRHP" | "UDRHP"; filed: string; url: string; abridged_url?: string | null };
 export type MovedOn = { name: string; filed: string };
 export type Stored = { filings: Filing[]; moved_on: MovedOn[]; fetched_at: string | null; tried_at: number; error: string | null };
 
 const MONTH: Record<string, string> = { Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06", Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12" };
 const decode = (s: string) => s.replace(/&amp;/g, "&").replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&nbsp;/g, " ");
 
-/** The rows of a listing page. A title can carry a second link after a <br>, which is dropped. */
+/** The rows of a listing page. A title can carry a second link after a <br>: kept only when SEBI labels it the draft abridged prospectus. */
 export function parseList(html: string): ListRow[] {
   const rows: ListRow[] = [];
   for (const m of html.matchAll(/<td>([A-Z][a-z]{2}) (\d{2}), (\d{4})<\/td>\s*<td><a href="(https:\/\/www\.sebi\.gov\.in\/filings\/[^"]+)"[^>]*?title="([^"]*)"/g)) {
     const month = MONTH[m[1]];
-    if (month) rows.push({ filed: `${m[3]}-${month}-${m[2]}`, url: m[4], title: decode(m[5]).split(/<br/i)[0].replace(/\s+/g, " ").trim() });
+    if (!month) continue;
+    const [title, extra = ""] = decode(m[5]).split(/<br[^>]*>/i);
+    const pdf = /draft abridged/i.test(extra) ? /href=\s*'(https:\/\/www\.sebi\.gov\.in\/sebi_data\/[^']+\.pdf)'/i.exec(extra)?.[1] ?? null : null;
+    rows.push({ filed: `${m[3]}-${month}-${m[2]}`, url: m[4], title: title.replace(/\s+/g, " ").trim(), abridged_url: pdf });
   }
   return rows;
 }
@@ -48,7 +51,7 @@ export function parseDraft(r: ListRow): Filing | null {
   if (/addendum|corrigendum|notice|withdraw/i.test(r.title)) return null;
   const m = /^(.+?)\s*[-–—:]+\s*(UDRHP(?:[\s-]*(?:I|1))?|DRHP)$/i.exec(r.title);
   if (!m) return null;
-  return { name: m[1].trim(), doc: /^U/i.test(m[2]) ? "UDRHP" : "DRHP", filed: r.filed, url: r.url };
+  return { name: m[1].trim(), doc: /^U/i.test(m[2]) ? "UDRHP" : "DRHP", filed: r.filed, url: r.url, abridged_url: r.abridged_url };
 }
 
 /** The company in a red herring or final prospectus row: "Jio Platforms Ltd.- Prospectus" is Jio Platforms Ltd. */
