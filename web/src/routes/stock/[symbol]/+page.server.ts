@@ -1,3 +1,4 @@
+import { redirect } from "@sveltejs/kit";
 import { api } from "$lib/server/api";
 
 const PERIODS = ["1d", "5d", "1m", "3m", "6m", "1y", "max"];
@@ -17,5 +18,7 @@ export async function load({ params, url }) {
     // Dhan's ratios against industry averages; the page loads without it.
     api(`/api/live/company?symbol=${encodeURIComponent(symbol)}`, { allowError: true }).catch(() => null),
   ]);
+  // A retired ticker answers with the company under its current symbol.
+  if (company.symbol !== symbol) redirect(301, `/stock/${encodeURIComponent(company.symbol)}${url.search}`);
   return { company, history: history?.candles ? { ...history, intraday: INTRADAY.has(period) } : null, financials, shareholding, industryInfo: dhanInfo?.ok ? dhanInfo : null, period, periods: PERIODS };
 }

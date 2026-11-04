@@ -4,7 +4,8 @@
 // which a prefix tree couldn't.
 
 export type SearchHit = { symbol: string; name: string; isin: string | null; close: number | null; change_pct: number | null };
-type Row = [symbol: string, name: string, isin: string | null, close: number | null, change_pct: number | null];
+// aka: the company's former tickers and names, so a search for an old one still finds it.
+type Row = [symbol: string, name: string, isin: string | null, close: number | null, change_pct: number | null, aka?: string | null];
 
 let rows: (Row & { upper?: string })[] | null = null;
 let loading: Promise<void> | null = null;
@@ -12,7 +13,7 @@ let loading: Promise<void> | null = null;
 export function loadSearchIndex(): Promise<void> {
   return (loading ??= fetch("/search-index.json")
     .then((r) => (r.ok ? r.json() : Promise.reject()))
-    .then((body: { rows: Row[] }) => void (rows = body.rows.map((r) => Object.assign(r, { upper: r[1].toUpperCase() }))))
+    .then((body: { rows: Row[] }) => void (rows = body.rows.map((r) => Object.assign(r, { upper: `${r[1]} ${r[5] ?? ""}`.toUpperCase() }))))
     .catch(() => void (loading = null)));
 }
 

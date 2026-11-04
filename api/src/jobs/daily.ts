@@ -4,6 +4,7 @@
 // a laptop running the pipeline:
 //
 //   1. prices        NSE bhavcopy                 → daily_prices (+ new listings in stocks)
+//      symbol changes one ISIN on two symbols     → moved onto the new symbol, symbol_changes
 //   2. deliveries    sec_bhavdata_full            → daily_prices.deliv_*
 //   3. indices       ind_close_all                → index_daily (closes, P/E, P/B, yield)
 //   4. FII / DII     NSE provisional activity     → fii_dii
@@ -24,6 +25,7 @@ import { csvObjects, num } from "../lib/csv.js";
 import { type Bar, METRIC_COLUMNS, metricsRow, snapRatio, ttmEps } from "../lib/indicators.js";
 import { addDaysISO, nseDate, NSE_HEADERS, nseFetch, nseQueryDate, todayIST } from "../lib/nse.js";
 import { currentQuarterEnd, FINANCIAL_COLUMNS, providerName, quarterRows, type Series } from "../lib/results.js";
+import { applySymbolChanges } from "./symbol-changes.js";
 
 export type StepReport = { step: string; status: "ok" | "exists" | "skipped" | "error"; rows?: number; message?: string };
 export type DailyReport = { date: string | null; steps: StepReport[]; ms: number };
@@ -77,6 +79,39 @@ async function sessionDate(today: string): Promise<{ date: string; buf: Uint8Arr
   return null;
 }
 
+/** Recomputes stock_metrics for every recently traded stock, or just the given symbols. */
+export async function recomputeMetrics(env: Env, only?: string[]): Promise<Omit<StepReport, "step">> {
+  const latest = (await env.DB.prepare("SELECT MAX(date) AS d FROM daily_prices").first<{ d: string }>())?.d;
+  if (!latest) return { status: "skipped", message: "No prices" };
+  const eps = ttmEps((await env.DB.prepare(`SELECT symbol, consolidated, eps FROM financials WHERE period_type = 'Q' AND eps IS NOT NULL
+    ORDER BY symbol, consolidated DESC, period_end DESC`).all<{ symbol: string; consolidated: number; eps: number }>()).results);
+  const promoter = new Map((await env.DB.prepare(`SELECT s.symbol, s.promoter FROM shareholding s
+    JOIN (SELECT symbol, MAX(quarter_end) q FROM shareholding GROUP BY symbol) m ON m.symbol = s.symbol AND m.q = s.quarter_end`)
+    .all<{ symbol: string; promoter: number }>()).results.map((r) => [r.symbol, r.promoter]));
+  const { results: recent } = await env.DB.prepare("SELECT DISTINCT symbol FROM daily_prices WHERE date >= date(?, '-14 days')").bind(latest).all<{ symbol: string }>();
+  const syms = only ? recent.filter((s) => only.includes(s.symbol)) : recent;
+  let n = 0;
+  // About 100 stocks × 270 sessions per read keeps each query and the Worker's memory small.
+  for (let i = 0; i < syms.length; i += 100) {
+    const batch = syms.slice(i, i + 100).map((s) => s.symbol);
+    const { results: bars } = await env.DB.prepare(`
+      SELECT symbol, date, close * adj AS close, prev_close * adj AS prev_close, volume / adj AS volume, turnover, deliv_pct FROM daily_prices
+      WHERE symbol IN (SELECT value FROM json_each(?)) AND date >= date(?, '-400 days') ORDER BY symbol, date`).bind(JSON.stringify(batch), latest).all<Bar>();
+    const rows: unknown[][] = [];
+    for (let a = 0; a < bars.length; ) {
+      let b = a;
+      while (b < bars.length && bars[b].symbol === bars[a].symbol) b++;
+      const row = metricsRow(bars.slice(a, b), latest, eps.get(bars[a].symbol) ?? null, promoter.get(bars[a].symbol) ?? null);
+      if (row) rows.push(row);
+      a = b;
+    }
+    n += await insertRows(env, `INSERT OR REPLACE INTO stock_metrics (${METRIC_COLUMNS.join(", ")})`, METRIC_COLUMNS.length, rows, 150);
+  }
+  // Stocks that stopped trading drop out, as in the full rebuild.
+  await env.DB.prepare("DELETE FROM stock_metrics WHERE as_of < date(?, '-14 days')").bind(latest).run();
+  return { status: "ok", rows: n, message: latest };
+}
+
 export async function runDaily(env: Env, opts: { date?: string; force?: boolean; results?: number } = {}): Promise<DailyReport> {
   const started = Date.now();
   const steps: StepReport[] = [];
@@ -107,6 +142,14 @@ export async function runDaily(env: Env, opts: { date?: string; force?: boolean;
 
   if (date) {
     const d: string = date;
+
+    // Before anything else reads the session, so splits and metrics see one continuous history.
+    await step(steps, "symbol changes", async () => {
+      const { merged, skipped, failed } = await applySymbolChanges(env);
+      if (merged.length) changed = true;
+      const notes = [...merged.map((c) => `${c.oldSymbol}→${c.newSymbol}`), ...skipped.map((s) => `left ${s.symbols.join("/")}: ${s.reason}`), ...failed.map((f) => `failed ${f.oldSymbol}: ${f.message}`)];
+      return { status: failed.length ? "error" : "ok", rows: merged.length, message: notes.join("; ").slice(0, 500) || undefined };
+    });
 
     // 2. Deliveries.
     await step(steps, "deliveries", async () => {
@@ -250,34 +293,7 @@ export async function runDaily(env: Env, opts: { date?: string; force?: boolean;
   // 9. Metrics for every stock that traded in the last two weeks.
   await step(steps, "metrics", async () => {
     if (!changed) return { status: "skipped", message: "Nothing new to recompute" };
-    const latest = (await env.DB.prepare("SELECT MAX(date) AS d FROM daily_prices").first<{ d: string }>())?.d;
-    if (!latest) return { status: "skipped", message: "No prices" };
-    const eps = ttmEps((await env.DB.prepare(`SELECT symbol, consolidated, eps FROM financials WHERE period_type = 'Q' AND eps IS NOT NULL
-      ORDER BY symbol, consolidated DESC, period_end DESC`).all<{ symbol: string; consolidated: number; eps: number }>()).results);
-    const promoter = new Map((await env.DB.prepare(`SELECT s.symbol, s.promoter FROM shareholding s
-      JOIN (SELECT symbol, MAX(quarter_end) q FROM shareholding GROUP BY symbol) m ON m.symbol = s.symbol AND m.q = s.quarter_end`)
-      .all<{ symbol: string; promoter: number }>()).results.map((r) => [r.symbol, r.promoter]));
-    const { results: syms } = await env.DB.prepare("SELECT DISTINCT symbol FROM daily_prices WHERE date >= date(?, '-14 days')").bind(latest).all<{ symbol: string }>();
-    let n = 0;
-    // About 100 stocks × 270 sessions per read keeps each query and the Worker's memory small.
-    for (let i = 0; i < syms.length; i += 100) {
-      const batch = syms.slice(i, i + 100).map((s) => s.symbol);
-      const { results: bars } = await env.DB.prepare(`
-        SELECT symbol, date, close * adj AS close, prev_close * adj AS prev_close, volume / adj AS volume, turnover, deliv_pct FROM daily_prices
-        WHERE symbol IN (SELECT value FROM json_each(?)) AND date >= date(?, '-400 days') ORDER BY symbol, date`).bind(JSON.stringify(batch), latest).all<Bar>();
-      const rows: unknown[][] = [];
-      for (let a = 0; a < bars.length; ) {
-        let b = a;
-        while (b < bars.length && bars[b].symbol === bars[a].symbol) b++;
-        const row = metricsRow(bars.slice(a, b), latest, eps.get(bars[a].symbol) ?? null, promoter.get(bars[a].symbol) ?? null);
-        if (row) rows.push(row);
-        a = b;
-      }
-      n += await insertRows(env, `INSERT OR REPLACE INTO stock_metrics (${METRIC_COLUMNS.join(", ")})`, METRIC_COLUMNS.length, rows, 150);
-    }
-    // Stocks that stopped trading drop out, as in the full rebuild.
-    await env.DB.prepare("DELETE FROM stock_metrics WHERE as_of < date(?, '-14 days')").bind(latest).run();
-    return { status: "ok", rows: n, message: latest };
+    return recomputeMetrics(env);
   });
 
   const ms = Date.now() - started;

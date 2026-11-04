@@ -90,7 +90,9 @@ const LIST_COLUMNS = `s.symbol, s.name, s.isin, s.sector, s.series, m.close, m.c
 async function requireStock(db: Database, symbol: unknown) {
   const sym = String(symbol ?? "").trim().toUpperCase();
   if (!sym) throw new ToolError("E_BAD_ARGS", "symbol is required.");
-  const row = await db.prepare("SELECT * FROM stocks WHERE symbol = ?").bind(sym).first<Record<string, unknown>>();
+  // A retired ticker still answers, with the company under its current symbol.
+  const row = await db.prepare(`SELECT * FROM stocks WHERE symbol = ?1
+    OR symbol = (SELECT new_symbol FROM symbol_changes WHERE old_symbol = ?1) ORDER BY symbol = ?1 DESC LIMIT 1`).bind(sym).first<Record<string, unknown>>();
   if (!row) throw new ToolError("E_NOT_FOUND", `No stock with symbol ${sym}. Try search_stocks first.`, 404);
   return row;
 }
@@ -155,9 +157,10 @@ export const TOOLS: Tool[] = [
       const up = q.toUpperCase();
       const { results } = await db.prepare(`
         SELECT ${LIST_COLUMNS} FROM stocks s LEFT JOIN stock_metrics m ON m.symbol = s.symbol
-        WHERE s.symbol LIKE ? OR UPPER(s.name) LIKE ?
-        ORDER BY (s.symbol = ?) DESC, (s.symbol LIKE ?) DESC, (m.turnover IS NULL), m.turnover DESC
-        LIMIT ?`).bind(`${up}%`, `%${up}%`, up, `${up}%`, clampLimit(limit, 10, 50)).all();
+        WHERE s.symbol LIKE ?1 OR UPPER(s.name) LIKE ?2
+          OR s.symbol IN (SELECT new_symbol FROM symbol_changes WHERE old_symbol LIKE ?1 OR UPPER(old_name) LIKE ?2)
+        ORDER BY (s.symbol = ?3) DESC, (s.symbol LIKE ?1) DESC, (m.turnover IS NULL), m.turnover DESC
+        LIMIT ?4`).bind(`${up}%`, `%${up}%`, up, clampLimit(limit, 10, 50)).all();
       return { query: q, results };
     },
   },

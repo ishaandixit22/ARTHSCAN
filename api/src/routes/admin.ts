@@ -1,10 +1,13 @@
 // Owner tools for the scheduled data refresh.
 //   POST /api/admin/refresh          run the daily refresh now (optional ?date=YYYY-MM-DD&force=1)
 //   GET  /api/admin/refresh-status   the latest pipeline runs and how fresh each dataset is
+//   GET  /api/admin/symbol-changes   ticker changes waiting to merge, left alone, and already merged
+//   POST /api/admin/symbol-changes   merge them now (optional ?old=SYMBOL for one) and recompute their metrics
 
 import { Hono } from "hono";
 import type { AppEnv } from "../env.js";
-import { runDaily } from "../jobs/daily.js";
+import { recomputeMetrics, runDaily } from "../jobs/daily.js";
+import { applySymbolChanges, findSymbolChanges } from "../jobs/symbol-changes.js";
 import { jsonError } from "../lib/http.js";
 import { fillStatements } from "../lib/statements.js";
 import { isOwner } from "./live.js";
@@ -26,6 +29,17 @@ admin.post("/refresh", async (c) => {
     results: c.req.query("results") ? Number(c.req.query("results")) : undefined,
   });
   return c.json({ ok: true, ...report });
+});
+
+admin.get("/symbol-changes", async (c) => {
+  const { results: merged } = await c.env.DB.prepare("SELECT * FROM symbol_changes ORDER BY changed_on DESC").all();
+  return c.json({ ok: true, ...(await findSymbolChanges(c.env)), merged });
+});
+
+admin.post("/symbol-changes", async (c) => {
+  const r = await applySymbolChanges(c.env, { only: c.req.query("old")?.toUpperCase() });
+  const metrics = r.merged.length ? await recomputeMetrics(c.env, r.merged.map((m) => m.newSymbol)) : null;
+  return c.json({ ok: true, ...r, metrics });
 });
 
 // Fill the statement store now: POST /api/admin/statements?max=40 (default 25), optionally &cap=N for today's request cap.
