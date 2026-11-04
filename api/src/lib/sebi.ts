@@ -1,6 +1,7 @@
 // Companies that have filed a draft offer document with SEBI, for the Expected tab on the IPO pages.
 // SEBI's public filing lists give the company, the date and the page of the filing, and nothing else,
-// so that is all a row carries: no price, size, dates or logo. A filing is not a promise of an issue.
+// so that is all a row carries, plus the company's website as its own abridged prospectus states it,
+// which the page uses to look up a logo. No price, size or dates. A filing is not a promise of an issue.
 //
 // Only the first page of each list is read. The endpoint behind SEBI's paging answers an automated
 // request with "Unauthorized Request Blocked", so don't work around it. Instead each read adds to the
@@ -26,7 +27,7 @@ const KEEP_MOVED_ON_MONTHS = 36;
 const READ_EVERY_SECONDS = 12 * 3600;
 
 export type ListRow = { filed: string; url: string; title: string; abridged_url: string | null };
-export type Filing = { name: string; doc: "DRHP" | "UDRHP"; filed: string; url: string; abridged_url?: string | null };
+export type Filing = { name: string; doc: "DRHP" | "UDRHP"; filed: string; url: string; abridged_url?: string | null; website?: string | null; website_tries?: number };
 export type MovedOn = { name: string; filed: string };
 export type Stored = { filings: Filing[]; moved_on: MovedOn[]; fetched_at: string | null; tried_at: number; error: string | null };
 
@@ -97,6 +98,10 @@ async function load(env: Env): Promise<Stored> {
   return row ? (JSON.parse(row.body) as Stored) : { filings: [], moved_on: [], fetched_at: null, tried_at: 0, error: null };
 }
 
+async function save(env: Env, body: Stored) {
+  await env.DB.prepare("INSERT INTO external_cache (key, body, fetched_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET body = excluded.body, fetched_at = excluded.fetched_at").bind(CACHE_KEY, JSON.stringify(body), Math.floor(Date.now() / 1000)).run();
+}
+
 /** Called by the ten-minute cron; reads SEBI at most twice a day. A failed read keeps everything stored. */
 export async function refreshFilings(env: Env, nowMs = Date.now()): Promise<{ read: boolean; filings: number; error: string | null }> {
   const stored = await load(env);
@@ -118,8 +123,61 @@ export async function refreshFilings(env: Env, nowMs = Date.now()): Promise<{ re
     console.error("sebi filings:", err instanceof Error ? err.message : err);
     next = { ...stored, tried_at: now, error: "SEBI's filing list could not be read" };
   }
-  await env.DB.prepare("INSERT INTO external_cache (key, body, fetched_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET body = excluded.body, fetched_at = excluded.fetched_at").bind(CACHE_KEY, JSON.stringify(next), now).run();
+  await save(env, next);
   return { read: true, filings: next.filings.length, error: next.error };
+}
+
+/**
+ * The company's website from the cover of its abridged prospectus. The cover's table ends with a
+ * WEBSITE column and the address comes last, right before the promoters, so it is read from there
+ * and not from the first address on the page, which could be an email domain or a bank's site. The
+ * column is narrow, so an address can be broken across lines ("https://carlsbergi ndia.com/").
+ */
+export function websiteFromCover(text: string): string | null {
+  const page = text.replace(/\s+/g, " ");
+  const column = page.search(/\bWEBSITE\b/i);
+  if (column < 0) return null;
+  const rest = page.slice(column);
+  const start = rest.search(/https?:\/\/|\bwww\./i);
+  if (start < 0) return null;
+  const tail = rest.slice(start);
+  const stop = tail.search(/\s(?:THE\s+|OUR\s+)?PROMOTERS?\b/i);
+  if (stop < 0 || stop > 80) return null;
+  const host = tail.slice(0, stop).replace(/\s+/g, "").replace(/^https?:\/\//i, "").replace(/^www\./i, "").split("/")[0].toLowerCase();
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(host) ? host : null;
+}
+
+/** The text of a PDF's first page. Loaded only when needed, so the PDF reader never slows an ordinary request. */
+async function coverText(bytes: Uint8Array): Promise<string> {
+  const { getDocumentProxy, extractText } = await import("unpdf");
+  const { text } = await extractText(await getDocumentProxy(bytes, { verbosity: 0 }), { mergePages: false });
+  return text[0] ?? "";
+}
+
+const WEBSITES_PER_RUN = 3;
+const WEBSITE_TRIES = 3;
+
+/** Reads a few prospectuses each cron run for filings with no website yet. A download that fails is tried again, up to a limit. */
+export async function fillWebsites(env: Env, readCover = coverText): Promise<{ read: number; found: number }> {
+  const stored = await load(env);
+  const waiting = stored.filings.filter((f) => f.abridged_url && f.website === undefined && (f.website_tries ?? 0) < WEBSITE_TRIES).slice(0, WEBSITES_PER_RUN);
+  if (!waiting.length) return { read: 0, found: 0 };
+  let found = 0;
+  for (const f of waiting) { // one after another, as with the lists
+    try {
+      const res = await fetch(f.abridged_url!, { headers: HEADERS, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (!res.ok || new TextDecoder().decode(bytes.slice(0, 4)) !== "%PDF") throw new Error(`answered ${res.status} without a PDF`);
+      f.website = websiteFromCover(await readCover(bytes)); // null: read, and it names no website, so don't ask again
+      if (f.website) found++;
+    } catch (err) {
+      console.error(`sebi prospectus ${f.name}:`, err instanceof Error ? err.message : err);
+      f.website_tries = (f.website_tries ?? 0) + 1;
+      if (f.website_tries >= WEBSITE_TRIES) f.website = null;
+    }
+  }
+  await save(env, stored);
+  return { read: waiting.length, found };
 }
 
 /** What a page shows. Only reads the database, so no visitor ever waits on SEBI. */

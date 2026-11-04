@@ -4,7 +4,7 @@
   import { BRAND } from "$lib/brand";
   import IpoLogo from "$lib/components/IpoLogo.svelte";
   import { fetchedAt, int, todayIST, tone } from "$lib/format";
-  import { DOC_NAME } from "$lib/ipo-filing";
+  import { DOC_NAME, filingLogo } from "$lib/ipo-filing";
 
   let { data } = $props();
   const d = $derived(data.dashboard);
@@ -108,7 +108,7 @@
 
 {#snippet who(r: any)}
   <span class="who">
-    <IpoLogo src={r.logo} name={r.name} size={34} />
+    <IpoLogo src={r.logo ?? filingLogo(r.filing?.website, data.logoKey, 34)} name={r.name} size={34} />
     {#if r.filing}<a href="/ipos/expected/{r.slug}">{r.name}</a>{:else}<a href="/ipos/{r.slug}">{r.name}</a>{/if}
   </span>
 {/snippet}

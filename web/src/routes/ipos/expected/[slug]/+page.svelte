@@ -2,7 +2,7 @@
   import { BRAND } from "$lib/brand";
   import IpoLogo from "$lib/components/IpoLogo.svelte";
   import { date, fetchedAt } from "$lib/format";
-  import { DOC_NAME } from "$lib/ipo-filing";
+  import { DOC_NAME, filingLogo } from "$lib/ipo-filing";
 
   let { data } = $props();
   const c = $derived(data.company);
@@ -19,7 +19,7 @@
   <p class="crumbs"><a href="/">Home</a> › <a href="/ipos?tab=expected">Expected IPOs</a> › {c.name}</p>
 
   <header class="head">
-    <IpoLogo src={c.logo} name={c.name} size={56} />
+    <IpoLogo src={filingLogo(f.website, data.logoKey, 56)} name={c.name} size={56} />
     <div>
       <h1>{c.name}</h1>
       <p class="tags"><span class="badge">Dates awaited</span> {c.board}</p>
@@ -33,6 +33,7 @@
     <p class="note">The draft sets out the proposed issue, the business, its finances and its risks.</p>
     <ul class="docs">
       <li><a href={f.url} target="_blank" rel="noopener">{DOC_NAME[f.doc]}</a> <span>on SEBI's website</span></li>
+      {#if f.website}<li><a href="https://{f.website}" target="_blank" rel="noopener nofollow">{f.website}</a> <span>the company's website, as its prospectus gives it</span></li>{/if}
       {#if f.abridged_url}<li><a href={f.abridged_url} target="_blank" rel="noopener">Draft Abridged Prospectus</a> <span>PDF on SEBI's website</span></li>{/if}
     </ul>
   </section>

@@ -113,6 +113,40 @@ describe("draft filings from SEBI", () => {
     expect(movedOnName("A One Steel Limited")).toBe("A One Steel Limited");
   });
 
+  it("reads the company's own website off a prospectus cover, joining an address broken across lines", async () => {
+    const { websiteFromCover } = await import("../src/lib/sebi.js");
+    const cover = (rest: string) => `ACME LIMITED REGISTERED OFFICE CONTACT PERSON EMAIL AND TELEPHONE WEBSITE 4th Floor, Mumbai Jane Doe Email: cs@acme-group.asi a Telephone: +91 124 6923530 ${rest} DETAILS OF THE OFFER`;
+    expect(websiteFromCover(cover("https://carlsbergi ndia.com/ THE PROMOTERS OF OUR COMPANY ARE X"))).toBe("carlsbergindia.com");
+    expect(websiteFromCover(cover("https://electromech- infra.com/ THE PROMOTERS OF OUR COMPANY"))).toBe("electromech-infra.com");
+    expect(websiteFromCover(cover("www.everbra nds.in OUR PROMOTERS: A B"))).toBe("everbrands.in");
+    expect(websiteFromCover(cover("www.acme.com PROMOTER OF OUR COMPANY"))).toBe("acme.com");
+    // An email domain is never taken for the website, and nor is an address far from the promoters' line.
+    expect(websiteFromCover(cover("OUR PROMOTERS: A B"))).toBeNull();
+    expect(websiteFromCover(`WEBSITE www.acme.com ${"x ".repeat(60)} OUR PROMOTERS`)).toBeNull();
+    expect(websiteFromCover("no such column www.acme.com OUR PROMOTERS")).toBeNull();
+  });
+
+  it("fills websites a few at a time, retries a failed download, and doesn't ask again once read", async () => {
+    await clear();
+    const { fillWebsites, refreshFilings, expectedFilings } = await import("../src/lib/sebi.js");
+    const many = Array.from({ length: 4 }, (_, i) => sebiRow("Oct 05, 2026", `co_${i}`, `Co${i} Limited - DRHP <br><a href='https://www.sebi.gov.in/sebi_data/${i}.pdf'>Co${i} Limited - Draft Abridged Prospectus</a>`)).join("\n");
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(url.endsWith("smid=10") ? many : SEBI_FINAL)));
+    await refreshFilings(env, NOW);
+    const pdf = vi.fn(async (url: string) => (url.includes("/2.pdf") ? new Response("<html>blocked</html>") : new Response("%PDF-1.5 x")));
+    vi.stubGlobal("fetch", pdf);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const read = vi.fn(async () => "WEBSITE www.acme.com OUR PROMOTERS");
+    expect(await fillWebsites(env, read)).toEqual({ read: 3, found: 2 }); // Co0, Co1, and Co2's block page
+    expect(await fillWebsites(env, read)).toEqual({ read: 2, found: 1 }); // Co2 again, and Co3
+    await fillWebsites(env, read);
+    expect(await fillWebsites(env, read)).toEqual({ read: 0, found: 0 }); // Co2 has run out of tries
+    expect(read).toHaveBeenCalledTimes(3);
+    const { filings } = await expectedFilings(env);
+    expect(filings.map((f) => f.website)).toEqual(["acme.com", "acme.com", null, "acme.com"]);
+    vi.restoreAllMocks();
+    await clear();
+  });
+
   it("takes a company off once a later prospectus is filed, but not when it files a new draft afterwards", async () => {
     const { stillExpected } = await import("../src/lib/sebi.js");
     const draft = { name: "Jio Platforms Limited", doc: "DRHP" as const, filed: "2026-10-05", url: "u" };
