@@ -12,7 +12,7 @@ import type { RequestEvent } from "@sveltejs/kit";
 const NAMESPACE = "https://page-cache.arthscan.internal";
 const STOCK = { fresh: 300, stale: 14_400 };
 const MARKET = { fresh: 300, stale: 3_600 };
-const MARKET_PAGES = /^\/(stocks|screener|sectors(\/[^/]+)?|heatmap|valuations|breadth)?$/;
+const MARKET_PAGES = /^\/(stocks|screener(\/custom)?|sectors(\/[^/]+)?|heatmap|valuations|breadth)?$/;
 
 function ruleFor(url: URL) {
   if (/^\/stock\/[^/]+$/.test(url.pathname)) return STOCK;

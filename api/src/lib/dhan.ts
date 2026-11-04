@@ -26,7 +26,7 @@ const COMPANY_FIELDS = {
 } as const;
 const SECTION_KEYS = { overview: "CO", ratios: "RATIOS", shareholding: "SHP" } as const;
 
-export type Fail = { ok: false; status: number; error: string };
+export type Fail = { ok: false; status: number; error: string; /** Dhan's own status, when it answered. */ upstream?: number };
 export const fail = (status: number, error: string): Fail => ({ ok: false, status, error });
 
 // The Workers edge cache, when there is one (absent under plain Node).
@@ -43,11 +43,16 @@ export async function cached<T extends { ok: boolean }>(key: string, ttl: number
   return out;
 }
 
+// Scans make hundreds of calls in one run, and each would otherwise spend a subrequest asking for the token.
+let credsMemo: { at: number; creds: { token: string; clientId: string } } | null = null;
+const CREDS_MEMO_MS = 60_000;
+
 async function credentials(env: Env): Promise<{ token: string; clientId: string } | null> {
+  if (credsMemo && Date.now() - credsMemo.at < CREDS_MEMO_MS) return credsMemo.creds;
   if (env.LIVE_FEED) {
     const res = await env.LIVE_FEED.get(env.LIVE_FEED.idFromName("dhan")).fetch(new Request("https://live/credentials")).catch(() => null);
     const creds = res?.ok ? ((await res.json().catch(() => null)) as { token: string; clientId: string } | null) : null;
-    if (creds) return creds;
+    if (creds) { credsMemo = { at: Date.now(), creds }; return creds; }
     console.warn(`dhan credentials: live feed answered ${res?.status ?? "nothing"}; using the configured token`);
   }
   return env.DHAN_ACCESS_TOKEN && env.DHAN_CLIENT_ID ? { token: env.DHAN_ACCESS_TOKEN, clientId: env.DHAN_CLIENT_ID } : null;
@@ -63,7 +68,7 @@ export async function instrument(env: Env, symbol: string): Promise<{ id: string
 }
 
 /** POST to a Dhan data endpoint. Returns the parsed body, or a failure to show. */
-async function post(env: Env, path: string, body: unknown, what: string): Promise<{ ok: true; data: any } | Fail> {
+async function post(env: Env, path: string, body: unknown, what: string, timeoutMs = UPSTREAM_TIMEOUT_MS): Promise<{ ok: true; data: any } | Fail> {
   const creds = await credentials(env);
   if (!creds) return fail(503, "Dhan is not configured");
   let res: Response;
@@ -72,7 +77,7 @@ async function post(env: Env, path: string, body: unknown, what: string): Promis
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json", "access-token": creds.token, "client-id": creds.clientId },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
     return fail(502, "Dhan is not reachable");
@@ -80,7 +85,7 @@ async function post(env: Env, path: string, body: unknown, what: string): Promis
   const data = await res.json().catch(() => null);
   if (!res.ok || !data) {
     console.error(`dhan ${what} -> ${res.status}: ${JSON.stringify(data).slice(0, 300)}`);
-    return fail(502, `Dhan returned no ${what}`);
+    return { ...fail(502, `Dhan returned no ${what}`), upstream: res.status };
   }
   return { ok: true, data };
 }

@@ -107,7 +107,7 @@
       </p>
       <div class="lookup">
         <Search lead placeholder="Look up any NSE company: ITC, HDFC Bank…" />
-        <a class="screen" href="/screener">Or screen every stock by your own rules →</a>
+        <a class="screen" href="/screener">Or browse 180 ready-made stock screens →</a>
       </div>
       <aside class="explainer">
         <b>What is breadth?</b>

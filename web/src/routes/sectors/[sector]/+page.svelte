@@ -14,7 +14,7 @@
       <h1>{data.sector}</h1>
       <p class="sub">{data.rows.length} stocks, most traded first</p>
     </div>
-    <a class="btn small" href="/screener?sector={encodeURIComponent(data.sector)}">Screen this sector</a>
+    <a class="btn small" href="/screener/custom?sector={encodeURIComponent(data.sector)}">Screen this sector</a>
   </div>
   <section class="card">
     <StockTable rows={data.rows} cols={["close", "change_pct", "ret_1m", "ret_1y", "pct_from_high", "pe", "turnover"]} />
