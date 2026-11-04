@@ -34,6 +34,9 @@ async function liveIsPublic(): Promise<boolean> {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+  // One address for the site. Logo.dev's key also accepts only this domain, so logos fail on www.
+  if (event.url.hostname === "www.arthscan.me") redirect(308, `https://arthscan.me${event.url.pathname}${event.url.search}`);
+
   const binding = event.platform?.env?.API;
   if (binding && API_PATHS.test(event.url.pathname)) return binding.fetch(event.request);
 

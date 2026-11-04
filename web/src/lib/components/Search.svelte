@@ -13,6 +13,9 @@
   let active = $state(-1);
   let timer: ReturnType<typeof setTimeout>;
   let input: HTMLInputElement | undefined = $state();
+  // Logo.dev allows 100 requests a minute per visitor, so logos wait for a pause in typing.
+  let typing = $state(false);
+  let pause: ReturnType<typeof setTimeout>;
 
   // "/" or ⌘K / Ctrl+K jumps to search from anywhere (except while typing in a field).
   function onGlobalKey(e: KeyboardEvent) {
@@ -27,6 +30,9 @@
 
   function onInput() {
     clearTimeout(timer);
+    clearTimeout(pause);
+    typing = true;
+    pause = setTimeout(() => (typing = false), 250);
     void loadSearchIndex();
     const query = q.trim();
     if (!query) {
@@ -96,10 +102,10 @@
   {/if}
   {#if open && results.length}
     <ul role="listbox">
-      {#each results as r, i}
+      {#each results as r, i (r.symbol)}
         <li role="option" aria-selected={i === active}>
           <button type="button" class:active={i === active} onmousedown={() => choose(r.symbol)}>
-            <span class="who"><Logo isin={r.isin} symbol={r.symbol} size={24} /><b>{r.symbol}</b> <small>{r.name}</small></span>
+            <span class="who"><Logo isin={r.isin} symbol={r.symbol} size={24} hold={typing} /><b>{r.symbol}</b> <small>{r.name}</small></span>
             <span class="num">{price(r.close)} <small class={tone(r.change_pct)}>{pct(r.change_pct)}</small></span>
           </button>
         </li>

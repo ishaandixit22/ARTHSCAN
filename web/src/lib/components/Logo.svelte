@@ -2,18 +2,35 @@
   import { page } from "$app/state";
 
   // A company's logo from logo.dev, looked up by ISIN; the initials stay when there is none (or no key).
-  let { isin, symbol, size = 40 }: { isin?: string | null; symbol: string; size?: number } = $props();
+  // `hold` keeps the initials and makes no request until it first turns false.
+  let { isin, symbol, size = 40, hold = false }: { isin?: string | null; symbol: string; size?: number; hold?: boolean } = $props();
   const key = $derived(page.data.logoKey as string | null);
   const monogram = $derived(symbol.replace(/[^A-Z]/g, "").slice(0, 2) || symbol.slice(0, 2));
+  let released = $state(false);
+  $effect(() => { if (!hold) released = true; });
   let failed = $state(false);
-  $effect(() => { isin; failed = false; });
+  let retried = false;
+  let retry: ReturnType<typeof setTimeout>;
+  $effect(() => {
+    isin;
+    failed = false;
+    retried = false;
+    return () => clearTimeout(retry);
+  });
+  // A failure may only be Logo.dev's limit of 100 requests a minute, so try once more after that minute.
+  function onFail() {
+    failed = true;
+    if (retried) return;
+    retried = true;
+    retry = setTimeout(() => (failed = false), 61_000);
+  }
   const px = $derived(size * 2); // sharp on high-density screens
   const src = $derived(key && isin ? `https://img.logo.dev/isin/${isin}?token=${key}&size=${px}&format=webp&fallback=404` : null);
 </script>
 
 <span class="logo" style="--s: {size}px" aria-hidden="true">
-  {#if src && !failed}
-    <img {src} alt="" width={size} height={size} decoding="async" onerror={() => (failed = true)} />
+  {#if src && !failed && (!hold || released)}
+    <img {src} alt="" width={size} height={size} decoding="async" onerror={onFail} />
   {:else}
     <i>{monogram}</i>
   {/if}
