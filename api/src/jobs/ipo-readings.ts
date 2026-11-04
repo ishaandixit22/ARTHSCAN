@@ -12,16 +12,26 @@ const IST_MS = 5.5 * 3600_000;
 const FIRST_MINUTE = 9 * 60 + 30;
 const LAST_MINUTE = 19 * 60 + 30;
 
-async function fromNse(env: Env, issue: { symbol: string; series: string; status: string }): Promise<CategoryTimes | null> {
+async function fromNse(env: Env, issue: { symbol: string; series: string; status: string; times?: number | null }): Promise<CategoryTimes | null> {
   const d = await detail(env, issue);
   const cats = parseCategories(d?.cats, null);
-  if (!cats.length) return null;
-  // On SME issues NSE lists QIB bids against 0 shares offered and writes 0.00 times: unknown, not zero.
+  // On SME issues NSE can list bids against 0 shares offered and write 0.00 times: unknown, not zero.
   const times = (key: string) => {
     const c = cats.find((x) => x.key === key);
     return c?.times === 0 && c.bid ? null : c?.times ?? null;
   };
-  return { total: times("total"), qib: times("qib"), nii: times("nii"), snii: times("snii"), bnii: times("bnii"), retail: times("retail") };
+  // Its list of current issues can still carry the right total when that table can't.
+  const total = times("total") ?? issue.times ?? null;
+  if (!cats.length && total == null) return null;
+  return { total, qib: times("qib"), nii: times("nii"), snii: times("snii"), bnii: times("bnii"), retail: times("retail") };
+}
+
+/** What NSE leaves unknown, from the provider where the plan allows it. */
+async function fillGaps(env: Env, slug: string, nse: CategoryTimes): Promise<CategoryTimes> {
+  if (nse.qib != null && nse.nii != null && nse.retail != null) return nse;
+  const live = await liveCategories(env, slug);
+  if (!live) return nse;
+  return { total: nse.total ?? live.total, qib: nse.qib ?? live.qib, nii: nse.nii ?? live.nii, snii: nse.snii ?? live.snii, bnii: nse.bnii ?? live.bnii, retail: nse.retail ?? live.retail };
 }
 
 export async function recordIpoCategories(env: Env, nowMs = Date.now()) {
@@ -42,8 +52,7 @@ export async function recordIpoCategories(env: Env, nowMs = Date.now()) {
       const nse = n ? await fromNse(env, n) : null;
       const provider = creditedTimes(r.times_total, r.open, today);
       if (nse && useExchange(nse.total, provider)) {
-        const qib = nse.qib ?? (await liveCategories(env, r.slug))?.qib ?? null;
-        if (await recordCategories(env, r.slug, "nse", { ...nse, qib }, nowMs)) saved++;
+        if (await recordCategories(env, r.slug, "nse", await fillGaps(env, r.slug, nse), nowMs)) saved++;
         continue;
       }
       const live = await liveCategories(env, r.slug);

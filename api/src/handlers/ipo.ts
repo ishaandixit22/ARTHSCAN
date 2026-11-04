@@ -17,12 +17,12 @@ import type { Tool } from "./tools.js";
 const BASE = "https://www.nseindia.com/api";
 const LIVE_TTL = 120;
 
-type Current = { symbol: string; name: string; series: string; status: string; start: string | null; end: string | null; low: number | null; high: number | null; lot: number | null; bse_only: boolean };
+type Current = { symbol: string; name: string; series: string; status: string; start: string | null; end: string | null; low: number | null; high: number | null; lot: number | null; bse_only: boolean; times?: number | null };
 const toCurrent = (r: any): Current => {
   const band = priceBand(r.issuePrice ?? r.priceBand);
   return {
     symbol: String(r.symbol), name: r.companyName, series: r.series ?? "EQ", status: r.status ?? "", start: isoDate(r.issueStartDate), end: isoDate(r.issueEndDate),
-    low: band.low, high: band.high, lot: Number(r.lotSize) || null, bse_only: r.isBse === "1",
+    low: band.low, high: band.high, lot: Number(r.lotSize) || null, bse_only: r.isBse === "1", times: toNum(r.noOfTime),
   };
 };
 

@@ -370,6 +370,35 @@ describe("IPO Guru", () => {
       expect(await db.prepare("SELECT qib, retail FROM ipo_category_readings WHERE source = 'nse'").first()).toEqual({ qib: null, retail: 110.21 });
     });
 
+    // Vedant Poly Fabs on 4 Nov: every category row reads 0 offered and 0.00 times, while the current-issue list has the real total.
+    const zeroTable = (plan: string, spent: string[]) => vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("/subscription")) { spent.push(url); return ok({ categories: [{ key: "QIB", times_value: 1 }, { key: "NII", times_value: 0.9, sub_categories: [{ key: "BNII", times_value: 0.8 }] }, { key: "Retail", times_value: 0.8 }, { key: "Total", times_value: 0.5 }] }, plan); }
+      if (url.includes("ipoguru.in")) return ok([{ ...ROW, subscription_total: "0.5" }], plan);
+      if (url.includes("ipo-current-issue")) return new Response(JSON.stringify([{ companyName: "Maxwell Engineering Solutions Limited", issueEndDate: "03-Nov-2026", issuePrice: "Rs.150 to Rs.158", issueStartDate: "30-Oct-2026", series: "SME", status: "Active", symbol: "MAXWELL", noOfTime: "0.87" }]));
+      if (url.includes("symbol=MAXWELL")) return new Response(JSON.stringify({ activeCat: { dataList: [{ category: "Qualified Institutional Buyers(QIBs)", srNo: "1", noOfShareOffered: "0", noOfSharesBid: "68400", noOfTotalMeant: "0.00" }, { category: "Non Institutional Investors", srNo: "2", noOfShareOffered: "0", noOfSharesBid: "2432400", noOfTotalMeant: "0.00" }, { category: "Total", srNo: null, noOfShareOffered: "0.0", noOfSharesBid: "2500800.0", noOfTotalMeant: "0.00" }] }, issueInfo: { dataList: [] } }));
+      return new Response("nope", { status: 403 });
+    }));
+    const saved = () => db.prepare("SELECT source, total, qib, nii, bnii, retail FROM ipo_category_readings").first();
+
+    it("takes NSE's total from its current-issue list when the category table says 0.00, and records it on a free key", async () => {
+      const { recordIpoCategories } = await import("../src/jobs/ipo-readings.js");
+      await wipe();
+      const spent: string[] = [];
+      zeroTable("free", spent);
+      expect((await recordIpoCategories(keyed, IST("2026-11-03T12:00:00"))).saved).toBe(1);
+      expect(await saved()).toEqual({ source: "nse", total: 0.87, qib: null, nii: null, bnii: null, retail: null });
+      expect(spent).toHaveLength(0);
+    });
+
+    it("fills the categories NSE left unknown from the provider on Standard, keeping NSE's total", async () => {
+      const { recordIpoCategories } = await import("../src/jobs/ipo-readings.js");
+      await wipe();
+      zeroTable("standard", []);
+      await db.prepare("INSERT INTO external_cache (key, body, fetched_at) VALUES ('ipoguru:quota', ?, 0)").bind(JSON.stringify({ plan: "standard", remaining: 900, limit: 1000, retry_at: 0, day: "2026-11-03" })).run();
+      expect((await recordIpoCategories(keyed, IST("2026-11-03T12:00:00"))).saved).toBe(1);
+      expect(await saved()).toEqual({ source: "nse", total: 0.87, qib: 1, nii: 0.9, bnii: 0.8, retail: 0.8 });
+    });
+
     it("spends nothing outside bidding hours or at weekends, and doesn't ask a free key for categories", async () => {
       const { recordIpoCategories } = await import("../src/jobs/ipo-readings.js");
       await wipe();
