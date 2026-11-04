@@ -2,6 +2,7 @@
 //   POST /api/admin/refresh          run the daily refresh now (optional ?date=YYYY-MM-DD&force=1)
 //   GET  /api/admin/refresh-status   the latest pipeline runs and how fresh each dataset is
 //   GET  /api/admin/symbol-changes   ticker changes waiting to merge, left alone, and already merged
+//   POST /api/admin/screens?step=    run one screens step now: tick, series, weekly, minutes, intraday
 //   POST /api/admin/symbol-changes   merge them now (optional ?old=SYMBOL for one) and recompute their metrics
 
 import { Hono } from "hono";
@@ -10,6 +11,9 @@ import { recomputeMetrics, runDaily } from "../jobs/daily.js";
 import { applySymbolChanges, findSymbolChanges } from "../jobs/symbol-changes.js";
 import { jsonError } from "../lib/http.js";
 import { fillStatements } from "../lib/statements.js";
+import { refreshMinuteHistory, runIntradayCycle, runWeekly } from "../screens/run.js";
+import { buildSeries } from "../screens/series.js";
+import { screensTick } from "../screens/tick.js";
 import { isOwner } from "./live.js";
 
 export const admin = new Hono<AppEnv>();
@@ -29,6 +33,16 @@ admin.post("/refresh", async (c) => {
     results: c.req.query("results") ? Number(c.req.query("results")) : undefined,
   });
   return c.json({ ok: true, ...report });
+});
+
+admin.post("/screens", async (c) => {
+  const step = c.req.query("step");
+  const steps: Record<string, () => Promise<unknown>> = {
+    tick: () => screensTick(c.env), series: () => buildSeries(c.env), weekly: () => runWeekly(c.env),
+    minutes: () => refreshMinuteHistory(c.env), intraday: () => runIntradayCycle(c.env, { force: true }),
+  };
+  if (!step || !steps[step]) return jsonError(c, 400, "E_BAD_STEP", `Step must be one of ${Object.keys(steps).join(", ")}.`);
+  return c.json({ step, result: (await steps[step]()) ?? null });
 });
 
 admin.get("/symbol-changes", async (c) => {

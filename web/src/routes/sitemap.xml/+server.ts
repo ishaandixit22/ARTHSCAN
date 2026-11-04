@@ -20,6 +20,7 @@ export async function GET({ url }) {
   // Stocks listed only on BSE aren't in the /v1/stocks list; the search table carries them.
   const { rows } = await api<{ rows: unknown[][] }>("/api/search-index");
   const bseOnly = rows.map((r) => String(r[0])).filter((s) => s.startsWith("BSE-"));
+  const { screens } = await api<{ screens: { slug: string }[] }>("/api/screens");
   const latest = stocks.reduce((d, s) => (s.as_of > d ? s.as_of : d), "");
 
   const entry = (path: string, lastmod?: string, priority?: string) =>
@@ -32,6 +33,8 @@ export async function GET({ url }) {
     ...["/about", "/pricing", "/contact", "/terms", "/privacy"].map((p) => entry(p, undefined, "0.3")),
     entry("/calculators", undefined, "0.8"),
     ...META.map((m) => entry(`/calculators/${m.slug}`, undefined, "0.7")),
+    entry("/screener/custom", latest, "0.6"),
+    ...screens.map((s) => entry(`/screener/${esc(s.slug)}`, latest, "0.6")),
     ...sectors.map((s: { sector: string }) => entry(`/sectors/${esc(s.sector)}`, latest, "0.6")),
     ...stocks.map((s) => entry(`/stock/${esc(s.symbol)}`, s.as_of, "0.5")),
     ...bseOnly.map((s) => entry(`/stock/${esc(s)}`, latest, "0.4")),

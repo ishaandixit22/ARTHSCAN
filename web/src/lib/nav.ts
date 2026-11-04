@@ -76,7 +76,7 @@ export function navGroups(live: boolean): NavGroup[] {
 
 /** Plain links beside the Markets menu in the top bar. */
 export const TOP_LINKS: NavItem[] = [
-  { href: "/screener", label: "Screener", about: "Filter by price, returns and fundamentals", icon: ICON.screener },
+  { href: "/screener", label: "Screener", about: "180 prebuilt fundamental and technical screens", icon: ICON.screener },
   { href: "/ipos", label: "IPOs", about: "Open, upcoming and recently listed issues", icon: ICON.ipos },
   { href: "/mutual-funds", label: "Mutual funds", about: "Categories, returns and fund details", icon: ICON.funds },
   { href: "/news", label: "News", about: "Market and company headlines", icon: ICON.news },

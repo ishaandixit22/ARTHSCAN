@@ -12,6 +12,7 @@ import { oauth, oauthAccount } from "./routes/oauth.js";
 import { live } from "./routes/live.js";
 import { searchIndex } from "./routes/search-index.js";
 import { admin } from "./routes/admin.js";
+import { screens } from "./routes/screens.js";
 import { jsonError } from "./lib/http.js";
 import { edgeCache } from "./middleware/edge-cache.js";
 
@@ -39,6 +40,7 @@ app.route("/api/oauth", oauthAccount);
 app.route("/api/live", live);
 app.route("/api/search-index", searchIndex);
 app.route("/api/admin", admin);
+app.route("/api/screens", screens);
 app.route("/api", account);
 app.route("/v1", rest);
 app.route("/mcp", mcp);
