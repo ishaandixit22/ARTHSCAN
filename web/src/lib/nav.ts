@@ -2,7 +2,17 @@
 // Market, Flows and Companies, so the top bar carries a few links instead of
 // fourteen. The Screener is a link of its own.
 
-export type NavItem = { href: string; label: string; about: string; icon: string; match?: string[] };
+import { CATEGORIES, META } from "$lib/calculators/catalog";
+
+/** A dropdown under a top-bar link: columns of links, each with an optional one-line note. */
+export type NavMenu = {
+  /** Sentence shown above the columns, linking to the section's front page. */
+  overview: { href: string; label: string };
+  groups: { title: string; items: { href: string; label: string; about?: string }[] }[];
+  /** Spans the full width of the bar, for menus with many entries. */
+  wide?: boolean;
+};
+export type NavItem = { href: string; label: string; about: string; icon: string; match?: string[]; menu?: NavMenu };
 
 // 24×24 outline icons (1.6px stroke), one per destination, drawn for what each tool shows.
 const ICON = {
@@ -74,17 +84,64 @@ export function navGroups(live: boolean): NavGroup[] {
   ];
 }
 
-/** Plain links beside the Markets menu in the top bar. */
+const SCREENER_MENU: NavMenu = {
+  overview: { href: "/screener", label: "All screeners" },
+  groups: [
+    {
+      title: "Prebuilt screens",
+      items: [
+        { href: "/screener", label: "Fundamental screens", about: "Growth, quality, value and dividends, from company statements. Refreshed weekly." },
+        { href: "/screener?tab=technical", label: "Technical screens", about: "Breakouts, crosses, RSI and volume spikes, on live prices." },
+      ],
+    },
+    { title: "Your own", items: [{ href: "/screener/custom", label: "Build your own", about: "Set your own filters on price, returns and fundamentals." }] },
+  ],
+};
+
+const IPO_MENU: NavMenu = {
+  overview: { href: "/ipos", label: "IPO dashboard" },
+  groups: [
+    {
+      title: "By stage",
+      items: [
+        { href: "/ipos?tab=open", label: "Open now", about: "Taking bids today" },
+        { href: "/ipos?tab=upcoming", label: "Upcoming", about: "Dates announced, not yet open" },
+        { href: "/ipos?tab=expected", label: "Expected", about: "Filed with SEBI, dates awaited" },
+        { href: "/ipos?tab=closed", label: "Closed", about: "Bidding over, not yet listed" },
+        { href: "/ipos?tab=listed", label: "Recently listed", about: "Listing gains and returns since" },
+      ],
+    },
+  ],
+};
+
+const CALCULATOR_MENU: NavMenu = {
+  overview: { href: "/calculators", label: `All ${META.length} calculators` },
+  wide: true,
+  groups: CATEGORIES.map((title) => ({
+    title,
+    items: META.filter((m) => m.category === title).map((m) => ({ href: `/calculators/${m.slug}`, label: m.title.replace(" calculator", "") })),
+  })),
+};
+
+/** Links beside the Markets menu in the top bar. Those with a `menu` open a dropdown. */
 export const TOP_LINKS: NavItem[] = [
-  { href: "/screener", label: "Screener", about: "180 prebuilt fundamental and technical screens", icon: ICON.screener },
-  { href: "/ipos", label: "IPOs", about: "Open, upcoming and recently listed issues", icon: ICON.ipos },
+  { href: "/screener", label: "Screener", about: "180 prebuilt fundamental and technical screens", icon: ICON.screener, menu: SCREENER_MENU },
+  { href: "/ipos", label: "IPOs", about: "Open, upcoming and recently listed issues", icon: ICON.ipos, menu: IPO_MENU },
   { href: "/mutual-funds", label: "Mutual funds", about: "Categories, returns and fund details", icon: ICON.funds },
   { href: "/news", label: "News", about: "Market and company headlines", icon: ICON.news },
-  { href: "/calculators", label: "Calculators", about: "SIP, EMI, tax, FD, PPF and more", icon: ICON.calculators },
+  { href: "/calculators", label: "Calculators", about: "SIP, EMI, tax, FD, PPF and more", icon: ICON.calculators, menu: CALCULATOR_MENU },
   { href: "/developers", label: "API", about: "REST and MCP for your AI assistant", icon: ICON.api },
 ];
 
 export function isActive(item: NavItem, path: string): boolean {
   if (item.href === "/") return path === "/";
   return path === item.href || path.startsWith(`${item.href}/`) || !!item.match?.some((m) => path.startsWith(m));
+}
+
+/** Whether a dropdown entry is the page showing: same path, and the same `tab` (none counts as none). */
+export function menuActive(href: string, url: URL): boolean {
+  const [path, query] = href.split("?");
+  if (url.pathname !== path) return false;
+  const tab = new URLSearchParams(query ?? "").get("tab");
+  return tab ? url.searchParams.get("tab") === tab : !url.searchParams.has("tab");
 }

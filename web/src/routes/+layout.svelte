@@ -2,6 +2,7 @@
   import "../app.css";
   import { page } from "$app/state";
   import MarketsMenu from "$lib/components/MarketsMenu.svelte";
+  import NavDropdown from "$lib/components/NavDropdown.svelte";
   import Search from "$lib/components/Search.svelte";
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import ThemeToggle from "$lib/components/ThemeToggle.svelte";
@@ -42,7 +43,11 @@
   <div class="wrap row">
     <MarketsMenu {groups} />
     {#each TOP_LINKS as r (r.href)}
-      <a href={r.href} class="link" class:current={isActive(r, page.url.pathname)} aria-current={isActive(r, page.url.pathname) ? "page" : undefined}>{r.label}</a>
+      {#if r.menu}
+        <NavDropdown item={r} />
+      {:else}
+        <a href={r.href} class="link" class:current={isActive(r, page.url.pathname)} aria-current={isActive(r, page.url.pathname) ? "page" : undefined}>{r.label}</a>
+      {/if}
     {/each}
     <span class="tagline">The stock market, explained as it moves</span>
   </div>

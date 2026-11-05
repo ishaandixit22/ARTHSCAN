@@ -5,7 +5,7 @@
   import { afterNavigate } from "$app/navigation";
   import { page } from "$app/state";
   import NavIcon from "$lib/components/NavIcon.svelte";
-  import { isActive, TOP_LINKS, type NavGroup } from "$lib/nav";
+  import { isActive, menuActive, TOP_LINKS, type NavGroup } from "$lib/nav";
 
   let { groups }: { groups: NavGroup[] } = $props();
 
@@ -62,7 +62,17 @@
       {/each}
       <ul class="extra">
         {#each TOP_LINKS.filter((l) => !groups.some((g) => g.items.some((i) => i.href === l.href))) as l (l.href)}
-          <li><a href={l.href} class:on={isActive(l, page.url.pathname)}><NavIcon d={l.icon} size={18} /><span>{l.label}</span></a></li>
+          <li>
+            <a href={l.href} class:on={isActive(l, page.url.pathname)}><NavIcon d={l.icon} size={18} /><span>{l.label}</span></a>
+            <!-- Short menus (screener, IPOs) carry their entries here; the calculators page lists its own. -->
+            {#if l.menu && !l.menu.wide}
+              <ul class="subs">
+                {#each l.menu.groups.flatMap((g) => g.items) as t (t.href)}
+                  <li><a href={t.href} class:on={menuActive(t.href, page.url)}>{t.label}</a></li>
+                {/each}
+              </ul>
+            {/if}
+          </li>
         {/each}
       </ul>
     </div>
@@ -104,6 +114,9 @@
   a.on { font-weight: 800; }
   a.on span { text-decoration: underline 2px; text-underline-offset: 4px; }
   .extra { display: none; }
+  .subs { margin: 0 0 6px 28px; }
+  .subs a { padding: 6px 4px; font-size: 14px; font-weight: 500; }
+  .subs a.on { font-weight: 800; }
 
   @media (max-width: 860px) {
     .markets { position: static; }
