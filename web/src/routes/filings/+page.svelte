@@ -54,7 +54,7 @@
     </div>
 
     <section class="card">
-      <FilingList filings={f.filings} kinds={f.kinds} showCompany={!data.symbol} empty="No filings of this kind in this period." />
+      <FilingList filings={f.filings} kinds={f.kinds} showCompany={!data.symbol} pageSize={60} empty="No filings of this kind in this period." />
       {#if f.total > f.filings.length}<p class="more sub">Showing the latest {f.filings.length} of {f.total}. Pick a kind or a company to narrow it down.</p>{/if}
     </section>
     <p class="sub small">Source: NSE corporate announcements. PDFs open from NSE's archive. Filings are the companies' own; Arthscan only lists them.</p>

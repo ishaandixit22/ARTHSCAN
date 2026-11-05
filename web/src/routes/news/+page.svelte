@@ -51,5 +51,13 @@
   .meta { color: var(--ink-3); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   img { width: 132px; height: 88px; object-fit: cover; border-radius: 2px; flex-shrink: 0; background: var(--panel-2); }
   .source { font-size: 12.5px; }
-  @media (max-width: 640px) { img { width: 88px; height: 66px; } .summary { -webkit-line-clamp: 2; line-clamp: 2; } }
+  /* A phone reads this as a column of headlines. Publishers' images are full-size originals, over 5 MB
+     for a page of thumbnails, and a lazy image set to display: none is never fetched. */
+  @media (max-width: 640px) {
+    img { display: none; }
+    .list article { padding: 13px 0; }
+    .title { font-size: 16.5px; font-weight: 700; display: block; padding: 2px 0; }
+    .summary { -webkit-line-clamp: 2; line-clamp: 2; }
+    .list article { content-visibility: auto; contain-intrinsic-size: auto 130px; }
+  }
 </style>

@@ -28,10 +28,10 @@
   <section class="card">
     <div class="card-head"><h2>What's included</h2></div>
     <div class="table-scroll">
-      <table>
+      <table class="m-cards">
         <thead><tr><th scope="col">Feature</th><th scope="col" class="left">Price</th><th scope="col" class="left">What you need</th></tr></thead>
         <tbody>
-          {#each rows as r (r[0])}<tr><td>{r[0]}</td><td class="left">{r[1]}</td><td class="left">{r[2]}</td></tr>{/each}
+          {#each rows as r (r[0])}<tr><td>{r[0]}</td><td class="left" data-label="Price">{r[1]}</td><td class="left m-half" data-label="What you need">{r[2]}</td></tr>{/each}
         </tbody>
       </table>
     </div>

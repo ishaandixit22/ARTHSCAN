@@ -506,7 +506,7 @@
   .page { gap: 16px; }
   .crumbs { color: var(--ink-3); font-size: 13px; margin: 0; }
   .crumbs a:hover { color: var(--ink); }
-  .subnav { position: sticky; top: 57px; z-index: 10; display: flex; gap: 20px; overflow-x: auto; padding: 10px 0; background: var(--bg); border-bottom: 1px solid var(--line-2); white-space: nowrap; scrollbar-width: none; font-size: 13.5px; font-weight: 600; font-stretch: 88%; color: var(--ink-2); }
+  .subnav { position: sticky; top: calc(var(--chrome-top) + 8px); z-index: 10; display: flex; gap: 20px; overflow-x: auto; padding: 10px 0; background: var(--bg); border-bottom: 1px solid var(--line-2); white-space: nowrap; scrollbar-width: none; font-size: 13.5px; font-weight: 600; font-stretch: 88%; color: var(--ink-2); }
   .subnav::-webkit-scrollbar { display: none; }
   .subnav a:hover { color: var(--ink); text-decoration: underline; }
   section[id], div[id] { scroll-margin-top: 110px; }

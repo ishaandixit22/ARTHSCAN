@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { phoneCap } from "$lib/phoneCap";
   import { BRAND } from "$lib/brand";
   import { compact, crore, date, fetchedAt, price } from "$lib/format";
 
@@ -30,17 +31,17 @@
         <div class="card-head"><h2>{s.title}</h2><span class="sub">{s.about}</span></div>
         {#if s.rows.length}
           <div class="table-scroll">
-            <table>
+            <table class="m-cards m-capped" use:phoneCap={s.rows.length}>
               <thead><tr><th>Stock</th><th class="left">Client</th><th class="left">Side</th><th>Quantity</th><th>Price</th><th>Value</th></tr></thead>
               <tbody>
                 {#each s.rows as x, i (x.symbol + x.client + i)}
                   <tr>
                     <td><a href="/stock/{x.symbol}" class="sym">{x.symbol}</a><span class="name">{x.company}</span></td>
-                    <td class="left client">{x.client}</td>
-                    <td class="left {x.side === 'Buy' ? 'up' : 'down'}">{x.side}</td>
-                    <td>{compact(x.quantity)}</td>
-                    <td>{price(x.price)}</td>
-                    <td>{crore(value(x))}</td>
+                    <td class="left client m-full">{x.client}</td>
+                    <td class="left {x.side === 'Buy' ? 'up' : 'down'}" data-label="Side">{x.side}</td>
+                    <td data-label="Quantity">{compact(x.quantity)}</td>
+                    <td data-label="Price">{price(x.price)}</td>
+                    <td data-label="Value">{crore(value(x))}</td>
                   </tr>
                 {/each}
               </tbody>

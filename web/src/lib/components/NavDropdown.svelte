@@ -1,7 +1,7 @@
 <script lang="ts">
   // A top-bar link that opens a dropdown, set like the Markets menu: a heavy rule, ruled columns,
   // one open at a time (a click anywhere else closes it). The label is a button; the section's own
-  // front page is the first link in the panel. Phones get the same links from the Markets panel.
+  // front page is the first link in the panel. Phones get the same links from SiteDrawer.
   import { afterNavigate } from "$app/navigation";
   import { page } from "$app/state";
   import { isActive, menuActive, type NavItem } from "$lib/nav";
@@ -103,7 +103,5 @@
   li a.on .label { font-weight: 800; text-decoration: underline 2px; text-underline-offset: 4px; }
   .about { font: 13px/1.35 var(--serif); color: var(--ink-3); }
 
-  /* Phones fold these links into the Markets panel. */
-  @media (max-width: 860px) { .dd { display: none; } }
   @media (prefers-reduced-motion: reduce) { .panel { animation: none; } }
 </style>

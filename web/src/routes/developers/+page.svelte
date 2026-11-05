@@ -22,7 +22,7 @@
     <div class="card card-body"><h3>3. Ask</h3><p class="sub">“Which IT stocks are within 5% of their 52-week high?” — the assistant picks the tools.</p></div>
   </div>
 
-  <section class="card">
+  <section class="card anchor" id="connect">
     <div class="card-head"><h2>Connect your client</h2></div>
     <div class="card-body setup">
       <h3>claude.ai, ChatGPT and other remote connectors (OAuth)</h3>
@@ -45,7 +45,7 @@ curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application
     </div>
   </section>
 
-  <section class="card">
+  <section class="card anchor" id="tools">
     <div class="card-head"><h2>Tools ({data.tools.length})</h2><span class="sub">MCP tool name · REST route</span></div>
     {#each data.tools as t}
       <details class="tool">
@@ -56,18 +56,20 @@ curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application
         </summary>
         <p>{t.description}</p>
         {#if Object.keys(t.inputSchema.properties).length}
-          <table>
+          <div class="table-scroll">
+          <table class="m-cards">
             <thead><tr><th>Argument</th><th class="left">Type</th><th class="left">Description</th></tr></thead>
             <tbody>
               {#each Object.entries(t.inputSchema.properties) as [k, v]}
                 <tr>
                   <td class="mono">{k}{t.inputSchema.required?.includes(k) ? " *" : ""}</td>
-                  <td class="left mono">{(v as any).type}{(v as any).enum ? ` (${(v as any).enum.slice(0, 6).join(" | ")}${(v as any).enum.length > 6 ? " …" : ""})` : ""}</td>
-                  <td class="left desc">{(v as any).description ?? ""}</td>
+                  <td class="left mono m-full">{(v as any).type}{(v as any).enum ? ` (${(v as any).enum.slice(0, 6).join(" | ")}${(v as any).enum.length > 6 ? " …" : ""})` : ""}</td>
+                  <td class="left desc m-full">{(v as any).description ?? ""}</td>
                 </tr>
               {/each}
             </tbody>
           </table>
+          </div>
         {/if}
       </details>
     {/each}
@@ -75,11 +77,17 @@ curl -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application
 </div>
 
 <style>
-  .setup { display: grid; gap: 10px; }
+  .setup { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .anchor { scroll-margin-top: calc(var(--chrome-top) + 12px); }
   .tool { border-top: 1px solid var(--line); padding: 12px 16px; }
   .tool summary { display: flex; gap: 12px; align-items: center; cursor: pointer; flex-wrap: wrap; }
   .tool .name { font-weight: 600; }
   .route { color: var(--ink-3); font-size: 13px; }
   .tool p { margin: 10px 0; color: var(--ink-2); font-size: 14px; }
   .desc { white-space: normal; color: var(--ink-2); min-width: 260px; }
+  @media (max-width: 640px) {
+    .tool { padding: 12px 0; }
+    .tool summary { gap: 4px 10px; min-height: var(--tap); }
+    .route { overflow-wrap: anywhere; }
+  }
 </style>

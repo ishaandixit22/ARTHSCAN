@@ -19,3 +19,7 @@ arthscan-mcp/
 
 # taste-skill working files
 .taste-skill/
+
+# Playwright run output
+test-results/
+playwright-report/

@@ -6,6 +6,7 @@
   import type { Chart, KLineData } from "klinecharts";
   import { INDICATORS, registerChartTools, TOOLS, type OhlcMark } from "$lib/chart-tools";
   import { compact, date as fmtDate } from "$lib/format";
+  import { near } from "$lib/near";
   import { theme } from "$lib/theme.svelte";
 
   type Tick = { ltp: number | null; volume?: number | null };
@@ -55,6 +56,8 @@
   let chart: Chart | undefined;
   let kl: typeof import("klinecharts") | undefined;
 
+  // On phones the drawing tools fold away: most of them need a mouse's precision and they take a row of the screen.
+  let drawOpen = $state(false);
   let tf = $state<string>("D");
   let rangeKey = $state<string>("1y");
   let style = $state<string>("candle_solid");
@@ -459,7 +462,9 @@
         hover = null;
       }
     };
-    (async () => {
+    // The chart library is the heaviest file on the site (64 KB compressed) and the candles another
+    // request, and this section is well down the page, so neither starts until it's nearly in view.
+    const start = async () => {
       kl = await import("klinecharts");
       if (disposed || !host) return;
       registerChartTools(kl);
@@ -477,7 +482,8 @@
         restore(saved);
         lastState = snapshot();
       }
-    })();
+    };
+    const stopWatching = near(shell!, () => void start(), 700);
 
     const ro = new ResizeObserver(() => chart?.resize());
     ro.observe(host!);
@@ -496,6 +502,7 @@
     addEventListener("keydown", onKey);
     return () => {
       disposed = true;
+      stopWatching?.destroy();
       ro.disconnect();
       host?.removeEventListener("wheel", wheel, { capture: true } as any);
       document.removeEventListener("fullscreenchange", onFull);
@@ -544,7 +551,7 @@
   <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path {d} /></svg>
 {/snippet}
 
-<div class="pro" class:full={isFull} bind:this={shell}>
+<div class="pro" class:full={isFull} class:drawing={drawOpen} bind:this={shell}>
   <div class="bar" role="toolbar" aria-label="Chart settings">
     <div class="group" role="group" aria-label="Candle size">
       {#each TIMEFRAMES as t}
@@ -576,12 +583,13 @@
     </div>
     <button class="wide" class:on={prevLevels} aria-pressed={prevLevels} title="Draw the previous session's open, high, low and close" onclick={() => { prevLevels = !prevLevels; drawPrevLevels(); }}>Previous OHLC</button>
     <button class="wide" class:on={showEvents} aria-pressed={showEvents} title="Mark dividends, bonuses, rights and splits on daily, weekly and monthly charts" onclick={() => { showEvents = !showEvents; drawEvents(); savePrefs(); }}>Events</button>
+    <button class="wide draw-toggle" class:on={drawOpen} aria-pressed={drawOpen} onclick={() => (drawOpen = !drawOpen)}>Draw</button>
     <div class="spacer"></div>
-    <button class="ico" title="Undo drawing" aria-label="Undo drawing" disabled={!undoStack.length} onclick={undo}>{@render icon("M9 7 4 12l5 5M4 12h11a5 5 0 0 1 0 10h-2")}</button>
-    <button class="ico" title="Redo drawing" aria-label="Redo drawing" disabled={!redoStack.length} onclick={redo}>{@render icon("m15 7 5 5-5 5M20 12H9a5 5 0 0 0 0 10h2")}</button>
-    <button class="ico" title="Zoom in" aria-label="Zoom in" onclick={() => zoom(1.4)}>{@render icon("M11 5v12M5 11h12M16 16l5 5")}</button>
-    <button class="ico" title="Zoom out" aria-label="Zoom out" onclick={() => zoom(0.7)}>{@render icon("M5 11h12M16 16l5 5")}</button>
-    <button class="ico" title="Save a picture of the chart" aria-label="Save a picture of the chart" onclick={screenshot}>{@render icon("M4 8h3l2-3h6l2 3h3v11H4zM12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6")}</button>
+    <button class="ico for-drawing" title="Undo drawing" aria-label="Undo drawing" disabled={!undoStack.length} onclick={undo}>{@render icon("M9 7 4 12l5 5M4 12h11a5 5 0 0 1 0 10h-2")}</button>
+    <button class="ico for-drawing" title="Redo drawing" aria-label="Redo drawing" disabled={!redoStack.length} onclick={redo}>{@render icon("m15 7 5 5-5 5M20 12H9a5 5 0 0 0 0 10h2")}</button>
+    <button class="ico for-mouse" title="Zoom in" aria-label="Zoom in" onclick={() => zoom(1.4)}>{@render icon("M11 5v12M5 11h12M16 16l5 5")}</button>
+    <button class="ico for-mouse" title="Zoom out" aria-label="Zoom out" onclick={() => zoom(0.7)}>{@render icon("M5 11h12M16 16l5 5")}</button>
+    <button class="ico for-mouse" title="Save a picture of the chart" aria-label="Save a picture of the chart" onclick={screenshot}>{@render icon("M4 8h3l2-3h6l2 3h3v11H4zM12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6")}</button>
     <button class="ico" title={isFull ? "Leave full screen" : "Full screen"} aria-label={isFull ? "Leave full screen" : "Full screen"} onclick={toggleFull}>{@render icon(isFull ? "M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" : "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5")}</button>
   </div>
 
@@ -641,7 +649,7 @@
 </div>
 
 <style>
-  .pro { display: grid; gap: 0; background: var(--bg); }
+  .pro { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; background: var(--bg); }
   .pro.full { height: 100vh; grid-template-rows: auto minmax(0, 1fr) auto; padding: 0 12px; }
   .bar, .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 8px 0; }
   .bar { border-bottom: var(--rule); }
@@ -659,6 +667,7 @@
   button:disabled { opacity: 0.35; cursor: default; }
   button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
   .wide { padding: 0 10px; }
+  .draw-toggle { display: none; }
   .count { min-width: 18px; padding: 0 4px; border-radius: 9px; background: var(--series); color: #fff; font-size: 11px; line-height: 18px; }
   svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -694,11 +703,20 @@
   .note { margin: 0; color: var(--ink-2); font-size: 12.5px; }
 
   @media (max-width: 760px) {
-    .canvas { height: 420px; }
+    .canvas { height: min(56dvh, 400px); touch-action: pan-y; }
+    .full .canvas { height: 100%; }
     .stage { grid-template-columns: minmax(0, 1fr); }
-    .rail { flex-direction: row; order: 2; padding: 6px 0; border-right: 0; border-top: var(--rule); overflow-x: auto; }
+    .draw-toggle { display: inline-flex; }
+    .rail { display: none; flex-direction: row; order: 2; padding: 6px 0; border-right: 0; border-top: var(--rule); overflow-x: auto; }
+    .drawing .rail { display: flex; }
+    .for-mouse { display: none; }
+    .for-drawing { display: none; }
+    .drawing .for-drawing { display: inline-flex; }
+    .bar .group, .foot .group { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+    .group button { flex: none; }
     .rule { width: 1px; height: 22px; margin: 0 5px; }
     .legend { right: 60px; font-size: 12px; }
+    .meta { display: none; }
     .menu.tall { min-width: min(300px, 80vw); }
     .bar .spacer, .foot .spacer { display: none; }
     button { min-width: 38px; height: 36px; }

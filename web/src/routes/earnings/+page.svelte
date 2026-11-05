@@ -219,6 +219,10 @@
 
   .tabs.main { border-bottom: 1px solid var(--line); gap: 26px; }
   .tabs.main a { padding: 10px 0; font-size: 14px; }
+  @media (max-width: 860px) {
+    .tabs.main { gap: 0; }
+    .tabs.main a { padding: 10px 12px; }
+  }
   .controls { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chips .chip { padding: 6px 12px; font-size: 12.5px; border: 0; background: var(--panel-2); color: var(--ink-2); }

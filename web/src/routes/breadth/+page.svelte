@@ -100,6 +100,10 @@
   .controls { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 24px; border-bottom: 1px solid var(--line); }
   .controls .tabs { flex-wrap: wrap; gap: 4px 22px; }
   .controls .tabs a { padding: 9px 0; font-size: 14px; }
+  @media (max-width: 860px) {
+    .controls .tabs { flex-wrap: nowrap; gap: 0; }
+    .controls .tabs a { padding: 9px 12px; }
+  }
   .n { color: var(--ink-3); font-family: var(--font); font-size: 11.5px; margin-left: 3px; }
   .more { display: block; padding: 12px 18px; border-top: 1px solid var(--line); font-size: 13px; color: var(--brand-2); }
   .small { font-size: 12.5px; }

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { phoneCap } from "$lib/phoneCap";
   import { BRAND } from "$lib/brand";
   import LiveStamp from "$lib/components/LiveStamp.svelte";
   import { crore, date, num, pct, price, tone } from "$lib/format";
@@ -49,19 +50,19 @@
   <section class="card">
     <div class="card-head"><h2>{d.results.length} stocks</h2><span class="sub">{d.definition}</span></div>
     <div class="table-scroll">
-      <table>
+      <table class="m-cards m-quote m-capped" use:phoneCap={d.results.length}>
         <thead><tr><th>Stock</th><th>Price</th><th>Day</th><th>RSI</th><th class="wide-only">MACD hist</th><th class="wide-only">Vol x</th><th class="wide-only">Delivery</th><th class="wide-only">Turnover</th></tr></thead>
         <tbody>
           {#each d.results as r (r.symbol)}
             <tr>
               <td><a href="/stock/{r.symbol}" class="sym">{r.symbol}</a>{#if r.cross_date}<span class="chip tiny">{date(r.cross_date)}</span>{/if}<span class="name">{r.name}</span></td>
-              <td>{price(r.close)}</td>
-              <td class={tone(r.change_pct)}>{pct(r.change_pct)}</td>
-              <td>{num(r.rsi_14, 1)}</td>
-              <td class="wide-only {tone(r.macd_hist)}">{num(r.macd_hist)}</td>
-              <td class="wide-only">{num(r.vol_ratio, 1)}</td>
-              <td class="wide-only">{pct(r.deliv_pct, false)}</td>
-              <td class="wide-only">{crore(r.turnover)}</td>
+              <td data-label="Price">{price(r.close)}</td>
+              <td class={tone(r.change_pct)} data-label="Day">{pct(r.change_pct)}</td>
+              <td data-label="RSI">{num(r.rsi_14, 1)}</td>
+              <td class="wide-only {tone(r.macd_hist)}" data-label="MACD hist">{num(r.macd_hist)}</td>
+              <td class="wide-only" data-label="Vol x">{num(r.vol_ratio, 1)}</td>
+              <td class="wide-only" data-label="Delivery">{pct(r.deliv_pct, false)}</td>
+              <td class="wide-only m-hide" data-label="Turnover">{crore(r.turnover)}</td>
             </tr>
           {:else}
             <tr><td colspan="8" class="empty">No stocks show this signal today.</td></tr>
@@ -81,5 +82,9 @@
   .chips .chip.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--accent); }
   .tiny { margin-left: 6px; font-size: 11px; padding: 1px 6px; }
   .small { font-size: 12.5px; }
-  @media (max-width: 640px) { .wide-only { display: none; } }
+  @media (max-width: 640px) {
+    .wide-only { display: none; }
+    .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -16px; padding-right: 16px; }
+    .chips .chip { flex: none; padding: 11px 0; }
+  }
 </style>

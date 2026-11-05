@@ -17,6 +17,7 @@
   import Logo from "$lib/components/Logo.svelte";
   import { BRAND } from "$lib/brand";
   import { compact, crore, date, num, pct, price, tone } from "$lib/format";
+  import { near } from "$lib/near";
   import { readStock } from "$lib/stock-reading";
   import { live, tradeTime, watch } from "$lib/live.svelte";
   import { session } from "$lib/session.svelte";
@@ -53,6 +54,12 @@
   // Statements and filings load at a visitor's first sign of life, ahead of the scroll that reaches
   // them, rather than on render: crawlers walking every stock page shouldn't spend the plan or call NSE.
   let engaged = $state(false);
+  // Statements and filings are several requests between them, so they also wait until their section
+  // is coming into view. Someone reading the price and chart on a phone never pays for them.
+  let financialsNear = $state(false);
+  let filingsNear = $state(false);
+  // The company's description and the written summary fold to a few lines on a phone.
+  let aboutOpen = $state(false);
   // Sections above a jump's target can grow while it scrolls, as their data arrives. Until that
   // settles, or the reader scrolls for themselves, the page keeps aiming at the target.
   let root = $state<HTMLElement>();
@@ -213,7 +220,7 @@
       });
   }
   $effect(() => {
-    if (!engaged) return;
+    if (!engaged || !financialsNear) return;
     const sym = c.symbol;
     // One first: it stores the company's whole bundle, so the rest don't each ask the provider.
     untrack(() => loadStatement("quarter_results")).then(() => {
@@ -237,7 +244,7 @@
     allFilings = allActions = false;
   });
   $effect(() => {
-    if (!engaged || filingsData !== undefined) return;
+    if (!engaged || !filingsNear || filingsData !== undefined) return;
     const sym = c.symbol;
     // Filings come from NSE's site, which has nothing for a stock listed only on BSE.
     if (bseOnly) {
@@ -317,7 +324,15 @@
     </div>
   </header>
 
-  <section class="about" aria-label="About the company">
+  <!-- Phones: the figures people come for, straight under the price. -->
+  <dl class="keyline">
+    {#if m.ret_1y != null}<div><dt>1 year</dt><dd class={tone(m.ret_1y)}>{pct(m.ret_1y)}</dd></div>{/if}
+    {#if m.high_52w != null}<div><dt>52W high</dt><dd>{price(m.high_52w)}</dd></div>{/if}
+    {#if m.low_52w != null}<div><dt>52W low</dt><dd>{price(m.low_52w)}</dd></div>{/if}
+    {#if m.pe != null}<div><dt>P/E</dt><dd>{num(m.pe, 1)}</dd></div>{/if}
+  </dl>
+
+  <section class="about" class:open={aboutOpen} aria-label="About the company">
     <div class="biz">
       <h2>About {c.name}</h2>
       {#if digest?.about}
@@ -342,6 +357,7 @@
         {/if}
       </div>
     {/if}
+    <button type="button" class="read-more" aria-expanded={aboutOpen} onclick={() => (aboutOpen = !aboutOpen)}>{aboutOpen ? "Show less" : "Read more"}</button>
   </section>
 
   <StockReading {reading} />
@@ -405,7 +421,7 @@
     </div>
   {/if}
 
-  <div id="financials" class="block">
+  <div id="financials" class="block" use:near={() => (financialsNear = true)}>
     <h2>Financials</h2>
     <section class="card">
       <div class="card-head">
@@ -457,7 +473,7 @@
     </section>
   </div>
 
-  <div id="filings" class="block">
+  <div id="filings" class="block" use:near={() => (filingsNear = true)}>
     <h2>Filings</h2>
     {#if !bseOnly && (filingsData === "loading" || filingsData === undefined)}
       <!-- Holds roughly the lists' height, so the page doesn't jump when they arrive. -->
@@ -548,7 +564,7 @@
 
 <style>
   /* One section of the page. The scroll margin clears the two sticky rails above it. */
-  .block { display: grid; grid-template-columns: minmax(0, 1fr); gap: 34px; scroll-margin-top: 108px; }
+  .block { display: grid; grid-template-columns: minmax(0, 1fr); gap: 34px; scroll-margin-top: calc(var(--chrome-top) + 59px); }
   .block > h2 { margin-bottom: -22px; padding-top: 14px; border-top: var(--rule-heavy); font-size: 30px; font-weight: 850; font-stretch: 66%; line-height: 1; }
   .filings-loading { min-height: 480px; }
   .more { margin-top: 12px; }
@@ -577,16 +593,39 @@
   .signals { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
 
   /* Section rail under the stock's name: printed section heads, the one being read underlined in ink. */
-  .sections { position: sticky; top: 49px; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--ink); }
+  .sections { position: sticky; top: var(--chrome-top); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--ink); }
   .sections .tabs { gap: 28px; border: 0; overflow: visible; }
   .sections .tabs a { position: relative; padding: 12px 0; border: 0; background: none; color: var(--ink-2); font-size: 13.5px; }
   .sections .tabs a:hover { background: none; color: var(--ink); }
   .sections .tabs [aria-current="true"], .sections .tabs [aria-current="true"]:hover { background: none; color: var(--ink); }
   .sections .tabs [aria-current="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 4px; background: var(--ink); }
-  @media (max-width: 640px) {
+  /* Between tablet and wide desktop the section names outgrow the page; let them scroll, not clip. */
+  @media (max-width: 1180px) {
     .sections { overflow-x: auto; scrollbar-width: none; }
-    .sections .tabs { gap: 22px; }
-    .sections a { white-space: nowrap; }
+    .sections .tabs { width: max-content; max-width: none; }
+    .sections .tabs a { white-space: nowrap; }
+  }
+  .keyline, .read-more { display: none; }
+  @media (max-width: 860px) {
+    .sections { overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+    .sections .tabs { gap: 20px; overflow: visible; max-width: none; }
+    .sections .tabs a { padding: 13px 0; white-space: nowrap; }
+    .block { gap: 22px; scroll-margin-top: calc(var(--chrome-top) + 52px); }
+    .block > h2 { margin-bottom: -10px; font-size: 26px; }
+    /* A long page: sections off screen skip layout and paint until they come near. */
+    #forecast, #technicals, #price-volume, #seasonality, #news, #shareholding, #peers { content-visibility: auto; contain-intrinsic-size: auto 520px; }
+    /* Phone order: who and how much, the keyline, the section rail, then the reading. */
+    .head { order: -5; }
+    .keyline { order: -4; display: grid; grid-template-columns: repeat(auto-fit, minmax(68px, 1fr)); margin: -10px 0 0; border-top: 1px solid var(--ink); border-bottom: var(--rule); }
+    .keyline div { padding: 8px 8px 8px 0; min-width: 0; }
+    .keyline dt { font-size: var(--text-micro); font-weight: 700; font-stretch: 82%; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-3); }
+    .keyline dd { margin: 2px 0 0; font-size: 14.5px; font-weight: 750; font-stretch: 82%; white-space: nowrap; }
+    .sections { order: -3; margin-top: -14px; }
+    .about { padding-top: 0; border-top: 0; gap: 14px; }
+    .about:not(.open) .story, .about:not(.open) .moving > p:first-of-type { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+    .about:not(.open) .people, .about:not(.open) .latest { display: none; }
+    .read-more { display: block; justify-self: start; min-height: var(--tap); margin-top: -10px; padding: 0; border: 0; background: none; color: var(--ink); font: 750 13px var(--font); font-stretch: 85%; text-transform: uppercase; letter-spacing: 0.05em; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+    .story { font-size: var(--text-read); }
   }
 
   .note { margin-top: 8px; font-size: 12.5px; }
@@ -596,9 +635,15 @@
   .next { line-height: 1.6; }
   .next .sub { display: block; font-size: 12.5px; }
   @media (max-width: 760px) {
-    .head { grid-template-columns: 1fr; }
+    .head { grid-template-columns: 1fr; gap: 10px; }
     .quote { text-align: left; }
-    .chg { justify-content: flex-start; }
+    .chg { justify-content: flex-start; flex-wrap: wrap; }
     .about { grid-template-columns: minmax(0, 1fr); }
+    .who { gap: 12px; align-items: flex-start; }
+    .who :global(.logo) { --s: 40px !important; }
+    .ids { gap: 4px 10px; }
+    .ids .mono + .mono { display: none; } /* the ISIN stays on the wide layout and in the overview */
+    .head h1 { font-size: clamp(28px, 8.5vw, 36px); }
+    .px { font-size: 44px; }
   }
 </style>

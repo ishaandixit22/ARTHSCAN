@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { BRAND } from "$lib/brand";
+  import Sheet from "$lib/components/Sheet.svelte";
   import { crore, num, pct, price, tone } from "$lib/format";
 
   let { data } = $props();
@@ -51,6 +52,15 @@
     goto(href(current()), { keepFocus: true, noScroll: true });
   }
 
+  // On phones the filters live in a sheet, behind a button that says how many are set.
+  let sheet = $state(false);
+  const activeFilters = $derived(data.query.filters.length + (data.query.sector ? 1 : 0) + (data.query.above200 ? 1 : 0));
+  function reset() {
+    rows = [{ field: "ret_1y", op: "gt", value: "" }];
+    sector = "";
+    above200 = false;
+  }
+
   function sortBy(field: string) {
     order = sort === field && order === "desc" ? "asc" : "desc";
     sort = field;
@@ -84,30 +94,57 @@
     {#each PRESETS as p}<a class="chip" href={href(p)}>{p.label}</a>{/each}
   </div>
 
-  <form class="card card-body filters" onsubmit={run}>
-    {#each rows as row, i}
+  {#snippet filterForm(close?: () => void)}
+    <form class="filters" class:in-sheet={!!close} onsubmit={(e) => { run(e); close?.(); }}>
+      {#each rows as row, i}
+        <div class="frow rule">
+          <select bind:value={row.field} aria-label="Field">
+            {#each usable as f}<option value={f.key}>{f.label} ({f.unit === "INR" ? "₹" : f.unit})</option>{/each}
+          </select>
+          <select bind:value={row.op} aria-label="Operator" class="op">
+            {#each OPS as [v, l]}<option value={v}>{l}</option>{/each}
+          </select>
+          <input type="number" step="any" inputmode="decimal" bind:value={row.value} placeholder="value" aria-label="Value" />
+          <button type="button" class="btn small remove" aria-label="Remove filter" onclick={() => (rows = rows.filter((_, j) => j !== i))}>✕</button>
+        </div>
+      {/each}
       <div class="frow">
-        <select bind:value={row.field} aria-label="Field">
-          {#each usable as f}<option value={f.key}>{f.label} ({f.unit === "INR" ? "₹" : f.unit})</option>{/each}
+        <button type="button" class="btn small" onclick={() => (rows = [...rows, { field: "close", op: "lt", value: "" }])}>+ Add filter</button>
+        <select bind:value={sector} aria-label="Sector">
+          <option value="">All sectors</option>
+          {#each data.sectors as s}<option value={s}>{s}</option>{/each}
         </select>
-        <select bind:value={row.op} aria-label="Operator" class="op">
-          {#each OPS as [v, l]}<option value={v}>{l}</option>{/each}
-        </select>
-        <input type="number" step="any" bind:value={row.value} placeholder="value" aria-label="Value" />
-        <button type="button" class="btn small" aria-label="Remove filter" onclick={() => (rows = rows.filter((_, j) => j !== i))}>✕</button>
+        <label class="check"><input type="checkbox" bind:checked={above200} /> Above 200-day average</label>
+        {#if !close}<button class="btn primary" type="submit">Run screen</button>{/if}
       </div>
-    {/each}
-    <div class="frow">
-      <button type="button" class="btn small" onclick={() => (rows = [...rows, { field: "close", op: "lt", value: "" }])}>+ Add filter</button>
-      <select bind:value={sector} aria-label="Sector">
-        <option value="">All sectors</option>
-        {#each data.sectors as s}<option value={s}>{s}</option>{/each}
-      </select>
-      <label class="check"><input type="checkbox" bind:checked={above200} /> Above 200-day average</label>
-      <button class="btn primary" type="submit">Run screen</button>
-    </div>
-    <p class="sub hint">Turnover is in ₹ (₹1 Cr = 1,00,00,000), volume in shares, returns and distances in %.</p>
-  </form>
+      <p class="sub hint">Turnover is in ₹ (₹1 Cr = 1,00,00,000), volume in shares, returns and distances in %.</p>
+      {#if close}
+        <div class="sheet-actions">
+          <button type="button" class="btn" onclick={reset}>Reset</button>
+          <button class="btn primary" type="submit">Apply</button>
+        </div>
+      {/if}
+    </form>
+  {/snippet}
+
+  <div class="card card-body desk-filters">{@render filterForm()}</div>
+
+  <div class="phone-filters">
+    <button type="button" class="btn" aria-haspopup="dialog" onclick={() => (sheet = true)}>Filters{#if activeFilters}<span class="count">{activeFilters}</span>{/if}</button>
+    <select aria-label="Sort by" value={data.query.sort} onchange={(e) => sortBy(e.currentTarget.value)}>
+      {#each COLS as [k, l]}<option value={k}>Sort: {l}</option>{/each}
+    </select>
+    <button type="button" class="btn dir" aria-label={data.query.order === "asc" ? "Sorted lowest first; switch to highest first" : "Sorted highest first; switch to lowest first"} onclick={() => sortBy(data.query.sort)}>{data.query.order === "asc" ? "↑" : "↓"}</button>
+  </div>
+
+  {#if sheet}
+    <Sheet label="Screen filters" side="bottom" onclose={() => (sheet = false)}>
+      {#snippet children(close)}
+        <header class="sheet-head"><h2>Filters</h2><button type="button" class="btn small" onclick={close}>Close</button></header>
+        <div class="sheet-body">{@render filterForm(close)}</div>
+      {/snippet}
+    </Sheet>
+  {/if}
 
   <section class="card">
     <div class="card-head">
@@ -116,7 +153,7 @@
     </div>
     {#if data.result.error}<div class="notice">{data.result.error}</div>{/if}
     <div class="table-scroll">
-      <table>
+      <table class="m-cards m-quote">
         <thead>
           <tr>
             <th>Stock</th>
@@ -133,14 +170,14 @@
                 {#if r.listed_today}<span class="chip new" title="First trading day: change is measured against the issue price">New</span>{/if}
                 <span class="name">{r.name}</span>
               </td>
-              <td>{price(r.close)}</td>
-              <td class={r.listed_today ? "muted" : tone(r.change_pct)}>{pct(r.change_pct)}{r.listed_today ? "*" : ""}</td>
-              <td class={tone(r.ret_1m)}>{pct(r.ret_1m)}</td>
-              <td class={tone(r.ret_1y)}>{pct(r.ret_1y)}</td>
-              <td class="wide-only {tone(r.pct_from_high)}">{pct(r.pct_from_high)}</td>
-              <td class="wide-only">{pct(r.volatility_1y, false)}</td>
-              {#if showPe}<td>{num(r.pe, 1)}</td>{/if}
-              <td class="wide-only">{crore(r.turnover)}</td>
+              <td data-label="Price">{price(r.close)}</td>
+              <td class={r.listed_today ? "muted" : tone(r.change_pct)} data-label="Day">{pct(r.change_pct)}{r.listed_today ? "*" : ""}</td>
+              <td class={tone(r.ret_1m)} data-label="1M">{pct(r.ret_1m)}</td>
+              <td class={tone(r.ret_1y)} data-label="1Y">{pct(r.ret_1y)}</td>
+              <td class="wide-only {tone(r.pct_from_high)}" data-label="From high">{pct(r.pct_from_high)}</td>
+              <td class="wide-only" data-label="Vol.">{pct(r.volatility_1y, false)}</td>
+              {#if showPe}<td data-label="P/E">{num(r.pe, 1)}</td>{/if}
+              <td class="wide-only" data-label="Turnover">{crore(r.turnover)}</td>
             </tr>
           {:else}
             <tr><td colspan={COLS.length + 1} class="empty">No stocks match these filters.</td></tr>
@@ -161,6 +198,29 @@
 
 <style>
   .presets { display: flex; gap: 8px; flex-wrap: wrap; }
+  .phone-filters { display: none; }
+  .sheet-head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--line-2); }
+  .sheet-head h2 { font-size: 17px; font-weight: 850; font-stretch: 72%; text-transform: uppercase; letter-spacing: 0.05em; }
+  .sheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 0; }
+  .sheet-actions { position: sticky; bottom: 0; display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin: 4px -16px 0; padding: 10px 16px; background: var(--bg); border-top: 1px solid var(--ink); }
+  .in-sheet .frow { display: grid; grid-template-columns: 76px minmax(0, 1fr) var(--tap); gap: 8px; padding-bottom: 10px; }
+  .in-sheet .frow:not(.rule) { grid-template-columns: minmax(0, 1fr); }
+  .in-sheet .frow.rule select:first-child { grid-column: 1 / -1; min-width: 0; width: 100%; }
+  .in-sheet .op, .in-sheet .frow input[type="number"] { width: 100%; }
+  .in-sheet .remove { min-height: var(--tap); padding: 0; }
+  .in-sheet .frow select { width: 100%; }
+  .in-sheet .check { min-height: var(--tap); }
+  @media (max-width: 860px) {
+    .desk-filters { display: none; }
+    .phone-filters { position: sticky; top: var(--chrome-top); z-index: 5; display: grid; grid-template-columns: auto minmax(0, 1fr) var(--tap); gap: 8px; padding: 8px 0; background: var(--bg); border-top: var(--rule-heavy); border-bottom: 1px solid var(--line-2); }
+    .phone-filters select { width: 100%; min-width: 0; }
+    .dir { padding: 0; }
+    .count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 4px; background: var(--ink); color: var(--on-ink); font-size: 12px; }
+    .btn:hover .count { background: var(--on-ink); color: var(--ink); }
+    .presets { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -16px; padding-right: 16px; }
+    .presets .chip { flex: none; padding: 10px 12px; }
+    .pager .btn { min-height: var(--tap); }
+  }
   .new { margin-left: 6px; font-size: 11px; padding: 1px 6px; background: var(--brand-soft); color: var(--brand); }
   .muted { color: var(--ink-3); }
   @media (max-width: 640px) { .wide-only { display: none; } }

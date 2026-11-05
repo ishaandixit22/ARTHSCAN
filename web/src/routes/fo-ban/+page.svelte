@@ -67,7 +67,7 @@
     {#if near.length}
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Stock</th><th class="left barcol">Share of limit</th><th>Open interest (shares)</th><th class="wide-only">Limit (MWPL, shares)</th><th class="wide-only">Room for the next day</th></tr></thead>
+          <thead><tr><th>Stock</th><th class="left barcol">Share of limit</th><th class="wide-only">Open interest (shares)</th><th class="wide-only">Limit (MWPL, shares)</th><th class="wide-only">Room for the next day</th></tr></thead>
           <tbody>
             {#each near as n (n.symbol)}
               <tr>
@@ -79,7 +79,7 @@
                   </div>
                   <b class="mono">{num(n.pct_mwpl, 1)}%</b>
                 </div></td>
-                <td>{compact(n.fut_eq_oi)}</td>
+                <td class="wide-only">{compact(n.fut_eq_oi)}</td>
                 <td class="wide-only">{compact(n.mwpl)}</td>
                 <td class="wide-only">{n.next_day_limit && /^\d+$/.test(n.next_day_limit) ? `${compact(Number(n.next_day_limit))} shares` : (n.next_day_limit ?? "—")}</td>
               </tr>
@@ -96,13 +96,13 @@
     <div class="card-head"><h2>Recent days</h2></div>
     <div class="table-scroll">
       <table>
-        <thead><tr><th>Trade date</th><th class="left">In ban</th><th>Stocks</th></tr></thead>
+        <thead><tr><th>Trade date</th><th class="left">In ban</th><th class="wide-only">Stocks</th></tr></thead>
         <tbody>
           {#each b.history as h (h.date)}
             <tr>
               <td>{date(h.date)}</td>
               <td class="left">{#if h.symbols.length}{#each h.symbols as s, i}<a href="/stock/{s}">{s}</a>{i < h.symbols.length - 1 ? ", " : ""}{/each}{:else}<span class="sub">None</span>{/if}</td>
-              <td>{h.symbols.length}</td>
+              <td class="wide-only">{h.symbols.length}</td>
             </tr>
           {/each}
         </tbody>

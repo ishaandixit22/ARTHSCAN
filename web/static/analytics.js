@@ -22,10 +22,21 @@
   if (internal) return;
 
   window.clarity = window.clarity || function () { (window.clarity.q = window.clarity.q || []).push(arguments); };
-  var clarity = document.createElement("script");
-  clarity.async = true;
-  clarity.src = "https://www.clarity.ms/tag/z877n6k3tp";
-  document.head.appendChild(clarity);
+  // Clarity records the page, which is real work on a phone's main thread, so it waits until the
+  // page has finished loading and the browser is idle. Calls made before then are queued above.
+  function startClarity() {
+    var clarity = document.createElement("script");
+    clarity.async = true;
+    clarity.src = "https://www.clarity.ms/tag/z877n6k3tp";
+    document.head.appendChild(clarity);
+  }
+  function whenIdle() {
+    if (window.requestIdleCallback) requestIdleCallback(startClarity, { timeout: 4000 });
+    else setTimeout(startClarity, 1000);
+  }
+  function afterLoad() { setTimeout(whenIdle, 2500); }
+  if (document.readyState === "complete") afterLoad();
+  else addEventListener("load", afterLoad, { once: true });
 
   var beacon = document.createElement("script");
   beacon.defer = true;

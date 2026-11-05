@@ -60,5 +60,6 @@
     .lead { grid-template-columns: minmax(0, 1fr); gap: 12px; }
     .more { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
-  @media (max-width: 480px) { .more { grid-template-columns: minmax(0, 1fr); } }
+  /* Publishers' pictures are full-size originals. Beyond the lead story, phones go without. */
+  @media (max-width: 640px) { .more { grid-template-columns: minmax(0, 1fr); gap: 14px; } .more img { display: none; } .lead h3 { font-size: 24px; } }
 </style>

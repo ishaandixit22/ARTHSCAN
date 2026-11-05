@@ -1,10 +1,10 @@
-/* Self-hosted fonts (SIL Open Font License, see /fonts/LICENSES.txt): Latin and Latin Extended, which holds the rupee sign, plus Devanagari for the masthead. */
-@font-face { font-family: "Archivo"; font-style: normal; font-weight: 400 900; font-stretch: 62% 125%; font-display: swap; src: url("/fonts/archivo-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
-@font-face { font-family: "Archivo"; font-style: normal; font-weight: 400 900; font-stretch: 62% 125%; font-display: swap; src: url("/fonts/archivo-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: "Source Serif 4"; font-style: italic; font-weight: 400; font-display: swap; src: url("/fonts/source-serif-italic-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
-@font-face { font-family: "Source Serif 4"; font-style: italic; font-weight: 400; font-display: swap; src: url("/fonts/source-serif-italic-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 400 700; font-display: swap; src: url("/fonts/source-serif-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
-@font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 400 700; font-display: swap; src: url("/fonts/source-serif-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+/* Self-hosted fonts (SIL Open Font License, see /fonts/LICENSES.txt): Latin (with the rupee sign added, so that one character no longer pulls in a second file), Latin Extended, and Devanagari for the masthead. */
+@font-face { font-family: "Archivo"; font-style: normal; font-weight: 400 900; font-stretch: 62% 100%; font-display: swap; src: url("/fonts/archivo-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20B8, U+20BA-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Archivo"; font-style: normal; font-weight: 400 900; font-stretch: 62% 100%; font-display: swap; src: url("/fonts/archivo-latin-2.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+20B9, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Source Serif 4"; font-style: italic; font-weight: 400; font-display: swap; src: url("/fonts/source-serif-italic-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20B8, U+20BA-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Source Serif 4"; font-style: italic; font-weight: 400; font-display: swap; src: url("/fonts/source-serif-italic-latin-2.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+20B9, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 400 700; font-display: swap; src: url("/fonts/source-serif-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20B8, U+20BA-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 400 700; font-display: swap; src: url("/fonts/source-serif-latin-2.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+20B9, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 @font-face { font-family: "Tiro Devanagari Hindi"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/tiro-devanagari.woff2") format("woff2"); unicode-range: U+0900-097F, U+1CD0-1CF4, U+1CF7-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B0A; }
 
 /* Arthscan design system — the market edition.
@@ -31,6 +31,28 @@
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --rule-heavy: 3px solid var(--ink);   /* opens a section, like a page's top rule */
   --rule: 1px solid var(--line-2);      /* between columns and rows */
+
+  /* Responsive scale. Compact is the phone and small-tablet layout, at or below 860px. */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --text-micro: 11px;    /* labels over figures */
+  --text-small: 12.5px;  /* captions, datelines */
+  --text-body: 15px;     /* interface text */
+  --text-read: 16px;     /* serif reading copy on a phone */
+  --tap: 44px;           /* the smallest control a thumb should have to hit */
+  --row: 48px;           /* a row in a menu or list */
+  /* What the sticky bars cover. Sticky rails and anchor jumps read these rather than hard-coded heights. */
+  --chrome-top: 49px;
+  --chrome-bottom: 0px;
+}
+@media (max-width: 860px) {
+  :root {
+    --chrome-top: calc(52px + env(safe-area-inset-top));
+    --chrome-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+}
+/* A phone on its side has no height to spare: the bottom bar steps aside, and the header's menu still reaches everything. */
+@media (max-width: 860px) and (max-height: 480px) {
+  :root { --chrome-bottom: 0px; }
 }
 
 /* Day edition: white paper. */
@@ -111,7 +133,9 @@ body {
   font-variant-numeric: tabular-nums;
   caret-color: var(--ink);
   overflow-x: clip;
+  padding-bottom: var(--chrome-bottom);
 }
+html.sheet-open { overflow: hidden; }
 ::selection { background: var(--ink); color: var(--on-ink); }
 a { color: inherit; text-decoration: none; transition: color 0.15s var(--ease); }
 a:hover { color: var(--brand-2); }
@@ -129,7 +153,7 @@ code { font-family: var(--mono); font-size: 0.9em; }
 .lede, .summary, .means, .prose, .page-head p { font-family: var(--serif); font-stretch: normal; }
 
 .wrap { max-width: var(--measure); margin: 0 auto; padding: 0 32px; }
-@media (max-width: 640px) { .wrap { padding: 0 16px; } }
+@media (max-width: 640px) { .wrap { padding: 0 max(16px, env(safe-area-inset-left)) 0 max(16px, env(safe-area-inset-right)); } }
 .page { padding: 34px 0 80px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 34px; animation: set 0.45s var(--ease) both; }
 @keyframes set { from { opacity: 0; } }
 .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; padding-bottom: 18px; border-bottom: var(--rule-heavy); }
@@ -255,6 +279,73 @@ pre {
 .reveal.in { clip-path: inset(0 0 -20% 0); opacity: 1; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Compact layout: thumb-sized controls, no zoom on focus, nothing that slides in as you scroll. */
+@media (max-width: 860px) {
+  /* iOS zooms the page when a focused field's text is under 16px. */
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea { height: var(--tap); font-size: 16px; }
+  .btn { min-height: var(--tap); }
+  .btn.small { min-height: 38px; height: auto; }
+  .reveal { clip-path: none; opacity: 1; transition: none; }
+  .page { padding: 20px 0 40px; gap: 26px; animation: none; }
+  .tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .tabs a, .tabs button { flex-shrink: 0; padding: 9px 12px; }
+  html { scroll-padding-top: calc(var(--chrome-top) + 8px); }
+  /* A chart measures the page only after it starts; until then it mustn't be wider than the page. */
+  main svg { max-width: 100%; }
+  /* Bars above the fold are drawn at once; long code and wide tables scroll inside themselves. */
+  pre { max-width: 100%; -webkit-overflow-scrolling: touch; }
+  /* A long listing's rows off screen skip layout and paint until they come near. */
+  .m-defer { content-visibility: auto; contain-intrinsic-size: auto 400px; }
+}
+@media (max-width: 640px) {
+  h1 { font-size: clamp(32px, 9.5vw, 40px); }
+  .page-head { padding-bottom: 12px; }
+  .card-head { padding: 10px 0 8px; }
+  /* A table that stays a table (statements, histories) keeps its first column in view as it scrolls. */
+  .table-scroll { -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+  .table-scroll td:first-child, .table-scroll th:first-child { position: sticky; left: 0; z-index: 1; background: var(--bg); }
+  /* A long name wraps rather than filling the screen and pushing every figure out of it. */
+  .table-scroll table:not(.m-cards) td:first-child:has(a) { max-width: 46vw; white-space: normal; }
+
+  /* A listing set as cards: each row a block, every figure under its own small label (data-label).
+     .m-quote puts name, price and day on one line, for lists of stocks. */
+  table.m-cards, table.m-cards tbody { display: block; width: 100%; }
+  table.m-cards thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  table.m-cards tr { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px 0; padding: 11px 0; border-bottom: 1px solid var(--line); }
+  table.m-cards tbody tr:last-child { border-bottom: 0; }
+  /* Rows off screen skip layout and paint until they come near. */
+  table.m-cards tbody tr { content-visibility: auto; contain-intrinsic-size: auto 104px; }
+  table.m-capped:not(.m-all) tbody tr:nth-child(n+41) { display: none; }
+  .btn.m-more { display: flex; width: 100%; margin-top: 12px; }
+  .btn.m-more[hidden] { display: none; }
+:root table.m-cards td, :root table.m-cards td.left, :root table.m-cards td.wide-only {
+    display: block; grid-column: span 4; height: auto; min-width: 0; padding: 0; border: 0; text-align: left; white-space: normal; overflow-wrap: anywhere; position: static;
+  }
+  table.m-cards td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 1px; font-size: var(--text-micro); font-weight: 650; font-stretch: 82%; letter-spacing: 0.03em; color: var(--ink-3); }
+  :root table.m-cards td:first-child, :root table.m-cards td.m-full, :root table.m-cards td.empty { grid-column: 1 / -1; }
+  :root table.m-cards td.empty { text-align: center; }
+  /* .m-first lifts a cell (the company) above one that comes before it in the desktop table. */
+  :root table.m-cards td.m-first { order: -1; grid-column: 1 / -1; }
+  :root table.m-cards td.m-half { grid-column: span 6; }
+  :root table.m-cards td.m-hide { display: none; }
+  table.m-cards .name { max-width: none; white-space: nowrap; }
+  table.m-cards .sym { display: inline-block; padding: 2px 0; }
+:root table.m-quote td { grid-column: span 3; }
+  :root table.m-quote td:first-child { grid-column: span 6; }
+  /* The two figures on the name's line: the 2nd and 3rd cells, or whichever cells say .m-p. */
+  :root table.m-quote:not(.m-explicit) td:nth-child(2), :root table.m-quote:not(.m-explicit) td:nth-child(3), :root table.m-quote td.m-p { text-align: right; font-weight: 700; font-size: 14.5px; }
+  table.m-quote:not(.m-explicit) td:nth-child(2)::before, table.m-quote:not(.m-explicit) td:nth-child(3)::before, table.m-quote td.m-p::before { display: none !important; }
+  :root table.m-quote.m-explicit td { order: 2; }
+  :root table.m-quote.m-explicit td:first-child { order: 0; }
+  :root table.m-quote.m-explicit td.m-p { order: 1; }
+  /* A stock row is one big tap target for that stock. */
+  table.m-explicit tbody tr { position: relative; }
+  table.m-explicit td:first-child a::after { content: ""; position: absolute; inset: 0; }
+}
+
+/* Only phones ever show this button; phoneCap adds it next to the table. */
+@media (min-width: 641px) { .btn.m-more { display: none; } }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

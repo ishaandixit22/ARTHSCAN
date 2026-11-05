@@ -15,7 +15,22 @@ export type NavMenu = {
 export type NavItem = { href: string; label: string; about: string; icon: string; match?: string[]; menu?: NavMenu };
 
 // 24×24 outline icons (1.6px stroke), one per destination, drawn for what each tool shows.
-const ICON = {
+export const ICON = {
+  home: "M4 11.5 12 4l8 7.5M6 10v10h4.5v-6h3v6H18V10",
+  menu: "M4 7h16M4 12h16M4 17h16",
+  search: "M10.5 4a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM15.3 15.3 20 20",
+  close: "M6 6l12 12M18 6 6 18",
+  chevron: "m6 9 6 6 6-6",
+  account: "M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4.5 20.5c1-4 4-5.5 7.5-5.5s6.5 1.5 7.5 5.5",
+  breadth: "M4 18 9 9l4 5 7-10M4 21h16",
+  about: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v5.5M12 7.8h.01",
+  pricing: "M7 4h10M7 8.5h10M9 4c4.5 0 6 2 6 4.5S13.5 13 9 13h-2l8 7.5",
+  contact: "M3.5 6h17v12h-17zM3.5 6.5 12 13l8.5-6.5",
+  legal: "M6 3.5h12v17H6zM9 8h6M9 12h6M9 16h3",
+  map: "M4 6.5 9.5 4l5 2.5L20 4v13.5L14.5 20l-5-2.5L4 20zM9.5 4v13.5M14.5 6.5V20",
+  token: "M8 11a4 4 0 1 1 3.4-1.9L20 17.5V20h-3v-2h-2v-2h-2l-1.6-1.6",
+  mcp: "M9 3v5M15 3v5M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0zM12 17v4",
+  docs: "M5 4.5h6a2 2 0 0 1 2 2V20a2 2 0 0 0-2-2H5zM19 4.5h-4a2 2 0 0 0-2 2V20a2 2 0 0 1 2-2h4z",
   overview: "M4 20h16M7 16v-4M12 16V7M17 16v-6",                                   // bars over a baseline
   live: "M12 10.2a1.8 1.8 0 1 1 0 3.6 1.8 1.8 0 0 1 0-3.6zM8 8a5.7 5.7 0 0 0 0 8M16 8a5.7 5.7 0 0 1 0 8M5.2 5.2a9.6 9.6 0 0 0 0 13.6M18.8 5.2a9.6 9.6 0 0 1 0 13.6", // broadcast
   heatmap: "M3.5 3.5h9v9h-9zM14.5 3.5h6v5h-6zM14.5 10.5h6v10h-6zM3.5 14.5h9v6h-9z", // tiles of different sizes
@@ -132,6 +147,146 @@ export const TOP_LINKS: NavItem[] = [
   { href: "/calculators", label: "Calculators", about: "SIP, EMI, tax, FD, PPF and more", icon: ICON.calculators, menu: CALCULATOR_MENU },
   { href: "/developers", label: "API", about: "REST and MCP for your AI assistant", icon: ICON.api },
 ];
+
+// ── The phone menu ──────────────────────────────────────────────────────────────────────────
+// Built from the lists above, so a page added to the desktop menus can't go missing here.
+// test/mobile/nav.spec.ts checks every desktop and footer destination appears.
+
+/** A row in the phone menu: a link, or (`search`) a button opening stock search. `sub` folds out beneath it. */
+export type DrawerLink = {
+  label: string;
+  href?: string;
+  about?: string;
+  icon?: string;
+  keywords?: string;
+  search?: boolean;
+  sub?: { title?: string; items: DrawerLink[] }[];
+};
+export type DrawerGroup = { title: string; links: DrawerLink[] };
+
+const fromMenu = (m: NavMenu): { title: string; items: DrawerLink[] }[] => m.groups.map((g) => ({ title: g.title, items: g.items }));
+
+/** Every destination on the site, in the groups the phone menu shows. */
+export function drawerGroups(live: boolean, signedIn = false): DrawerGroup[] {
+  const tools = navGroups(live).flatMap((g) => g.items);
+  const tool = (href: string, keywords?: string): DrawerLink => {
+    const t = tools.find((i) => i.href === href)!;
+    return { href: t.href, label: t.label, about: t.about, icon: t.icon, keywords };
+  };
+  const top = (href: string) => TOP_LINKS.find((l) => l.href === href)!;
+  return [
+    {
+      title: "Markets",
+      links: [
+        tool("/", "home market overview dashboard"),
+        ...(live ? [tool("/live", "real time quotes")] : []),
+        tool("/stocks", "list a to z directory companies"),
+        tool("/heatmap", "treemap map"),
+        tool("/sectors", "industry rotation performance"),
+        tool("/signals", "technical breakout rsi macd"),
+        { href: "/breadth", label: "Market breadth", about: "How many stocks rose and fell; 52-week highs and lows", icon: ICON.breadth, keywords: "advances declines" },
+        tool("/valuations", "pe pb yield nifty"),
+        tool("/deliveries", "delivery percentage"),
+        tool("/fo-ban", "futures options ban list"),
+        tool("/fii-dii", "institutional flows foreign domestic money"),
+        tool("/deals", "bulk block large trades"),
+        tool("/commodities", "mcx gold silver crude"),
+      ],
+    },
+    {
+      title: "Discover",
+      links: [
+        { href: "/screener", label: "Stock screener", about: top("/screener").about, icon: ICON.screener, keywords: "fundamental prebuilt screens all" },
+        { href: "/screener?tab=technical", label: "Technical screens", about: SCREENER_MENU.groups[0].items[1].about, icon: ICON.signals, keywords: "prebuilt chart rsi" },
+        { href: "/screener/custom", label: "Build your own screen", about: SCREENER_MENU.groups[1].items[0].about, icon: ICON.screener, keywords: "custom filters" },
+      ],
+    },
+    {
+      title: "Research",
+      links: [
+        { search: true, label: "Look up a stock", about: "Price, chart, financials, filings and peers for any company", icon: ICON.search, keywords: "individual company research stock page" },
+        tool("/earnings", "results quarterly transcripts concall"),
+        tool("/filings", "announcements pdf nse"),
+        tool("/corporate-actions", "dividend bonus split rights buyback"),
+        tool("/board-meetings"),
+        tool("/events", "calendar rbi fed holidays expiry"),
+      ],
+    },
+    {
+      title: "Investments",
+      links: [
+        { href: "/ipos", label: "IPOs", about: top("/ipos").about, icon: ICON.ipos, keywords: "gmp subscription listing", sub: fromMenu(IPO_MENU) },
+        { href: "/mutual-funds", label: top("/mutual-funds").label, about: top("/mutual-funds").about, icon: ICON.funds, keywords: "nav sip scheme aum" },
+      ],
+    },
+    { title: "News", links: [{ href: "/news", label: "Financial and business news", about: top("/news").about, icon: ICON.news, keywords: "headlines" }] },
+    {
+      title: "Tools & Data",
+      links: [
+        { href: "/calculators", label: CALCULATOR_MENU.overview.label, about: top("/calculators").about, icon: ICON.calculators, keywords: "sip emi tax", sub: fromMenu(CALCULATOR_MENU) },
+        { href: "/developers", label: "Stock market API", about: "REST access to the data on this site", icon: ICON.api, keywords: "developer rest" },
+        { href: "/developers#connect", label: "MCP server", about: "Connect your AI assistant", icon: ICON.mcp, keywords: "claude chatgpt cursor connector" },
+        { href: "/developers#tools", label: "Developer documentation", about: "Every tool, route and argument", icon: ICON.docs, keywords: "reference docs" },
+        { href: "/settings/tokens", label: "API tokens", about: "Create and revoke your tokens", icon: ICON.token, keywords: "key account" },
+      ],
+    },
+    {
+      title: "Platform",
+      links: [
+        { href: "/about", label: "About", icon: ICON.about },
+        { href: "/pricing", label: "Pricing", icon: ICON.pricing, keywords: "plans" },
+        { href: "/contact", label: "Contact", icon: ICON.contact, keywords: "support email help" },
+        { href: "/terms", label: "Terms of use", icon: ICON.legal },
+        { href: "/privacy", label: "Privacy", icon: ICON.legal },
+        { href: "/sitemap.xml", label: "Sitemap", icon: ICON.map },
+        ...(signedIn ? [] : [{ href: "/login", label: "Sign in", icon: ICON.account, keywords: "login account" }]),
+      ],
+    },
+  ];
+}
+
+/** Every row as one flat list with its group, for the menu's own search. */
+export function flatDestinations(groups: DrawerGroup[]): (DrawerLink & { group: string })[] {
+  const out: (DrawerLink & { group: string })[] = [];
+  const add = (l: DrawerLink, group: string) => {
+    out.push({ ...l, group });
+    for (const s of l.sub ?? []) for (const i of s.items) add(i, l.label === "IPOs" ? "IPOs" : (s.title ?? group));
+  };
+  for (const g of groups) for (const l of g.links) add(l, g.title);
+  return out;
+}
+
+/** Rows matching every word typed, those whose name matches first. */
+export function findDestinations(all: (DrawerLink & { group: string })[], query: string, limit = 30) {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const hit = all.filter((d) => {
+    const hay = `${d.label} ${d.about ?? ""} ${d.group} ${d.keywords ?? ""}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  });
+  const inName = (d: DrawerLink) => words.every((w) => d.label.toLowerCase().includes(w));
+  return [...hit.filter(inName), ...hit.filter((d) => !inName(d))].slice(0, limit);
+}
+
+/** The bottom bar on phones. `paths` also light up the tab, so a market page reads as being under Markets. */
+export const BOTTOM_NAV: { href: string; label: string; icon: string; paths?: string[] }[] = [
+  { href: "/", label: "Home", icon: ICON.home },
+  { href: "/heatmap", label: "Markets", icon: ICON.overview, paths: ["/heatmap", "/stocks", "/stock/", "/sectors", "/signals", "/breadth", "/valuations", "/deliveries", "/fo-ban", "/fii-dii", "/deals", "/commodities", "/live"] },
+  { href: "/screener", label: "Screener", icon: ICON.screener, paths: ["/screener"] },
+  { href: "/ipos", label: "IPOs", icon: ICON.ipos, paths: ["/ipos"] },
+];
+
+/** Whether a phone-menu row is the page showing. */
+export function drawerActive(l: DrawerLink, url: URL): boolean {
+  if (!l.href) return false;
+  const [pathAndQuery, hash] = l.href.split("#");
+  if (hash) return false; // anchors within a page aren't pages of their own
+  const path = pathAndQuery.split("?")[0];
+  if (path === "/") return url.pathname === "/";
+  if (l.href === "/stocks" && url.pathname.startsWith("/stock/")) return true;
+  if (pathAndQuery.includes("?") || url.searchParams.has("tab")) return menuActive(pathAndQuery, url);
+  return url.pathname === path || (path !== "/screener" && url.pathname.startsWith(`${path}/`));
+}
 
 export function isActive(item: NavItem, path: string): boolean {
   if (item.href === "/") return path === "/";

@@ -1,14 +1,19 @@
 <script lang="ts">
   import "../app.css";
+  import { afterNavigate } from "$app/navigation";
   import { page } from "$app/state";
+  import { onMount, type Component } from "svelte";
+  import BottomNav from "$lib/components/BottomNav.svelte";
   import MarketsMenu from "$lib/components/MarketsMenu.svelte";
   import NavDropdown from "$lib/components/NavDropdown.svelte";
+  import NavIcon from "$lib/components/NavIcon.svelte";
   import Search from "$lib/components/Search.svelte";
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import ThemeToggle from "$lib/components/ThemeToggle.svelte";
   import TickerTape from "$lib/components/TickerTape.svelte";
   import { BRAND } from "$lib/brand";
-  import { isActive, navGroups, TOP_LINKS } from "$lib/nav";
+  import { ICON, isActive, navGroups, TOP_LINKS } from "$lib/nav";
+  import { viewport } from "$lib/viewport.svelte";
 
   let { data, children } = $props();
 
@@ -17,9 +22,44 @@
   // The edition line under the masthead: today's date in India.
   const edition = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
 
+  // The phone header's two panels. Only one is ever open, and following a link closes it.
+  let panel = $state<"menu" | "search" | null>(null);
+  let searchFor = $state("");
+  const openSearch = (query = "") => { searchFor = query; panel = "search"; };
+  afterNavigate(() => (panel = null));
+  // Desktop never downloads the panels. Phones fetch them once the page is idle, so a tap opens them at once.
+  let Drawer = $state<Component<any> | null>(null);
+  let Finder = $state<Component<any> | null>(null);
+  const loadPanels = () => {
+    import("$lib/components/SiteDrawer.svelte").then((m) => (Drawer = m.default as Component<any>));
+    import("$lib/components/SiteSearch.svelte").then((m) => (Finder = m.default as Component<any>));
+  };
+  $effect(() => {
+    if (!viewport.compact || (Drawer && Finder)) return;
+    if (panel) return loadPanels();
+    const idle = window.requestIdleCallback ?? ((fn: () => void) => setTimeout(fn, 1500));
+    idle(loadPanels);
+  });
+  onMount(() => {
+    // A tap made before the app had started (see static/theme.js).
+    const early = (window as any).__earlyTap;
+    if (early === "menu" || early === "search") panel = early;
+  });
 </script>
 
 <TickerTape quotes={data.ticker} liveAccess={!!data.live} />
+
+<!-- Phones: one sticky bar that needs no data, so it's there and working from first paint. -->
+<header class="phone-bar">
+  <button type="button" class="tap" data-early="menu" aria-label="Open menu" aria-haspopup="dialog" aria-expanded={panel === "menu"} onclick={() => (panel = "menu")}><NavIcon d={ICON.menu} size={24} /></button>
+  <a class="phone-logo" href="/" aria-label="{BRAND} home">{BRAND.toUpperCase()}</a>
+  <button type="button" class="tap" data-early="search" aria-label="Search stocks and pages" aria-haspopup="dialog" aria-expanded={panel === "search"} onclick={() => openSearch()}><NavIcon d={ICON.search} size={22} /></button>
+  {#if data.account}
+    <a class="tap" href="/settings/tokens" aria-label="Your account" data-clarity-mask="true"><NavIcon d={ICON.account} size={22} /></a>
+  {:else}
+    <a class="phone-signin" href="/login">Sign in</a>
+  {/if}
+</header>
 
 <header class="mast" class:front={page.url.pathname === "/"}>
   <div class="wrap top">
@@ -59,6 +99,14 @@
 
 <SiteFooter logoKey={data.logoKey} />
 
+<BottomNav onmore={() => (panel = "menu")} moreOpen={panel === "menu"} />
+
+{#if panel === "menu" && Drawer}
+  <Drawer live={!!data.live} account={data.account} onclose={() => (panel = null)} onsearch={openSearch} />
+{:else if panel === "search" && Finder}
+  <Finder live={!!data.live} account={data.account} initial={searchFor} onclose={() => (panel = null)} onmenu={() => (panel = "menu")} />
+{/if}
+
 <style>
   /* The masthead: edition line, the name, tools. Full size on the front page, compact inside. */
   .mast { background: var(--bg); }
@@ -83,18 +131,20 @@
   .tagline { margin-left: auto; font: italic 400 14px var(--serif); color: var(--ink-2); white-space: nowrap; }
 
   @media (max-width: 1080px) { .tagline { display: none; } }
+  /* The phone bar replaces the masthead and section rail at this width. */
+  .phone-bar { display: none; }
   @media (max-width: 860px) {
-    .top { grid-template-columns: auto 1fr; }
-    .edition { display: none; }
-    .sections .link { display: none; } /* they move into the Markets panel */
-  }
-  @media (max-width: 640px) {
-    /* Name on its own line, centred like a paper's flag; tools in a full-width row beneath. */
-    .top, .front .top { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 12px; padding-top: 16px; padding-bottom: 12px; }
-    .tools { width: 100%; }
-    .tools :global(.search) { max-width: none; }
-    .word, .front .word { font-size: 44px; }
-    .deva, .front .deva { font-size: 28px; }
-    .tools :global(.btn.small) { padding: 0 9px; }
+    .mast, .sections { display: none; }
+    .phone-bar {
+      position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: var(--tap) minmax(0, 1fr) var(--tap) auto; align-items: center;
+      height: var(--chrome-top); padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0 max(4px, env(safe-area-inset-left));
+      background: var(--bg); border-bottom: 3px double var(--ink);
+    }
+    .tap { display: grid; place-items: center; width: var(--tap); height: var(--tap); padding: 0; border: 0; background: none; color: var(--ink); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .tap:active { background: var(--panel-2); }
+    .phone-logo { display: flex; align-items: center; min-height: var(--tap); padding-left: 4px; font: 900 28px/1 var(--display); font-stretch: 62%; letter-spacing: 0.01em; color: var(--ink); white-space: nowrap; }
+    .phone-logo:hover { color: var(--ink); }
+    .phone-signin { display: flex; align-items: center; min-height: 38px; margin-left: 2px; padding: 0 10px; background: var(--ink); color: var(--on-ink); border-radius: var(--radius-s); font: 750 12px var(--font); font-stretch: 85%; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+    .phone-signin:hover { color: var(--on-ink); }
   }
 </style>

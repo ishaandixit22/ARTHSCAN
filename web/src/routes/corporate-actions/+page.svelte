@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { phoneCap } from "$lib/phoneCap";
   import { BRAND } from "$lib/brand";
   import { date, fetchedAt } from "$lib/format";
 
@@ -42,15 +43,15 @@
         <div class="card-head"><h2>{title}</h2><span class="sub">{rows.length} actions</span></div>
         {#if rows.length}
           <div class="table-scroll">
-            <table>
+            <table class="m-cards m-capped" use:phoneCap>
               <thead><tr><th>Ex-date</th><th class="left">Company</th><th class="left">Action</th><th class="wide-only">Record date</th></tr></thead>
               <tbody>
                 {#each rows as a, i (a.symbol + a.subject + i)}
                   <tr class:today={a.ex_date === today}>
-                    <td>{date(a.ex_date)}{#if a.ex_date === today} <span class="chip">today</span>{/if}</td>
-                    <td class="left"><a href="/stock/{a.symbol}" class="sym">{a.symbol}</a><span class="name">{a.company}</span></td>
-                    <td class="left subject"><span class="chip type">{a.type}</span> {a.subject}</td>
-                    <td class="wide-only">{date(a.record_date)}</td>
+                    <td class="m-half" data-label="Ex-date">{date(a.ex_date)}{#if a.ex_date === today} <span class="chip">today</span>{/if}</td>
+                    <td class="left m-first"><a href="/stock/{a.symbol}" class="sym">{a.symbol}</a><span class="name">{a.company}</span></td>
+                    <td class="left subject m-full" style="order: -1"><span class="chip type">{a.type}</span> {a.subject}</td>
+                    <td class="wide-only m-half" data-label="Record date">{date(a.record_date)}</td>
                   </tr>
                 {/each}
               </tbody>
