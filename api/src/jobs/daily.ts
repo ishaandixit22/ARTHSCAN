@@ -32,11 +32,11 @@ export type DailyReport = { date: string | null; steps: StepReport[]; ms: number
 
 const SERIES = new Set(["EQ", "BE", "BZ", "SM", "ST"]);
 const ddmmyyyy = (d: string) => `${d.slice(8, 10)}${d.slice(5, 7)}${d.slice(0, 4)}`;
-const isWeekday = (d: string) => { const w = new Date(`${d}T00:00:00Z`).getUTCDay(); return w !== 0 && w !== 6; };
+export const isWeekday = (d: string) => { const w = new Date(`${d}T00:00:00Z`).getUTCDay(); return w !== 0 && w !== 6; };
 const nextWeekday = (d: string) => { let x = addDaysISO(d, 1); while (!isWeekday(x)) x = addDaysISO(x, 1); return x; };
 
 /** GET an NSE file; null when it isn't there (holiday, not yet published). */
-async function nseFile(url: string): Promise<Uint8Array | null> {
+export async function nseFile(url: string): Promise<Uint8Array | null> {
   const res = await fetch(url, { headers: { ...NSE_HEADERS, accept: "*/*" }, signal: AbortSignal.timeout(30_000) });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url.split("/").pop()}`);
@@ -45,6 +45,8 @@ async function nseFile(url: string): Promise<Uint8Array | null> {
   if (buf[0] === 0x3c /* < */) return null;
   return buf;
 }
+/** NSE's end-of-day equity file for one session (YYYY-MM-DD). */
+export const bhavcopyUrl = (d: string) => `https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_${d.replace(/-/g, "")}_F_0000.csv.zip`;
 const text = (b: Uint8Array) => new TextDecoder().decode(b);
 const unzipFirst = (b: Uint8Array) => strFromU8(Object.values(unzipSync(b))[0]);
 
@@ -73,7 +75,7 @@ async function step(report: StepReport[], name: string, fn: () => Promise<Omit<S
 async function sessionDate(today: string): Promise<{ date: string; buf: Uint8Array | null } | null> {
   for (let i = 0, d = today; i < 7; i++, d = addDaysISO(d, -1)) {
     if (!isWeekday(d)) continue;
-    const buf = await nseFile(`https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_${d.replace(/-/g, "")}_F_0000.csv.zip`);
+    const buf = await nseFile(bhavcopyUrl(d));
     if (buf) return { date: d, buf };
   }
   return null;
@@ -122,7 +124,7 @@ export async function runDaily(env: Env, opts: { date?: string; force?: boolean;
   let date: string | null = null;
   await step(steps, "prices", async () => {
     const s = opts.date
-      ? { date: opts.date, buf: await nseFile(`https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_${opts.date.replace(/-/g, "")}_F_0000.csv.zip`) }
+      ? { date: opts.date, buf: await nseFile(bhavcopyUrl(opts.date)) }
       : await sessionDate(today);
     if (!s?.buf) return { status: "skipped", message: "No bhavcopy published in the last week" };
     date = s.date;

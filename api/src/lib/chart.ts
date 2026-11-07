@@ -43,15 +43,27 @@ function toDays(c: DhanSeries): Day[] {
 async function dailyHistory(env: Env, symbol: string) {
   return cached(`daily/${symbol}`, DAILY_TTL_S, async () => {
     const inst = await instrument(env, symbol);
-    if (!inst) return fail(404, `No Dhan instrument for ${symbol}`);
+    if (!inst) return storedHistory(env, symbol, fail(404, `No Dhan instrument for ${symbol}`));
     const r = await dhanPost(env, "/charts/historical", {
       securityId: inst.id, exchangeSegment: inst.segment, instrument: "EQUITY", expiryCode: 0, oi: false,
       fromDate: HISTORY_FROM, toDate: istDate(Date.now() + DAY_MS),
     }, "daily candles");
-    if (!r.ok) return r;
-    if (!hasRows(r.data)) return fail(404, `Dhan has no daily candles for ${symbol}`);
+    // Dhan has no candles for suspended, trade-for-trade and renamed stocks; our own stored sessions still cover them.
+    if (!r.ok) return storedHistory(env, symbol, r);
+    if (!hasRows(r.data)) return storedHistory(env, symbol, fail(404, `Dhan has no daily candles for ${symbol}`));
     return { ok: true as const, days: toDays(r.data) };
   });
+}
+
+/** The sessions we store ourselves (split-adjusted for NSE), when Dhan can't give the history. `why` is returned if there are none. */
+async function storedHistory(env: Env, symbol: string, why: Fail): Promise<{ ok: true; days: Day[] } | Fail> {
+  const bse = symbol.startsWith("BSE-");
+  const { results } = await env.DB.prepare(bse
+    ? "SELECT date, open, high, low, close, volume FROM bse_daily_prices WHERE symbol = ? ORDER BY date"
+    : "SELECT date, open * adj AS open, high * adj AS high, low * adj AS low, close * adj AS close, CAST(volume / adj AS INTEGER) AS volume FROM daily_prices WHERE symbol = ? ORDER BY date")
+    .bind(bse ? symbol.slice(4) : symbol).all<Day>().catch(() => ({ results: [] as Day[] }));
+  const days = results.filter((d) => d.close != null).map((d) => ({ ...d, open: d.open ?? d.close, high: d.high ?? d.close, low: d.low ?? d.close, volume: d.volume ?? 0 }));
+  return days.length >= 2 ? { ok: true as const, days } : why;
 }
 
 const niftyHistory = (env: Env) => cached("daily-index/nifty50", INDEX_TTL_S, async () => {

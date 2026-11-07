@@ -15,6 +15,7 @@ import { admin } from "./routes/admin.js";
 import { screens } from "./routes/screens.js";
 import { jsonError } from "./lib/http.js";
 import { edgeCache } from "./middleware/edge-cache.js";
+import { type CheckReport, freshness } from "./jobs/check.js";
 
 export const app = new Hono<AppEnv>();
 
@@ -31,8 +32,16 @@ app.use("/v1/*", edgeCache());
 
 app.get("/", (c) => c.json({ ok: true, service: SERVER_INFO.name, version: SERVER_INFO.version, rest: "/v1", mcp: "/mcp" }));
 app.get("/health", async (c) => {
-  const row = await c.env.DB.prepare("SELECT MAX(date) AS latest_price_date FROM daily_prices").first();
-  return c.json({ ok: true, ...row });
+  // Dates only, nothing private: lets the daily report and any uptime monitor see a stale dataset.
+  const [fresh, check] = await Promise.all([
+    freshness(c.env),
+    c.env.DB.prepare("SELECT body FROM external_cache WHERE key = 'health:last_check'").first<{ body: string }>(),
+  ]);
+  const last = check ? (JSON.parse(check.body) as CheckReport) : null;
+  return c.json({
+    ok: true, latest_price_date: fresh.prices ?? null, datasets: fresh,
+    last_check: last && { at: last.at, latest_published: last.latest_published, latest_loaded: last.latest_loaded, items: last.items },
+  });
 });
 
 app.route("/", oauth); // /.well-known/* and /oauth/*

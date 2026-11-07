@@ -1,5 +1,6 @@
 // Owner tools for the scheduled data refresh.
 //   POST /api/admin/refresh          run the daily refresh now (optional ?date=YYYY-MM-DD&force=1)
+//   POST /api/admin/check            run the daily self-check now: reload missed sessions, catch up metrics and BSE
 //   GET  /api/admin/refresh-status   the latest pipeline runs and how fresh each dataset is
 //   GET  /api/admin/symbol-changes   ticker changes waiting to merge, left alone, and already merged
 //   POST /api/admin/screens?step=    run one screens step now: tick, series, weekly, minutes, intraday
@@ -7,6 +8,7 @@
 
 import { Hono } from "hono";
 import type { AppEnv } from "../env.js";
+import { selfCheck } from "../jobs/check.js";
 import { recomputeMetrics, runDaily } from "../jobs/daily.js";
 import { applySymbolChanges, findSymbolChanges } from "../jobs/symbol-changes.js";
 import { jsonError } from "../lib/http.js";
@@ -34,6 +36,8 @@ admin.post("/refresh", async (c) => {
   });
   return c.json({ ok: true, ...report });
 });
+
+admin.post("/check", async (c) => c.json({ ok: true, ...(await selfCheck(c.env)) }));
 
 admin.post("/screens", async (c) => {
   const step = c.req.query("step");

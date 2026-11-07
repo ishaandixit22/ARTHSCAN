@@ -5,6 +5,7 @@
 import { app } from "./app.js";
 import type { Env } from "./env.js";
 import { fillBseHistory, refreshBse } from "./jobs/bse.js";
+import { selfCheck } from "./jobs/check.js";
 import { runDaily } from "./jobs/daily.js";
 import { recordIpoCategories } from "./jobs/ipo-readings.js";
 import { fillWebsites, refreshFilings } from "./lib/sebi.js";
@@ -25,7 +26,12 @@ export default {
   },
   scheduled: (event: { cron: string }, env: Env, ctx: Ctx) => {
     // Every five minutes in market hours: the intraday screens, on the candles that just finished.
-    if (event.cron === "*/5 3-10 * * 1-5") {
+    // Every morning, weekends included: load any session a run missed and report what's stale (see jobs/check.ts).
+    if (event.cron === "30 4 * * *") {
+      ctx.waitUntil(selfCheck(env).then((r) => console.log(`self-check: ${r.items.map((i) => `${i.check}=${i.status}`).join(" ")} in ${r.ms} ms`)).catch((err) => console.error("self-check:", err)));
+      return;
+    }
+    if (event.cron === "*/5 3-10 * * MON-FRI") {
       ctx.waitUntil(runIntradayCycle(env).then((r) => r.ran && console.log(`intraday screens: ${JSON.stringify(r)}`)).catch((err) => console.error("intraday screens:", err)));
       return;
     }
