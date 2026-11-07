@@ -19,6 +19,9 @@
     "PUBLIC_SITE_ORIGIN": "https://arthscan.me",
     // Must match the API Worker. "true" = pages need sign-in and crawlers are kept out.
     "INVITE_ONLY": "false",
+    // "true" = anyone can sign in with Google, but only the home page, calculators and legal pages open
+    // without it (see hooks.server.ts). Set to "false" to open the whole site again.
+    "REQUIRE_SIGN_IN": "true",
     // Must match the API Worker's LIVE_ACCESS being "public". Lets signed-out pages show live prices
     // without a call to the API before every page view. Set to "false" together with LIVE_ACCESS.
     "LIVE_PUBLIC": "true"

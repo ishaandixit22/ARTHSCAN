@@ -11,6 +11,11 @@ const API_PATHS = /^\/(api|v1|mcp|oauth|\.well-known|health)(\/|$)/;
 // Reachable without signing in while the site is invite-only.
 const OPEN_PATHS = /^\/(login|robots\.txt|sitemap\.xml|favicon\.(svg|ico)|apple-touch-icon\.png|icon-(192|512)\.png)$/;
 
+// What a signed-out visitor can see while REQUIRE_SIGN_IN is on: the home page, the calculators and
+// the legal pages (Google's sign-in rules need the privacy policy public). The search data stays open
+// so the home page's search works; choosing a result then asks for sign-in.
+const PUBLIC_PATHS = /^\/($|calculators(\/|$)|terms$|privacy$|search\.json$|search-index\.json$|googlea2331a3f68c95126\.html$)/;
+
 // Content-Security-Policy itself comes from kit.csp in svelte.config.js, which
 // adds per-request nonces for SvelteKit's inline hydration script.
 const SECURITY_HEADERS: Record<string, string> = {
@@ -63,6 +68,11 @@ export const handle: Handle = async ({ event, resolve }) => {
   if (inviteOnly && !event.locals.account && !OPEN_PATHS.test(event.url.pathname)) {
     const path = event.url.pathname + event.url.search;
     redirect(303, path === "/" ? "/login" : `/login?return_to=${encodeURIComponent(path)}`);
+  }
+
+  const signInRequired = env.REQUIRE_SIGN_IN === "true";
+  if (signInRequired && !event.locals.account && !OPEN_PATHS.test(event.url.pathname) && !PUBLIC_PATHS.test(event.url.pathname)) {
+    redirect(303, `/login?return_to=${encodeURIComponent(event.url.pathname + event.url.search)}`);
   }
 
   const render = async () => {

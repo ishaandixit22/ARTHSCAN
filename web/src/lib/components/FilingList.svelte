@@ -3,7 +3,11 @@
   // and the PDF on NSE's archive. Used by the filings page, the earnings tracker
   // and a stock's Filings tab.
   export type Filing = { time: string | null; symbol: string; company: string; kind: string; subject: string; category: string; pdf: string | null; size: string | null };
-  let { filings, kinds, showCompany = true, empty = "No filings." }: { filings: Filing[]; kinds: Record<string, string>; showCompany?: boolean; empty?: string } = $props();
+  // `pageSize`: show this many, with a button for the next lot. A day's filings can run to hundreds.
+  let { filings, kinds, showCompany = true, empty = "No filings.", pageSize = 0 }: { filings: Filing[]; kinds: Record<string, string>; showCompany?: boolean; empty?: string; pageSize?: number } = $props();
+  let limit = $state(pageSize);
+  $effect(() => { void filings; limit = pageSize; });
+  const visible = $derived(limit ? filings.slice(0, limit) : filings);
 
   const when = (t: string | null) => {
     if (!t) return "—";
@@ -16,7 +20,7 @@
 
 {#if filings.length}
   <ul class="filings">
-    {#each filings as f, i (f.pdf ?? `${f.symbol}-${f.time}-${i}`)}
+    {#each visible as f, i (f.pdf ?? `${f.symbol}-${f.time}-${i}`)}
       <li>
         <time class="mono">{when(f.time)}</time>
         <div class="body">
@@ -38,6 +42,9 @@
       </li>
     {/each}
   </ul>
+  {#if limit && filings.length > limit}
+    <button type="button" class="btn small next" onclick={() => (limit += pageSize)}>Show {Math.min(pageSize, filings.length - limit)} more of {filings.length}</button>
+  {/if}
 {:else}
   <div class="empty">{empty}</div>
 {/if}
@@ -58,8 +65,11 @@
   .pdf svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; color: var(--down); }
   .pdf small { color: var(--ink-3); font-size: 11px; font-family: var(--font); }
   .pdf.none { border-style: dashed; color: var(--ink-3); }
+  .next { margin: 12px 18px; }
   @media (max-width: 640px) {
-    li { grid-template-columns: 1fr auto; gap: 6px 12px; }
+    li { grid-template-columns: 1fr auto; gap: 6px 12px; padding: 12px 0; }
+    .next { margin: 12px 0; min-height: var(--tap); }
+    .pdf { height: 36px; }
     time { grid-column: 1 / -1; }
     .pdf small { display: none; }
   }

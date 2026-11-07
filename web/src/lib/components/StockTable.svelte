@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { phoneCap } from "$lib/phoneCap";
   import Logo from "$lib/components/Logo.svelte";
   import { crore, num, pct, price, tone } from "$lib/format";
 
@@ -23,7 +24,7 @@
 {/snippet}
 
 <div class="table-scroll">
-  <table class:compact>
+  <table class="m-cards m-quote m-explicit m-capped" class:compact use:phoneCap={rows.length}>
     <thead>
       <tr>
         <th>Stock</th>
@@ -44,13 +45,13 @@
             {/if}
           </td>
           {#each shown as c}
-            {#if c === "close"}<td>{price(r.close)}</td>
-            {:else if c === "turnover"}<td class="wide-only">{crore(r.turnover)}</td>
-            {:else if c === "pe"}<td>{num(r.pe, 1)}</td>
-            {:else if c === "volatility_1y"}<td class="wide-only">{pct(r.volatility_1y, false)}</td>
-            {:else if c === "sector"}<td class="left sector wide-only">{r.sector ?? "—"}</td>
-            {:else if c === "change_pct" && r.listed_today}<td class="muted" title="vs issue price">{pct(r[c])}*</td>
-            {:else}<td class="{tone(r[c])}" class:wide-only={WIDE_ONLY.has(c)}>{pct(r[c])}</td>
+            {#if c === "close"}<td class="m-p" data-label={LABELS[c]}>{price(r.close)}</td>
+            {:else if c === "turnover"}<td class="wide-only" data-label={LABELS[c]}>{crore(r.turnover)}</td>
+            {:else if c === "pe"}<td data-label={LABELS[c]}>{num(r.pe, 1)}</td>
+            {:else if c === "volatility_1y"}<td class="wide-only" data-label={LABELS[c]}>{pct(r.volatility_1y, false)}</td>
+            {:else if c === "sector"}<td class="left sector wide-only m-hide">{r.sector ?? "—"}</td>
+            {:else if c === "change_pct" && r.listed_today}<td class="muted m-p" title="vs issue price" data-label={LABELS[c]}>{pct(r[c])}*</td>
+            {:else}<td class="{tone(r[c])}" class:m-p={c === "change_pct"} class:wide-only={WIDE_ONLY.has(c)} data-label={LABELS[c]}>{pct(r[c])}</td>
             {/if}
           {/each}
         </tr>
@@ -71,7 +72,7 @@
   .txt { min-width: 0; display: grid; justify-items: start; }
   @media (max-width: 640px) {
     .wide-only { display: none; }
-    /* With a logo the stock column is wider; keep the name from running into the price. */
-    .stk .name { max-width: 92px; }
+    .stk { gap: 8px; }
+    .sector { max-width: none; }
   }
 </style>

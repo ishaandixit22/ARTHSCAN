@@ -1,0 +1,3 @@
+// Used only by local previews and the browser tests (PREVIEW_NO_BINDINGS=1). The real wrangler.jsonc
+// declares an API service binding that has no local Worker behind it, which makes every page answer 503.
+{ "name": "arthscan-preview", "compatibility_date": "2026-10-01" }

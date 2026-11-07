@@ -83,6 +83,8 @@
     .about { grid-column: 1 / -1; }
     .about p { max-width: 520px; }
   }
+  /* The Devanagari face is a 64 KB file for three letters. Phones keep the word alone. */
+  @media (max-width: 860px) { .deva { display: none; } footer { margin-top: 24px; } }
   @media (max-width: 680px) {
     .columns { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 20px; }
     nav a { padding: 7px 0; }

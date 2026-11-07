@@ -147,20 +147,20 @@
         <p class="empty">{search.trim() || board !== "all" ? "No IPO here matches this search." : tab.empty}</p>
       {:else if tab.key === "listed"}
         <div class="table-scroll tbl">
-          <table>
+          <table class="m-cards listed">
             <thead><tr><th class="co">Company</th><th class="left">Listed</th><th>Issue price</th><th>Listing price</th><th>Listing gain</th><th>Latest</th><th>Since issue</th><th>Subscribed</th><th>Issue size</th></tr></thead>
             <tbody>
               {#each shown as r (r.slug)}
                 <tr>
                   <td class="co">{@render who(r)}</td>
-                  <td class="left">{short(r.listing)}</td>
-                  <td>{money(r.price_high)}</td>
-                  <td>{money(r.listing_price)}</td>
-                  <td class="strong {tone(r.listing_gain)}">{signed(r.listing_gain)}</td>
-                  <td>{money(r.cmp)}</td>
-                  <td class="strong {tone(r.current_gain)}">{signed(r.current_gain)}</td>
-                  <td class:up={(r.times_total ?? 0) >= 1}>{times(r.times_total)}</td>
-                  <td>{size(r.size_cr)}</td>
+                  <td class="left" data-label="Listed">{short(r.listing)}</td>
+                  <td data-label="Issue price">{money(r.price_high)}</td>
+                  <td data-label="Listing price">{money(r.listing_price)}</td>
+                  <td class="strong {tone(r.listing_gain)}" data-label="Listing gain">{signed(r.listing_gain)}</td>
+                  <td data-label="Latest">{money(r.cmp)}</td>
+                  <td class="strong {tone(r.current_gain)}" data-label="Since issue">{signed(r.current_gain)}</td>
+                  <td class:up={(r.times_total ?? 0) >= 1} data-label="Subscribed">{times(r.times_total)}</td>
+                  <td data-label="Issue size">{size(r.size_cr)}</td>
                 </tr>
               {/each}
             </tbody>
@@ -348,9 +348,14 @@
     .controls select { flex: 1; min-width: 0; }
     .stages a { flex-direction: column; align-items: center; gap: 1px; padding: 9px 2px; font-size: 13px; }
     .tbl table { min-width: 720px; }
+    .tbl table.listed { min-width: 0; }
+    .tbl table.listed tr:hover td { background: none; }
+    /* Every listing here is reachable from the tabs above; on a phone this list only lengthens the page. */
+    .directory { display: none; }
     .expected table { min-width: 0; }
     .expected .status { display: none; }
     th.co, td.co { min-width: 160px; max-width: 170px; }
+    table.listed td.co { max-width: none; }
     .reads > div { padding: 12px; }
     .fig { font-size: 26px; }
   }

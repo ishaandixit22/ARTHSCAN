@@ -81,7 +81,7 @@
 <style>
   .calc { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 40px; align-items: start; border-top: var(--rule-heavy); }
   .inputs { display: grid; align-content: start; }
-  .answer { display: grid; gap: 18px; padding-top: 14px; min-width: 0; position: sticky; top: 60px; }
+  .answer { display: grid; gap: 18px; padding-top: 14px; min-width: 0; position: sticky; top: calc(var(--chrome-top) + 11px); }
 
   .choice { display: grid; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--line); }
   .choice label { font-size: 14.5px; font-weight: 600; font-stretch: 88%; }

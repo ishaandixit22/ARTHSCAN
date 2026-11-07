@@ -3,6 +3,7 @@
   import Logo from "$lib/components/Logo.svelte";
   import { price, pct, tone } from "$lib/format";
   import { loadSearchIndex, searchLocally } from "$lib/searchIndex";
+  import { viewport } from "$lib/viewport.svelte";
 
   // `lead` is the front page's big search: its own placeholder and a Look up button,
   // and it leaves the "/" shortcut to the masthead's search.
@@ -16,6 +17,10 @@
   // Logo.dev allows 100 requests a minute per visitor, so logos wait for a pause in typing.
   let typing = $state(false);
   let pause: ReturnType<typeof setTimeout>;
+  let request: AbortController | null = null;
+  // The company table is 150 KB compressed: worth it for instant answers on a desktop connection,
+  // not on a phone's. Phones ask the search API for each pause in typing instead.
+  const prepare = () => { if (!viewport.compact) void loadSearchIndex(); };
 
   // "/" or ⌘K / Ctrl+K jumps to search from anywhere (except while typing in a field).
   function onGlobalKey(e: KeyboardEvent) {
@@ -33,7 +38,8 @@
     clearTimeout(pause);
     typing = true;
     pause = setTimeout(() => (typing = false), 250);
-    void loadSearchIndex();
+    request?.abort();
+    prepare();
     const query = q.trim();
     if (!query) {
       results = [];
@@ -49,8 +55,9 @@
       return;
     }
     timer = setTimeout(async () => {
-      const res = await fetch(`/search.json?q=${encodeURIComponent(query)}`);
-      if (res.ok && q.trim() === query) {
+      const ask = (request = new AbortController());
+      const res = await fetch(`/search.json?q=${encodeURIComponent(query)}`, { signal: ask.signal }).catch(() => null);
+      if (res?.ok && q.trim() === query) {
         results = (await res.json()).results;
         open = true;
         active = -1;
@@ -92,7 +99,7 @@
     bind:value={q}
     oninput={onInput}
     onkeydown={onKey}
-    onfocus={() => (loadSearchIndex(), (open = results.length > 0))}
+    onfocus={() => (prepare(), (open = results.length > 0))}
     onblur={() => setTimeout(() => (open = false), 150)}
   />
   {#if lead}

@@ -28,6 +28,11 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 
 async function poll() {
   timer = null;
+  // Nobody is looking: wait for the next turn rather than spend the phone's data and battery.
+  if (document.hidden) {
+    if (users > 0) timer = setTimeout(poll, POLL_MS);
+    return;
+  }
   try {
     const res = await fetch(signalUsers ? "/api/live/market" : "/api/live/market?lite=1", { credentials: "same-origin" });
     if (res.ok) {

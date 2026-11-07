@@ -357,7 +357,7 @@
   @media (max-width: 640px) {
     .wide-only { display: none; }
     .sectors .flowcol { min-width: 0; }
-    .diverge { width: 60px; }
+    .diverge { display: none; }
     .heat td:first-child, .sectors td:first-child { white-space: normal; min-width: 120px; }
   }
 </style>

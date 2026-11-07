@@ -7,5 +7,6 @@ export async function GET({ url }) {
   const q = url.searchParams.get("q")?.trim() ?? "";
   if (!q) return json({ results: [] });
   const data = await api(`/v1/search?query=${encodeURIComponent(q)}&limit=8`);
-  return json({ results: data.results });
+  // Public and the same for everyone, so a popular query is answered from the edge for a minute.
+  return json({ results: data.results }, { headers: { "cache-control": "public, max-age=60" } });
 }

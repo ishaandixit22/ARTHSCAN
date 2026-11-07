@@ -41,7 +41,7 @@
     {#if data.config.invite_only}
       <p class="sub">{BRAND} is in private beta. Sign in with the Google account you were invited with to browse the research pages and get API and MCP access (50 calls a day).</p>
     {:else}
-      <p class="sub">An account gives you API tokens for the REST API and the MCP server — 50 free calls a day. Browsing the site needs no account.</p>
+      <p class="sub">Sign in with Google to open stock pages, the screener and market data. It's free. Your account also includes API tokens for the REST API and the MCP server, with 50 calls a day.</p>
     {/if}
 
     {#if data.error}<div class="notice">{ERRORS[data.error] ?? "Sign-in failed."}</div>{/if}

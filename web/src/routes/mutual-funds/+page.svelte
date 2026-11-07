@@ -29,11 +29,11 @@
       {:else if !data.search.data?.length}
         <div class="empty">No schemes match “{data.q}”.</div>
       {:else}
-        <table>
+        <table class="m-cards">
           <thead><tr><th>Scheme</th><th class="wide-only">Type</th><th>ISIN</th></tr></thead>
           <tbody>
             {#each data.search.data as f (f.id)}
-              <tr><td><a class="sym" href={fundHref(f.schemeName)}>{f.schemeName}</a></td><td class="wide-only">{f.schemeType ?? "—"}</td><td class="mono">{f.isin ?? "—"}</td></tr>
+              <tr><td><a class="sym" href={fundHref(f.schemeName)}>{f.schemeName}</a></td><td class="wide-only m-half" data-label="Type">{f.schemeType ?? "—"}</td><td class="mono m-half" data-label="ISIN">{f.isin ?? "—"}</td></tr>
             {/each}
           </tbody>
         </table>
@@ -51,18 +51,18 @@
       <section class="card">
         <div class="card-head"><h2>{sub}</h2></div>
         <div class="table-scroll">
-          <table>
+          <table class="m-cards">
             <thead><tr><th>Scheme</th><th>NAV</th><th>1Y</th><th>3Y</th><th class="wide-only">5Y</th><th class="wide-only">AUM</th><th class="wide-only">Rating</th></tr></thead>
             <tbody>
               {#each funds as f (f.fund_name)}
                 <tr>
                   <td><a class="sym fund" href={fundHref(f.fund_name)}>{f.fund_name}</a></td>
-                  <td>{num(f.latest_nav)}</td>
-                  <td class={tone(f["1_year_return"])}>{pct(f["1_year_return"])}</td>
-                  <td class={tone(f["3_year_return"])}>{pct(f["3_year_return"])}</td>
-                  <td class="wide-only {tone(f['5_year_return'])}">{pct(f["5_year_return"])}</td>
-                  <td class="wide-only">{cr(f.asset_size)}</td>
-                  <td class="wide-only">{f.star_rating ? "★".repeat(f.star_rating) : "—"}</td>
+                  <td data-label="NAV">{num(f.latest_nav)}</td>
+                  <td class={tone(f["1_year_return"])} data-label="1Y">{pct(f["1_year_return"])}</td>
+                  <td class={tone(f["3_year_return"])} data-label="3Y">{pct(f["3_year_return"])}</td>
+                  <td class="wide-only {tone(f['5_year_return'])}" data-label="5Y">{pct(f["5_year_return"])}</td>
+                  <td class="wide-only" data-label="AUM">{cr(f.asset_size)}</td>
+                  <td class="wide-only" data-label="Rating">{f.star_rating ? "★".repeat(f.star_rating) : "—"}</td>
                 </tr>
               {/each}
             </tbody>

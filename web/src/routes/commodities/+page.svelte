@@ -31,17 +31,17 @@
   {:else}
     <section class="card">
       <div class="table-scroll">
-        <table>
+        <table class="m-cards">
           <thead><tr><th>Contract</th><th>Last price</th><th>Change</th><th class="wide-only">Day range</th><th class="wide-only">Open interest</th><th class="left wide-only">Unit</th></tr></thead>
           <tbody>
             {#each near as r (r.product)}
               <tr>
                 <td><span class="sym">{r.product}</span><span class="name">expires {r.expiry}</span></td>
-                <td>₹{num(n(r.last_traded_price))}</td>
-                <td class={tone(r.change)}>{r.change > 0 ? "+" : ""}{num(r.change)} ({pct(r.per_change)})</td>
-                <td class="wide-only">{num(n(r.low_price))} – {num(n(r.high_price))}</td>
-                <td class="wide-only">{num(n(r.open_interest), 0)}{#if r.oiResult}<span class="name">{r.oiResult}</span>{/if}</td>
-                <td class="left wide-only">per {r.quotation_lot} {r.price_quotation_unit?.toLowerCase()}</td>
+                <td class="m-half" data-label="Last price">₹{num(n(r.last_traded_price))}</td>
+                <td class="m-half {tone(r.change)}" data-label="Change">{r.change > 0 ? "+" : ""}{num(r.change)} ({pct(r.per_change)})</td>
+                <td class="wide-only m-half" data-label="Day range">{num(n(r.low_price))} – {num(n(r.high_price))}</td>
+                <td class="wide-only m-half" data-label="Open interest">{num(n(r.open_interest), 0)}{#if r.oiResult}<span class="name">{r.oiResult}</span>{/if}</td>
+                <td class="left wide-only m-hide">per {r.quotation_lot} {r.price_quotation_unit?.toLowerCase()}</td>
               </tr>
             {/each}
           </tbody>

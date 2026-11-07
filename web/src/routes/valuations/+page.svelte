@@ -57,12 +57,12 @@
     </div>
     <div class="table-scroll">
       <table>
-        <thead><tr><th>Index</th><th>Close</th><th>Day</th><th>P/E</th><th>P/B</th><th class="wide-only">Div yield</th></tr></thead>
+        <thead><tr><th>Index</th><th class="wide-only">Close</th><th>Day</th><th>P/E</th><th>P/B</th><th class="wide-only">Div yield</th></tr></thead>
         <tbody>
           {#each rows as i (i.index_name)}
             <tr class:on={i.index_name === data.index}>
               <td><a href="?index={encodeURIComponent(i.index_name)}" data-sveltekit-noscroll>{i.index_name}</a></td>
-              <td>{num(i.close)}</td>
+              <td class="wide-only">{num(i.close)}</td>
               <td class={tone(i.change_pct)}>{pct(i.change_pct)}</td>
               <td>{num(i.pe)}</td>
               <td>{num(i.pb)}</td>

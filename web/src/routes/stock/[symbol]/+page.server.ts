@@ -1,5 +1,6 @@
 import { redirect } from "@sveltejs/kit";
 import { api } from "$lib/server/api";
+import bseTickers from "$lib/server/bse-tickers.json";
 
 export async function load({ params, url }) {
   const symbol = params.symbol.toUpperCase();
@@ -15,5 +16,7 @@ export async function load({ params, url }) {
   ]);
   // A retired ticker answers with the company under its current symbol.
   if (company.symbol !== symbol) redirect(301, `/stock/${encodeURIComponent(company.symbol)}${url.search}`);
-  return { company, bseOnly, financials, shareholding, industryInfo: dhanInfo?.ok ? dhanInfo : null };
+  // TradingView's free chart refuses NSE symbols, so it gets the company's BSE ticker, matched by ISIN.
+  const bseTicker = (bseTickers as Record<string, string>)[company.isin ?? ""];
+  return { company, bseOnly, tvSymbol: bseTicker ? `BSE:${bseTicker}` : null, financials, shareholding, industryInfo: dhanInfo?.ok ? dhanInfo : null };
 }

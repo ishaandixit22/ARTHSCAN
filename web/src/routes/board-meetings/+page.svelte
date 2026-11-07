@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { phoneCap } from "$lib/phoneCap";
   import { BRAND } from "$lib/brand";
   import DocLinks from "$lib/components/DocLinks.svelte";
   import { fetchedAt, todayIST } from "$lib/format";
@@ -23,6 +24,10 @@
     for (const e of shown) m.set(e.date, [...(m.get(e.date) ?? []), e]);
     return [...m];
   });
+  // Hundreds of meetings across dozens of days: the next few days first, the rest on request.
+  const FIRST_DAYS = 6;
+  let allDays = $state(false);
+  const shownDays = $derived(allDays ? byDate : byDate.slice(0, FIRST_DAYS));
   const dayLabel = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
 </script>
 
@@ -46,19 +51,19 @@
       {/each}
     </nav>
 
-    {#each byDate as [d, rows] (d)}
-      <section class="card">
+    {#each shownDays as [d, rows] (d)}
+      <section class="card m-defer">
         <div class="card-head"><h2>{dayLabel(d)}{d === today ? " · today" : ""}</h2><span class="sub">{rows.length} meetings</span></div>
         <div class="table-scroll">
-          <table>
+          <table class="m-cards m-capped" use:phoneCap>
             <thead><tr><th>Company</th><th class="left">Purpose</th><th class="left">Documents</th><th class="left wide-only">Details</th></tr></thead>
             <tbody>
               {#each rows as e, i (e.symbol + i)}
                 <tr>
                   <td><a href="/stock/{e.symbol}" class="sym">{e.symbol}</a><span class="name">{e.company}</span></td>
-                  <td class="left purpose">{e.purpose}</td>
-                  <td class="left">{#if ["concall", "presentation", "results"].some((k) => docsBy.get(e.symbol)?.[k]?.some((d: any) => d.pdf))}<DocLinks docs={docsBy.get(e.symbol)} only={["concall", "presentation", "results"]} filedOnly />{:else}<span class="sub">None filed yet</span>{/if}</td>
-                  <td class="left wide-only details">{e.details}</td>
+                  <td class="left purpose m-full">{e.purpose}</td>
+                  <td class="left m-full" class:m-hide={!["concall", "presentation", "results"].some((k) => docsBy.get(e.symbol)?.[k]?.some((d: any) => d.pdf))}>{#if ["concall", "presentation", "results"].some((k) => docsBy.get(e.symbol)?.[k]?.some((d: any) => d.pdf))}<DocLinks docs={docsBy.get(e.symbol)} only={["concall", "presentation", "results"]} filedOnly />{:else}<span class="sub">None filed yet</span>{/if}</td>
+                  <td class="left wide-only details m-hide">{e.details}</td>
                 </tr>
               {/each}
             </tbody>
@@ -68,6 +73,9 @@
     {:else}
       <div class="card empty">No meetings of this kind are scheduled.</div>
     {/each}
+    {#if !allDays && byDate.length > FIRST_DAYS}
+      <button type="button" class="btn more-days" onclick={() => (allDays = true)}>Show all {byDate.length} days</button>
+    {/if}
     <p class="sub small">Source: NSE event calendar.</p>
   {/if}
 </div>
@@ -80,5 +88,6 @@
   td:has(:global(.docs)) { min-width: 210px; }
   .details { white-space: normal; min-width: 340px; color: var(--ink-2); font-size: 12.5px; }
   .small { font-size: 12.5px; }
+  .more-days { justify-self: start; }
   @media (max-width: 640px) { .wide-only { display: none; } }
 </style>

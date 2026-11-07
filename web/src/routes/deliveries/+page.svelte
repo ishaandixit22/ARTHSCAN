@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { phoneCap } from "$lib/phoneCap";
   import { BRAND } from "$lib/brand";
   import { crore, date, num, pct, price, tone } from "$lib/format";
 
@@ -22,18 +23,18 @@
 
   <section class="card">
     <div class="table-scroll">
-      <table>
+      <table class="m-cards m-quote m-capped" use:phoneCap={d.results.length}>
         <thead><tr><th>Stock</th><th>Delivery</th><th>20D avg</th><th>Price</th><th class="wide-only">Day</th><th class="wide-only">Vol x</th><th class="wide-only">Turnover</th></tr></thead>
         <tbody>
           {#each d.results as r (r.symbol)}
             <tr>
               <td><a href="/stock/{r.symbol}" class="sym">{r.symbol}</a><span class="name">{r.name}</span></td>
-              <td><b>{pct(r.deliv_pct, false)}</b></td>
-              <td class={tone(r.deliv_pct_avg_20 != null ? r.deliv_pct - r.deliv_pct_avg_20 : null)}>{pct(r.deliv_pct_avg_20, false)}</td>
-              <td>{price(r.close)}</td>
-              <td class="wide-only {tone(r.change_pct)}">{pct(r.change_pct)}</td>
-              <td class="wide-only">{num(r.vol_ratio, 1)}</td>
-              <td class="wide-only">{crore(r.turnover)}</td>
+              <td data-label="Delivery"><b>{pct(r.deliv_pct, false)}</b></td>
+              <td data-label="20D avg" class={tone(r.deliv_pct_avg_20 != null ? r.deliv_pct - r.deliv_pct_avg_20 : null)}>{pct(r.deliv_pct_avg_20, false)}</td>
+              <td data-label="Price">{price(r.close)}</td>
+              <td data-label="Day" class="wide-only {tone(r.change_pct)}">{pct(r.change_pct)}</td>
+              <td data-label="Vol x" class="wide-only">{num(r.vol_ratio, 1)}</td>
+              <td data-label="Turnover" class="wide-only">{crore(r.turnover)}</td>
             </tr>
           {/each}
         </tbody>

@@ -3,14 +3,21 @@
   // (two copies of the row, shifted by half), pauses on hover or keyboard focus,
   // and becomes a still, swipeable row for visitors who prefer reduced motion.
   // Shows the last NSE close; accounts with live access get Dhan prices in place.
+  import { onMount } from "svelte";
   import { date, pct, tone } from "$lib/format";
   import { live, watch } from "$lib/live.svelte";
   import { session } from "$lib/session.svelte";
+  import { viewport } from "$lib/viewport.svelte";
 
   type Quote = { symbol: string; close: number | null; change_pct: number | null; as_of: string | null };
   let { quotes, liveAccess: access = false }: { quotes: Quote[]; liveAccess?: boolean } = $props();
   // Live only while the market is open; otherwise NSE's close.
-  const liveAccess = $derived(access && session.open);
+  // Phones don't show the tape, so they don't hold a socket open for it either.
+  const liveAccess = $derived(access && session.open && !viewport.compact);
+  // The second copy only makes the loop seamless. It's added once running on a wide screen, which keeps 50 links out of every page's HTML.
+  let looping = $state(false);
+  onMount(() => (looping = !viewport.compact));
+  $effect(() => { if (!viewport.compact) looping = true; });
 
   $effect(() => (liveAccess && quotes.length ? watch(quotes.map((q) => q.symbol)) : undefined));
 
@@ -34,8 +41,8 @@
       <span class="when">{#if isLive}<i class="dot"></i>Live{:else}Close {date(asOf).replace(/ \d{4}$/, "")}{/if}</span>
     </div>
     <div class="viewport">
-      <div class="track" style="--dur: {seconds}s">
-        {#each [0, 1] as copy}
+      <div class="track" class:looping style="--dur: {seconds}s">
+        {#each looping ? [0, 1] : [0] as copy}
           <ul class="set" aria-hidden={copy === 1 ? "true" : undefined}>
             {#each rows as r (r.symbol)}
               <li>
@@ -62,7 +69,8 @@
   .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--up-rev); animation: pulse 2s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: 0.35; } }
   .viewport { flex: 1; min-width: 0; overflow: hidden; mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
-  .track { display: flex; width: max-content; height: 100%; animation: scroll var(--dur) linear infinite; }
+  .track { display: flex; width: max-content; height: 100%; }
+  .track.looping { animation: scroll var(--dur) linear infinite; }
   .ticker:hover .track, .ticker:focus-within .track { animation-play-state: paused; }
   .set { display: flex; margin: 0; padding: 0; list-style: none; }
   li a { display: flex; align-items: center; gap: 6px; height: 100%; padding: 0 14px; white-space: nowrap; color: var(--on-ink); }
@@ -74,8 +82,9 @@
   @keyframes scroll { to { transform: translateX(-50%); } }
   @media (prefers-reduced-motion: reduce) {
     .viewport { overflow-x: auto; scrollbar-width: none; mask-image: none; }
-    .track { animation: none; }
+    .track.looping { animation: none; }
     .set[aria-hidden] { display: none; }
   }
-  @media (max-width: 640px) { .when { display: none; } .label { padding: 0 10px 0 12px; } }
+  /* The home page's index strip does this job on phones, in less space. */
+  @media (max-width: 860px) { .ticker { display: none; } }
 </style>

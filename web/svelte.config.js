@@ -9,7 +9,8 @@ export default {
   kit: {
     // Builds a Cloudflare Worker (see wrangler.jsonc). `npm run dev:web` still
     // runs plain Vite, proxying API paths to the local Node API.
-    adapter: adapter(),
+    // PREVIEW_NO_BINDINGS: local previews and browser tests talk to API_URL instead of the service binding.
+    adapter: adapter(process.env.PREVIEW_NO_BINDINGS ? { platformProxy: { configPath: "test/preview.wrangler.jsonc" } } : {}),
     env: { dir: ".." },
     // Behind a tunnel the dev server sees http:// while the browser sends an
     // https:// Origin, so form posts need the public origin trusted explicitly.
@@ -24,7 +25,9 @@ export default {
       directives: {
         "default-src": ["self"],
         // Cloudflare Web Analytics and Microsoft Clarity: their scripts and where those scripts report.
-        "script-src": ["self", "https://static.cloudflareinsights.com", "https://*.clarity.ms", "https://c.bing.com"],
+        // TradingView's chart: its loader script here, the chart itself in the frame below.
+        "script-src": ["self", "https://static.cloudflareinsights.com", "https://*.clarity.ms", "https://c.bing.com", "https://widgets.tradingview-widget.com"],
+        "frame-src": ["https://www.tradingview-widget.com"],
         "style-src": ["self", "unsafe-inline"],
         "font-src": ["self"],
         // News thumbnails come from many publishers' image hosts; images can't run code.

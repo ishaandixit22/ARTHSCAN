@@ -131,6 +131,10 @@
   .filters { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 24px; border-bottom: 1px solid var(--line); }
   .filters .tabs { flex-wrap: wrap; gap: 4px 20px; }
   .filters .tabs a { padding: 9px 0; }
+  @media (max-width: 860px) {
+    .filters .tabs { flex-wrap: nowrap; gap: 0; }
+    .filters .tabs a { padding: 9px 12px; }
+  }
   .toggle { font-size: 13px; color: var(--brand-2); }
 
   .timeline { list-style: none; margin: 0; padding: 0; }

@@ -178,5 +178,11 @@
   .movers .name { max-width: none; }
   .movers b { font-weight: 500; font-size: 13px; }
   .small { font-size: 12.5px; }
-  @media (max-width: 640px) { .right select { min-width: 0; flex: 1; } .legend .sub { display: none; } }
+  @media (max-width: 860px) {
+    .views { flex-wrap: nowrap; gap: 0; }
+    .views a { padding: 9px 12px; }
+    .right { width: 100%; gap: 10px; }
+    .right select { min-width: 0; flex: 1 1 100%; }
+  }
+  @media (max-width: 640px) { .legend .sub { display: none; } }
 </style>

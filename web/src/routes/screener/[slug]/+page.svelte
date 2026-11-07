@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
   import { BRAND } from "$lib/brand";
   import { cr, date, int, num, pct, price, tone } from "$lib/format";
 
@@ -116,8 +117,18 @@
           Checked {int(r.checked)} stocks{#if r.freshness.live_stocks}, {int(r.freshness.live_stocks)} with a trade today; the rest are on their last close{/if}.
           {#if s.kind !== "intraday" && s.segment === "fundamental"}Stocks without loaded company statements aren't included.{/if}
         </p>
+        <div class="phone-sort">
+          <select aria-label="Sort by" value={data.sort} onchange={(e) => goto(`?${new URLSearchParams({ sort: e.currentTarget.value, dir: "desc" })}`, { noScroll: true })}>
+            <option value="symbol">Sort: Stock</option>
+            <option value="price">Sort: Price</option>
+            <option value="change">Sort: Day</option>
+            <option value="mcap">Sort: Market cap</option>
+            {#each s.columns as c, i}<option value="v{i}">Sort: {c.label}</option>{/each}
+          </select>
+          <a class="btn dir" href={sortHref(data.sort)} data-sveltekit-noscroll aria-label={data.dir === "asc" ? "Sorted lowest first; switch to highest first" : "Sorted highest first; switch to lowest first"}>{data.dir === "asc" ? "↑" : "↓"}</a>
+        </div>
         <div class="table-scroll">
-          <table>
+          <table class="m-cards m-quote">
             <thead>
               <tr>
                 <th><a class="sort" class:on={data.sort === "symbol"} href={sortHref("symbol")}>Stock{arrow("symbol")}</a></th>
@@ -133,10 +144,10 @@
               {#each r.results as row (row.symbol)}
                 <tr>
                   <td><a href="/stock/{row.symbol}" class="sym">{row.symbol}</a><span class="name">{row.name}</span></td>
-                  <td>{price(row.price)}</td>
-                  <td class={tone(row.change_pct)}>{pct(row.change_pct)}</td>
-                  <td class="wide-only">{cr(row.mcap)}</td>
-                  {#each row.values as v}<td class="wide-only">{num(v)}</td>{/each}
+                  <td data-label="Price">{price(row.price)}</td>
+                  <td class={tone(row.change_pct)} data-label="Day">{pct(row.change_pct)}</td>
+                  <td class="wide-only" data-label="Market cap">{cr(row.mcap)}</td>
+                  {#each row.values as v, i}<td class="wide-only" data-label={s.columns[i]?.label}>{num(v)}</td>{/each}
                 </tr>
               {:else}
                 <tr><td colspan={4 + s.columns.length} class="empty">No stocks meet these rules right now.</td></tr>
@@ -175,5 +186,15 @@
   .sort.on { color: var(--ink); font-weight: 600; }
   .pager { display: flex; gap: 12px; align-items: center; justify-content: center; padding: 12px; }
   .foot { font-size: 12.5px; }
-  @media (max-width: 640px) { .wide-only { display: none; } .fresh { justify-content: flex-start; } }
+  .phone-sort { display: none; }
+  @media (max-width: 640px) {
+    .wide-only { display: none; }
+    .fresh { justify-content: flex-start; }
+    .checked { padding: 0 0 8px; }
+    .pager .btn { min-height: var(--tap); }
+    .phone-sort { display: grid; grid-template-columns: minmax(0, 1fr) var(--tap); gap: 8px; padding-bottom: 6px; }
+    .phone-sort select { width: 100%; }
+    .dir { padding: 0; }
+    .wait { padding: 16px 0; }
+  }
 </style>

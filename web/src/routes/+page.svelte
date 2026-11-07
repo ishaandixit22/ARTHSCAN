@@ -1,6 +1,6 @@
 <script lang="ts">
   import StockTable from "$lib/components/StockTable.svelte";
-  import MarketCity from "$lib/components/MarketCity.svelte";
+  import CityTiles from "$lib/components/CityTiles.svelte";
   import Search from "$lib/components/Search.svelte";
   import { BRAND } from "$lib/brand";
   import LiveStamp from "$lib/components/LiveStamp.svelte";
@@ -8,6 +8,8 @@
   import { live, watch } from "$lib/live.svelte";
   import { market, useLiveMarket, type LiveStock } from "$lib/liveMarket.svelte";
   import { reveal } from "$lib/reveal";
+  import { viewport } from "$lib/viewport.svelte";
+  import { onMount, type Component } from "svelte";
 
   let { data } = $props();
   // Accounts with live access see breadth and movers from live prices; everyone else the last close.
@@ -44,7 +46,19 @@
   // The city keeps its layout (sector districts, footprint by the last close's turnover); live prices move the towers.
   // Keyed on a boolean: `lm` is a new object every poll, which would drop and resend the subscription each time.
   const isLive = $derived(!!lm);
-  $effect(() => (isLive ? watch(data.cityStocks.map((s) => s.symbol)) : undefined));
+  // The 3D city is the page's costliest code by far, so it arrives separately: straight away on a
+  // desktop, and only on request on a phone, which shows the same market as plain tiles.
+  let City = $state<Component<{ stocks: any[]; label: string }> | null>(null);
+  let cityLoading = $state(false);
+  async function loadCity() {
+    if (City || cityLoading) return;
+    cityLoading = true;
+    City = (await import("$lib/components/MarketCity.svelte")).default as any;
+    cityLoading = false;
+  }
+  onMount(() => { if (!viewport.compact) void loadCity(); });
+  $effect(() => { if (!viewport.compact) void loadCity(); });
+  $effect(() => (isLive && City ? watch(data.cityStocks.map((s) => s.symbol)) : undefined));
   const city = $derived(lm ? data.cityStocks.map((s) => {
     const q = live.quotes[s.symbol];
     return q?.changePct != null ? { ...s, change: q.changePct, close: q.ltp } : s;
@@ -106,7 +120,7 @@
         {#if fii}Foreign institutions were net <a href="/fii-dii" class={tone(fii.net_value)}>{(fii.net_value ?? 0) >= 0 ? "buyers" : "sellers"} of {cr(Math.abs(fii.net_value ?? 0))}</a>{#if dii}, Indian institutions net <a href="/fii-dii" class={tone(dii.net_value)}>{(dii.net_value ?? 0) >= 0 ? "buyers" : "sellers"} of {cr(Math.abs(dii.net_value ?? 0))}</a>{/if}.{/if}
       </p>
       <div class="lookup">
-        <Search lead placeholder="Look up any NSE company: ITC, HDFC Bank…" />
+        <Search lead placeholder="Look up a company: ITC, HDFC Bank…" />
         <a class="screen" href="/screener">Or browse 180 ready-made stock screens →</a>
       </div>
       <aside class="explainer">
@@ -119,11 +133,20 @@
     <figure class="scene">
       <figcaption class="caption-top">
         <h2>The Nifty 100 as a city</h2>
-        <span>Height is the day's move; footprint is turnover. Drag to turn, tap a tower to open the stock.</span>
+        <span class="desk-note">Height is the day's move; footprint is turnover. Drag to turn, tap a tower to open the stock.</span>
+        <span class="phone-note">Each tile is a company, grouped by sector: green rose, red fell, deeper for a bigger move.</span>
       </figcaption>
       {#if data.cityStocks.length}
-        <div class="plate">
-          <MarketCity stocks={city} label="The Nifty 100 as a 3D city: {cityUp} companies {cityLive ? "are up" : "rose"} and {cityDown} {cityLive ? "are down" : "fell"}{cityLive ? " right now" : ` on ${day}`}." />
+        {#if !City}
+          <div class="phone-city">
+            <CityTiles stocks={city} />
+            <button type="button" class="btn open-3d" disabled={cityLoading} onclick={loadCity}>{cityLoading ? "Opening the city…" : "Open the 3D city"}</button>
+          </div>
+        {/if}
+        <div class="plate" class:ready={!!City}>
+          {#if City}
+            <City stocks={city} label="The Nifty 100 as a 3D city: {cityUp} companies {cityLive ? "are up" : "rose"} and {cityDown} {cityLive ? "are down" : "fell"}{cityLive ? " right now" : ` on ${day}`}." />
+          {/if}
         </div>
         <figcaption class="caption">
           <span><i class="sw up"></i>{cityUp} {cityLive ? "up" : "rose"}</span>
@@ -279,6 +302,7 @@
   .caption-top h2 { font-size: 15px; font-weight: 850; font-stretch: 72%; text-transform: uppercase; letter-spacing: 0.05em; }
   .caption-top span { font: 14px/1.4 var(--serif); color: var(--ink-2); }
   .plate { position: relative; min-height: 0; animation: develop 1.4s var(--ease) both 0.2s; }
+  .phone-city, .phone-note { display: none; }
   @keyframes develop { from { opacity: 0; filter: contrast(0.4); } }
   .caption { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding-top: 10px !important; border-top: 1px solid var(--line-2); font-size: 13px; font-weight: 600; font-stretch: 85%; }
   .caption span { display: inline-flex; align-items: center; gap: 6px; }
@@ -356,13 +380,31 @@
     .ideas article:nth-child(4) { padding-left: 0; border-left: 0; }
   }
   @media (max-width: 860px) {
-    .page1 { grid-template-columns: minmax(0, 1fr); }
-    .page1 > * { padding: 18px 0 22px !important; border-left: 0 !important; }
+    /* Read top down on a phone: the day's story, who moved, then the market as a picture. */
+    .front { grid-template-columns: minmax(0, 1fr); gap: 26px; padding-bottom: 32px; }
+    .page1 > * { min-width: 0; }
+    .indices { position: relative; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 8px 16px; }
+    .indices a { flex: none; white-space: nowrap; }
+    .asof { display: none; }
+    .page1 { display: flex; flex-direction: column; margin-top: -14px; }
+    .page1 > * { padding: 16px 0 20px !important; border-left: 0 !important; }
     .page1 > * + * { border-top: 1px solid var(--line-2); }
-    .scene, .listings { grid-column: auto; grid-row: auto; }
-    .scene { min-height: 0; grid-template-rows: auto 420px auto; }
+    .lead { order: 1; gap: 12px; }
+    .lead h1 { animation: none; }
+    .listings { order: 2; }
+    .scene { order: 3; min-height: 0; display: block; }
     .scene figcaption { padding: 0; }
-    .boards { grid-template-columns: minmax(0, 1fr); gap: 34px; }
+    .caption-top { border-bottom: 0; padding-bottom: 6px !important; }
+    .desk-note { display: none; }
+    .phone-note { display: inline; }
+    .phone-city { display: grid; gap: 12px; }
+    .plate { animation: none; display: none; }
+    .plate.ready { display: block; height: 380px; }
+    .caption { margin-top: 10px; }
+    .boards { content-visibility: visible; }
+    .mrow { height: 40px; }
+    .boards .card .tabs button { padding: 10px 12px; }
+    .boards { grid-template-columns: minmax(0, 1fr); gap: 28px; }
     .boards .card:first-child { padding-right: 0; }
     .boards .card + .card { padding-left: 0; border-left: 0; }
     .ideas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -370,17 +412,16 @@
     .ideas article:nth-child(4) { padding-left: 22px; border-left: 1px solid var(--line-2); }
   }
   @media (max-width: 640px) {
-    .front { gap: 30px; }
-    .indices { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-    .indices a { padding: 0 12px; font-size: 13px; white-space: nowrap; }
-    .asof { display: none; }
-    .lead h1 { font-size: 44px; }
+    .indices a { padding: 0 12px; font-size: 13px; }
+    .lead h1 { font-size: clamp(32px, 10vw, 40px); line-height: 0.96; }
     .standfirst { font-size: 16px; }
-    .scene { grid-template-rows: auto 340px auto; }
+    .lead :global(.lead input) { height: 46px; font-size: 16px; }
+    .lead :global(.lead .go) { height: 46px; }
+    .lead :global(.lead .glass) { top: 16px; }
     .caption .dateline { margin-left: 0; }
     .pulse .value { font-size: 28px; }
     .means { font-size: 13px; }
-    .sectors a { grid-template-columns: minmax(0, 1fr) 64px; }
+    .sectors a { grid-template-columns: minmax(0, 1fr) 64px; min-height: var(--row); }
     .sbar { display: none; }
     .ideas { grid-template-columns: minmax(0, 1fr); row-gap: 22px; }
     .ideas article { padding-left: 0 !important; border-left: 0 !important; }
