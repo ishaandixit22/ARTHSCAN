@@ -11,5 +11,9 @@ export default defineConfig({
     baseURL: process.env.BASE_URL ?? "http://localhost:5173",
     reducedMotion: "reduce",
     actionTimeout: 10_000,
+    // Gated pages need a session while REQUIRE_SIGN_IN is on.
+    storageState: process.env.SESSION_COOKIE
+      ? { cookies: [{ name: "al_session", value: process.env.SESSION_COOKIE, domain: new URL(process.env.BASE_URL ?? "http://localhost:5173").hostname, path: "/", expires: -1, httpOnly: true, secure: false, sameSite: "Lax" }], origins: [] }
+      : undefined,
   },
 });

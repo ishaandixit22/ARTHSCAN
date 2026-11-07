@@ -3,8 +3,8 @@
   import Prose from "$lib/components/Prose.svelte";
 
   const rows = [
-    ["Stock pages, screener and market pages", "Free", "No account needed"],
-    ["Mutual funds, IPOs and news", "Free", "No account needed"],
+    ["Stock pages, screener and market pages", "Free", "Sign in with Google"],
+    ["Mutual funds, IPOs and news", "Free", "Sign in with Google"],
     ["Financial calculators", "Free", "No account needed"],
     ["REST API and MCP server", "Free", "Sign in; 50 calls a day"],
   ];
@@ -12,7 +12,7 @@
 
 <svelte:head>
   <title>Pricing — {BRAND}</title>
-  <meta name="description" content="{BRAND} is free to use. Browse the site without an account, and use the API and MCP server on a free plan of 50 calls a day." />
+  <meta name="description" content="{BRAND} is free to use. Sign in with Google to use the site, the API and MCP server on a free plan of 50 calls a day." />
   <link rel="canonical" href="https://{DOMAIN}/pricing" />
 </svelte:head>
 

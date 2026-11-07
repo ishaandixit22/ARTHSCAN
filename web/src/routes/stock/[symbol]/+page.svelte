@@ -2,6 +2,7 @@
   import { page } from "$app/state";
   import { onMount, untrack } from "svelte";
   import ProChart from "$lib/components/ProChart.svelte";
+  import TradingViewChart from "$lib/components/TradingViewChart.svelte";
   import StockReading from "$lib/components/StockReading.svelte";
   import StockOverview from "$lib/components/StockOverview.svelte";
   import StockForecast from "$lib/components/StockForecast.svelte";
@@ -162,6 +163,7 @@
     return () => clearInterval(timer);
   });
   const digest = $derived(desk.digest);
+  let chartView = $state<"tradingview" | "intraday">("tradingview");
   const chartTick = $derived(lq ? { ltp: lq.ltp, volume: lq.volume } : session.open && desk.quote?.ltp ? { ltp: desk.quote.ltp, volume: desk.quote.volume } : null);
   const headPrice = $derived(bseOnly && desk.quote?.ltp && session.open ? desk.quote.ltp : m.close);
   const headChange = $derived(bseOnly && desk.quote?.ltp && desk.quote?.prev_close && session.open ? ((desk.quote.ltp - desk.quote.prev_close) / desk.quote.prev_close) * 100 : m.change_pct);
@@ -378,8 +380,19 @@
   <div id="chart" class="block">
     <h2>Chart</h2>
     <section class="chart-card">
-      <ProChart symbol={c.symbol} name={c.name} tick={chartTick} actions={digest?.actions ?? []} />
-      <p class="sub note">Candles from Dhan, {bseOnly ? "BSE" : "NSE"} prices, times in IST. Past prices are adjusted for splits and bonuses. Your drawings and settings stay in this browser.</p>
+      {#if data.tvSymbol}
+        <div class="chart-switch" role="group" aria-label="Chart type">
+          <button type="button" aria-pressed={chartView === "tradingview"} onclick={() => (chartView = "tradingview")}>TradingView</button>
+          <button type="button" aria-pressed={chartView === "intraday"} onclick={() => (chartView = "intraday")}>Intraday &amp; live</button>
+        </div>
+      {/if}
+      {#if data.tvSymbol && chartView === "tradingview"}
+        <TradingViewChart symbol={data.tvSymbol} />
+        <p class="sub note">Daily, weekly and monthly candles on BSE prices, supplied by TradingView{bseOnly ? "" : ", so they can differ slightly from the NSE price above"}. For minute and hourly candles, use Intraday &amp; live.</p>
+      {:else}
+        <ProChart symbol={c.symbol} name={c.name} tick={chartTick} actions={digest?.actions ?? []} />
+        <p class="sub note">Candles from Dhan, {bseOnly ? "BSE" : "NSE"} prices, times in IST. Past prices are adjusted for splits and bonuses. Your drawings and settings stay in this browser.</p>
+      {/if}
     </section>
   </div>
 
@@ -590,6 +603,10 @@
   .moving a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
   .moving a:hover { text-decoration-color: currentColor; }
   .chart-card .note { margin-top: 8px; }
+  .chart-switch { display: inline-flex; gap: 4px; margin-bottom: 12px; }
+  .chart-switch button { min-height: 36px; padding: 0 14px; font: inherit; font-size: 13px; color: var(--ink-2); background: none; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+  .chart-switch button[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); font-weight: 600; }
+  @media (pointer: coarse) { .chart-switch button { min-height: 44px; } }
   .signals { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
 
   /* Section rail under the stock's name: printed section heads, the one being read underlined in ink. */

@@ -25,7 +25,9 @@ export default {
       directives: {
         "default-src": ["self"],
         // Cloudflare Web Analytics and Microsoft Clarity: their scripts and where those scripts report.
-        "script-src": ["self", "https://static.cloudflareinsights.com", "https://*.clarity.ms", "https://c.bing.com"],
+        // TradingView's chart: its loader script here, the chart itself in the frame below.
+        "script-src": ["self", "https://static.cloudflareinsights.com", "https://*.clarity.ms", "https://c.bing.com", "https://widgets.tradingview-widget.com"],
+        "frame-src": ["https://www.tradingview-widget.com"],
         "style-src": ["self", "unsafe-inline"],
         "font-src": ["self"],
         // News thumbnails come from many publishers' image hosts; images can't run code.

@@ -1,4 +1,5 @@
 // What must hold on every page at every width, and the phone behaviours that keep pages light.
+// With REQUIRE_SIGN_IN on, run with SESSION_COOKIE=<al_session value> so gated pages open.
 import { expect, test, type Page } from "@playwright/test";
 
 const ROUTES = [

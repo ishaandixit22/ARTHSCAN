@@ -31,7 +31,7 @@
   <Prose>
     <h2>What it is</h2>
     <p>{BRAND} brings together what you need to look into an Indian stock. Each company has a page with its prices, financials, filings and ownership. The rest of the site follows the market around it: sectors, FII and DII flows, bulk and block deals, deliveries, F&amp;O bans, earnings dates, corporate actions, IPOs and mutual funds.</p>
-    <p>There is also a <a href="/screener">stock screener</a> and a set of <a href="/calculators">financial calculators</a>. You can use all of it without an account.</p>
+    <p>There is also a <a href="/screener">stock screener</a> and a set of <a href="/calculators">financial calculators</a>. The calculators need no account; everything else is free with a Google sign-in.</p>
 
     <h2>For developers and AI assistants</h2>
     <p>The same data is available over a REST API and an MCP server, so Claude, ChatGPT, Cursor and other assistants can answer questions from it directly. The <a href="/developers">developer page</a> shows how to connect.</p>
