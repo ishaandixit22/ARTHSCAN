@@ -1,6 +1,6 @@
 // Owner tools for the scheduled data refresh.
 //   POST /api/admin/refresh          run the daily refresh now (optional ?date=YYYY-MM-DD&force=1)
-//   POST /api/admin/check            run the daily self-check now: reload missed sessions, catch up metrics and BSE
+//   POST /api/admin/check            run the daily self-check now: reload missed sessions, catch up metrics and BSE (?notify=1 also sends the summary)
 //   GET  /api/admin/refresh-status   the latest pipeline runs and how fresh each dataset is
 //   GET  /api/admin/symbol-changes   ticker changes waiting to merge, left alone, and already merged
 //   POST /api/admin/screens?step=    run one screens step now: tick, series, weekly, minutes, intraday
@@ -9,6 +9,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env.js";
 import { selfCheck } from "../jobs/check.js";
+import { sendSummary } from "../jobs/health-report.js";
 import { recomputeMetrics, runDaily } from "../jobs/daily.js";
 import { applySymbolChanges, findSymbolChanges } from "../jobs/symbol-changes.js";
 import { jsonError } from "../lib/http.js";
@@ -37,7 +38,12 @@ admin.post("/refresh", async (c) => {
   return c.json({ ok: true, ...report });
 });
 
-admin.post("/check", async (c) => c.json({ ok: true, ...(await selfCheck(c.env)) }));
+admin.post("/check", async (c) => {
+  const report = await selfCheck(c.env);
+  // ?notify=1 also sends the morning summary, to test email and WhatsApp.
+  const summary = c.req.query("notify") === "1" ? await sendSummary(c.env, report) : null;
+  return c.json({ ok: true, ...report, summary });
+});
 
 admin.post("/screens", async (c) => {
   const step = c.req.query("step");

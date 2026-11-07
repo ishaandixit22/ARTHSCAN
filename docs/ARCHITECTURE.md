@@ -41,15 +41,17 @@ only. They never run on the site.
 
 ## 3. Scheduled work (Cloudflare cron, UTC)
 
+Alerts go by email (Resend: secrets `RESEND_API_KEY`, `ALERT_EMAIL_TO`, optional `ALERT_EMAIL_FROM`) and WhatsApp (CallMeBot: `CALLMEBOT_PHONE`, `CALLMEBOT_APIKEY`). A channel without its secrets is skipped. `POST /api/admin/check?notify=1` sends the summary on demand.
+
 Cloudflare numbers weekdays 1 = Sunday to 7 = Saturday, so the crons use day names. Until 2026-11-07 they read `1-5`, which ran Sunday to Thursday and never loaded Friday's session.
 
 | Cron | IST | Job |
 |---|---|---|
 | `45 12 * * MON-FRI` | 18:15 weekdays | daily refresh: prices, deliveries, indices, FII/DII, F&O ban, open interest, splits, results, metrics |
 | `0 14 * * MON-FRI` | 19:30 weekdays | same refresh again (files NSE publishes late) |
-| `30 16 * * MON-FRI` | 22:00 weekdays | same refresh again |
+| `30 16 * * MON-FRI` | 22:00 weekdays | same refresh again; failed steps here or in the 08:30 run send an instant alert |
 | `0 3 * * TUE-SAT` | 08:30 Tue-Sat | catch-up for the previous session |
-| `30 4 * * *` | 10:00 every day | self-check (`jobs/check.ts`): reloads any missed session of the last week, catches up metrics and BSE prices, publishes the result on `/health` |
+| `30 4 * * *` | 10:00 every day | self-check (`jobs/check.ts`): reloads any missed session of the last week, catches up metrics and BSE prices, publishes the result on `/health`, then emails and WhatsApps the morning summary (`jobs/health-report.ts`, `lib/notify.ts`) |
 | `*/5 3-10 * * MON-FRI` | every 5 min, 08:30-16:25 weekdays | intraday screens |
 | `*/10 * * * *` | every 10 min | statement store fill: up to 25 companies, 300 provider requests a day |
 

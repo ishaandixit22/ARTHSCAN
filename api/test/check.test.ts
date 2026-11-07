@@ -25,7 +25,7 @@ describe("daily self-check", () => {
     const asked: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       asked.push(url);
-      if (url.includes("BhavCopy_NSE_CM_0_0_0_20261106_")) return new Response(bhavcopy(["AAA,EQ,Aaa Ltd,INE000A01010,101,104,100,103,101,1200,123600,40"]));
+      if (url.includes("BhavCopy_NSE_CM_0_0_0_20261106_")) return new Response(bhavcopy(["AAA,EQ,Aaa Ltd,INE000A01010,101,104,100,103,101,1200,123600,40"]) as unknown as BodyInit);
       return new Response("not found", { status: 404 });
     }));
     const r = await selfCheck(env, Date.parse("2026-11-07T04:30:00Z"));
@@ -41,7 +41,7 @@ describe("daily self-check", () => {
   });
 
   it("the next day finds nothing missing and reloads nothing", async () => {
-    const fetchMock = vi.fn(async () => new Response("not found", { status: 404 }));
+    const fetchMock = vi.fn(async (_url: string) => new Response("not found", { status: 404 }));
     vi.stubGlobal("fetch", fetchMock);
     const r = await selfCheck(env, Date.parse("2026-11-08T04:30:00Z"));
     expect(r.items.find((i) => i.check === "sessions")).toMatchObject({ status: "ok" });
@@ -50,7 +50,7 @@ describe("daily self-check", () => {
   });
 
   it("before 18:00 IST doesn't expect today's file yet", async () => {
-    const fetchMock = vi.fn(async () => new Response("not found", { status: 404 }));
+    const fetchMock = vi.fn(async (_url: string) => new Response("not found", { status: 404 }));
     vi.stubGlobal("fetch", fetchMock);
     await selfCheck(env, Date.parse("2026-11-09T06:00:00Z")); // Monday 11:30 IST
     expect(fetchMock.mock.calls.some(([u]) => String(u).includes("20261109"))).toBe(false);

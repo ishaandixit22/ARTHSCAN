@@ -23,6 +23,12 @@ export interface Env {
   DHAN_FEED_URL?: string;
   /** Indian Stock API (indianapi.in) key, a secret. Its tools answer 503 until it is set. */
   INDIANAPI_KEY?: string;
+  /** Alerts and the daily health summary (lib/notify.ts). Each channel is skipped while its settings are missing. */
+  RESEND_API_KEY?: string;
+  ALERT_EMAIL_TO?: string;
+  ALERT_EMAIL_FROM?: string;
+  CALLMEBOT_PHONE?: string;
+  CALLMEBOT_APIKEY?: string;
   INDIANAPI_BASE_URL?: string;
   /** Provider requests the background statement fill may spend per day (default 300; raise it to match the plan). */
   STATEMENTS_DAILY_MAX?: string;
