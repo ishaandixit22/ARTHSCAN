@@ -49,7 +49,7 @@ Cloudflare numbers weekdays 1 = Sunday to 7 = Saturday, so the crons use day nam
 |---|---|---|
 | `45 12 * * MON-FRI` | 18:15 weekdays | daily refresh: prices, deliveries, indices, FII/DII, F&O ban, open interest, splits, results, metrics |
 | `0 14 * * MON-FRI` | 19:30 weekdays | same refresh again (files NSE publishes late) |
-| `30 16 * * MON-FRI` | 22:00 weekdays | same refresh again; failed steps here or in the 08:30 run send an instant alert |
+| `30 16 * * MON-FRI` | 22:00 weekdays | same refresh again, then an evening email saying whether today's session loaded; failed steps here or in the 08:30 run send an instant alert instead |
 | `0 3 * * TUE-SAT` | 08:30 Tue-Sat | catch-up for the previous session |
 | `30 4 * * *` | 10:00 every day | self-check (`jobs/check.ts`): reloads any missed session of the last week, catches up metrics and BSE prices, publishes the result on `/health`, then emails and WhatsApps the morning summary (`jobs/health-report.ts`, `lib/notify.ts`) |
 | `*/5 3-10 * * MON-FRI` | every 5 min, 08:30-16:25 weekdays | intraday screens |

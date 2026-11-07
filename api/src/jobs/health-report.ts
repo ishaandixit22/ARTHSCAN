@@ -121,3 +121,18 @@ export function failureMessage(daily: DailyReport | null, bse: { failedCalls: nu
     short: lines.join("\n"),
   };
 }
+
+/** The evening note after the 22:00 IST refresh, when nothing failed: did today's session load? */
+export function eveningMessage(daily: DailyReport, bse: { saved: number; stocks: number } | null, today: string): Message {
+  const prices = daily.steps.find((s) => s.step === "prices");
+  const loaded = daily.date === today && (prices?.status === "ok" || prices?.status === "exists");
+  const steps = daily.steps.map((s) => `  ${s.status === "error" ? "✗" : "✓"} ${s.step}: ${s.status}${s.rows != null ? ` (${s.rows})` : ""}${s.message ? ` — ${s.message}` : ""}`);
+  const head = loaded
+    ? `Today's session (${today}) is loaded: ${prices?.rows ?? "?"} NSE stocks${bse ? `, ${bse.saved} BSE-only stocks` : ""}.`
+    : `NSE hasn't published a file for ${today} (a market holiday, or late). The site shows ${daily.date ?? "no"} prices; the 08:30 run and the 10:00 IST check will load it if it appears.`;
+  return {
+    subject: loaded ? `Arthscan evening: ${today} loaded` : `Arthscan evening: no NSE session for ${today}`,
+    text: [head, "", "Tonight's refresh:", ...steps, "", "Details: https://arthscan.me/health"].join("\n"),
+    short: head,
+  };
+}

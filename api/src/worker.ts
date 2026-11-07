@@ -6,7 +6,8 @@ import { app } from "./app.js";
 import type { Env } from "./env.js";
 import { fillBseHistory, refreshBse } from "./jobs/bse.js";
 import { selfCheck } from "./jobs/check.js";
-import { failureMessage, sendSummary } from "./jobs/health-report.js";
+import { eveningMessage, failureMessage, sendSummary } from "./jobs/health-report.js";
+import { todayIST } from "./lib/nse.js";
 import { notify } from "./lib/notify.js";
 import { runDaily } from "./jobs/daily.js";
 import { recordIpoCategories } from "./jobs/ipo-readings.js";
@@ -64,6 +65,8 @@ export default {
       if (!final) return;
       const m = failureMessage(d, b, final) ?? (!d ? { subject: `Arthscan alert: the ${final} refresh crashed`, text: "See the Workers logs. Details: https://arthscan.me/health" } : null);
       if (m) await notify(env, m);
+      // The evening note: one message a weekday night saying whether today's session made it.
+      else if (d && event.cron === "30 16 * * MON-FRI") await notify(env, eveningMessage(d, b, todayIST()));
     }));
   },
 };

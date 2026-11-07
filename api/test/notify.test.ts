@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../src/env.js";
 import type { CheckReport } from "../src/jobs/check.js";
-import { failureMessage, summaryMessage } from "../src/jobs/health-report.js";
+import { eveningMessage, failureMessage, summaryMessage } from "../src/jobs/health-report.js";
 import { notify } from "../src/lib/notify.js";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -65,5 +65,13 @@ describe("alerts", () => {
     const m = failureMessage({ date: "2026-11-06", ms: 1, steps: [{ step: "deliveries", status: "error", message: "HTTP 403" }] }, { failedCalls: 2, stocks: 2000 }, "22:00 IST");
     expect(m?.subject).toBe("Arthscan alert: 2 failed steps in the 22:00 IST refresh");
     expect(m?.text).toContain("NSE deliveries (2026-11-06): HTTP 403");
+  });
+
+  it("evening note says whether today's session loaded", () => {
+    const ok = eveningMessage({ date: "2026-11-09", ms: 1, steps: [{ step: "prices", status: "ok", rows: 3440 }] }, { saved: 1810, stocks: 2000 }, "2026-11-09");
+    expect(ok.subject).toBe("Arthscan evening: 2026-11-09 loaded");
+    expect(ok.short).toContain("3440 NSE stocks, 1810 BSE-only stocks");
+    const holiday = eveningMessage({ date: "2026-11-06", ms: 1, steps: [{ step: "prices", status: "exists", rows: 3443 }] }, null, "2026-11-09");
+    expect(holiday.subject).toBe("Arthscan evening: no NSE session for 2026-11-09");
   });
 });
