@@ -23,6 +23,7 @@ import type { Env } from "../env.js";
 import { filingKind } from "../handlers/filings.js";
 import { csvObjects, num } from "../lib/csv.js";
 import { type Bar, METRIC_COLUMNS, metricsRow, snapRatio, ttmEps } from "../lib/indicators.js";
+import { isSessionDay } from "../lib/market-hours.js";
 import { addDaysISO, nseDate, NSE_HEADERS, nseFetch, nseQueryDate, todayIST } from "../lib/nse.js";
 import { currentQuarterEnd, FINANCIAL_COLUMNS, providerName, quarterRows, type Series } from "../lib/results.js";
 import { applySymbolChanges } from "./symbol-changes.js";
@@ -32,7 +33,7 @@ export type DailyReport = { date: string | null; steps: StepReport[]; ms: number
 
 const SERIES = new Set(["EQ", "BE", "BZ", "SM", "ST"]);
 const ddmmyyyy = (d: string) => `${d.slice(8, 10)}${d.slice(5, 7)}${d.slice(0, 4)}`;
-export const isWeekday = (d: string) => { const w = new Date(`${d}T00:00:00Z`).getUTCDay(); return w !== 0 && w !== 6; };
+const isWeekday = (d: string) => { const w = new Date(`${d}T00:00:00Z`).getUTCDay(); return w !== 0 && w !== 6; };
 const nextWeekday = (d: string) => { let x = addDaysISO(d, 1); while (!isWeekday(x)) x = addDaysISO(x, 1); return x; };
 
 /** GET an NSE file; null when it isn't there (holiday, not yet published). */
@@ -71,10 +72,10 @@ async function step(report: StepReport[], name: string, fn: () => Promise<Omit<S
   }
 }
 
-/** The session to load: the latest weekday up to today whose bhavcopy NSE has published. */
+/** The session to load: the latest weekday or special session up to today whose bhavcopy NSE has published. */
 async function sessionDate(today: string): Promise<{ date: string; buf: Uint8Array | null } | null> {
   for (let i = 0, d = today; i < 7; i++, d = addDaysISO(d, -1)) {
-    if (!isWeekday(d)) continue;
+    if (!isSessionDay(d)) continue;
     const buf = await nseFile(bhavcopyUrl(d));
     if (buf) return { date: d, buf };
   }

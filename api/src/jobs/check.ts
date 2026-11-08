@@ -1,7 +1,7 @@
 // The daily self-check, run every morning (weekends included) by its own cron and on demand by the owner.
 // It compares what the site holds with what the exchanges have published, and repairs what it can:
 //
-//   sessions   every weekday of the last week that has an NSE bhavcopy but no rows here → runDaily for it
+//   sessions   every weekday or special session of the last week that has an NSE bhavcopy but no rows here → runDaily for it
 //   metrics    stock_metrics older than the latest session                              → recomputed
 //   bse        BSE-only prices behind the latest NSE session                            → refreshBse
 //
@@ -9,9 +9,10 @@
 // which the public /health answer shows, so a missed or failed run is visible from outside.
 
 import type { Env } from "../env.js";
+import { isSessionDay } from "../lib/market-hours.js";
 import { addDaysISO, todayIST } from "../lib/nse.js";
 import { refreshBse } from "./bse.js";
-import { bhavcopyUrl, isWeekday, nseFile, recomputeMetrics, runDaily } from "./daily.js";
+import { bhavcopyUrl, nseFile, recomputeMetrics, runDaily } from "./daily.js";
 
 export type CheckItem = { check: string; status: "ok" | "fixed" | "failed" | "behind"; message: string };
 export type CheckReport = { at: string; latest_published: string | null; latest_loaded: string | null; items: CheckItem[]; ms: number };
@@ -43,7 +44,7 @@ export async function selfCheck(env: Env, now = Date.now()): Promise<CheckReport
   let latestPublished: string | null = null;
   const missing: string[] = [];
   for (let i = 0, d = todayExpected ? today : addDaysISO(today, -1); i < 8; i++, d = addDaysISO(d, -1)) {
-    if (!isWeekday(d)) continue;
+    if (!isSessionDay(d)) continue;
     const have = await env.DB.prepare("SELECT 1 FROM daily_prices WHERE date = ? LIMIT 1").bind(d).first();
     if (have) {
       latestPublished ??= d;

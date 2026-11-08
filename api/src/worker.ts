@@ -7,6 +7,7 @@ import type { Env } from "./env.js";
 import { fillBseHistory, refreshBse } from "./jobs/bse.js";
 import { selfCheck } from "./jobs/check.js";
 import { eveningMessage, failureMessage, sendSummary } from "./jobs/health-report.js";
+import { MORNING_REFRESH_CRON, refreshDue } from "./lib/market-hours.js";
 import { todayIST } from "./lib/nse.js";
 import { notify } from "./lib/notify.js";
 import { runDaily } from "./jobs/daily.js";
@@ -43,7 +44,7 @@ export default {
         }));
       return;
     }
-    if (event.cron === "*/5 3-10 * * MON-FRI") {
+    if (event.cron === "*/5 3-10 * * *") {
       ctx.waitUntil(runIntradayCycle(env).then((r) => r.ran && console.log(`intraday screens: ${JSON.stringify(r)}`)).catch((err) => console.error("intraday screens:", err)));
       return;
     }
@@ -57,16 +58,18 @@ export default {
       ctx.waitUntil(screensTick(env).catch((err) => console.error("screens:", err)));
       return;
     }
+    // These run every day so a weekend special session (Muhurat) is covered; ordinary weekends stop here.
+    if (!refreshDue(event.cron)) return;
     const bse = refreshBse(env).then((r) => { console.log(`bse prices: saved ${r.saved} of ${r.stocks}, corrected ${r.corrected}, failed calls ${r.failedCalls}`); return r; });
     const daily = runDaily(env).then((r) => { console.log(`daily ${r.date}: ${r.steps.map((s) => `${s.step}=${s.status}${s.rows != null ? `(${s.rows})` : ""}`).join(" ")} in ${r.ms} ms`); return r; });
     // Alerts only from the last run of the evening and the morning catch-up: earlier runs often fail while NSE is still publishing.
-    const final = { "30 16 * * MON-FRI": "22:00 IST", "0 3 * * TUE-SAT": "08:30 IST" }[event.cron];
+    const final = { "30 16 * * *": "22:00 IST", [MORNING_REFRESH_CRON]: "08:30 IST" }[event.cron];
     ctx.waitUntil(Promise.all([daily.catch(() => null), bse.catch(() => null)]).then(async ([d, b]) => {
       if (!final) return;
       const m = failureMessage(d, b, final) ?? (!d ? { subject: `Arthscan alert: the ${final} refresh crashed`, text: "See the Workers logs. Details: https://arthscan.me/health" } : null);
       if (m) await notify(env, m);
       // The evening note: one message a weekday night saying whether today's session made it.
-      else if (d && event.cron === "30 16 * * MON-FRI") await notify(env, eveningMessage(d, b, todayIST()));
+      else if (d && event.cron === "30 16 * * *") await notify(env, eveningMessage(d, b, todayIST()));
     }));
   },
 };

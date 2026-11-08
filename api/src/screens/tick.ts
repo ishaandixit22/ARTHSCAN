@@ -2,7 +2,7 @@
 // Steps run one after another, because Dhan's limit of 5 data calls a second covers them all.
 
 import type { Env } from "../env.js";
-import { istClock, marketOpen } from "../lib/market-hours.js";
+import { isSessionDay, istClock, marketOpen } from "../lib/market-hours.js";
 import { fillKeyMetrics, fillLongHistory, fillSnapshots, refreshIndexMembers } from "./fill.js";
 import { refreshMinuteHistory, runIntradayCycle, runWeekly } from "./run.js";
 import { buildSeries, seriesStale } from "./series.js";
@@ -51,7 +51,7 @@ export async function screensTick(env: Env) {
     await step("minutes", async () => {
       const c = istClock();
       const built = (await blobBuild(env, "min5_index"))?.split("|")[0] ?? null;
-      const due = built === null || (c.weekday >= 1 && c.weekday <= 5 && c.minutes >= 16 * 60 && built !== c.date);
+      const due = built === null || (isSessionDay(c.date) && c.minutes >= 16 * 60 && built !== c.date);
       return due ? refreshMinuteHistory(env) : null;
     });
     // Once per history load, so outside market hours the intraday screens show the session just ended.
