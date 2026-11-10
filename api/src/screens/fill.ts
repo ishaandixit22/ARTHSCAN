@@ -18,6 +18,9 @@ const OLDER_DAILY_ROWS = 280;
 /** Months kept beyond those: long enough for every monthly rule. */
 const OLDER_MONTH_ROWS = 180;
 const SNAPSHOT_DAYS = 7;
+// Snapshots taken before promoter holding was kept (10 Nov 2026) are asked again for it, Nifty 500 first.
+// One asked since then with no promoter figure has none at Dhan, and waits for its weekly turn.
+const PROMOTER_SINCE = Date.UTC(2026, 10, 10, 3) / 1000;
 const DAY = 86400;
 
 /** Older candles from Dhan, split into recent days and older months, on our share basis. */
@@ -93,16 +96,19 @@ export async function fillSnapshots(env: Env, max = 120) {
   const now = Math.floor(Date.now() / 1000);
   const { results: queue } = await env.DB.prepare(`SELECT s.symbol, m.close FROM stocks s JOIN stock_metrics m ON m.symbol = s.symbol
     LEFT JOIN company_snapshot c ON c.symbol = s.symbol
-    WHERE s.dhan_security_id IS NOT NULL AND COALESCE(s.instrument_type, 'ES') = 'ES' AND (c.symbol IS NULL OR c.fetched_at < ?)
-    ORDER BY (c.symbol IS NULL) DESC, COALESCE(m.turnover, 0) DESC LIMIT ?`).bind(now - SNAPSHOT_DAYS * DAY, max).all<{ symbol: string; close: number | null }>();
+    WHERE s.dhan_security_id IS NOT NULL AND COALESCE(s.instrument_type, 'ES') = 'ES'
+      AND (c.symbol IS NULL OR c.fetched_at < ? OR (c.fetched_at < ? AND c.market_cap_cr IS NOT NULL AND c.promoter_pct IS NULL))
+    ORDER BY (c.symbol IS NULL) DESC, (s.symbol IN (SELECT symbol FROM index_members WHERE index_name = 'nifty500')) DESC, COALESCE(m.turnover, 0) DESC
+    LIMIT ?`).bind(now - SNAPSHOT_DAYS * DAY, PROMOTER_SINCE, max).all<{ symbol: string; close: number | null }>();
   let saved = 0, failed = 0;
   for (const { symbol, close } of queue) {
     const started = Date.now();
     const r = await patient<any>(() => companyInfo(env, symbol));
     if (r.ok) {
-      const o = (r as unknown as { overview: Record<string, number | null>; ratios: Record<string, number | null> });
-      await env.DB.prepare("INSERT OR REPLACE INTO company_snapshot (symbol, fetched_at, price, market_cap_cr, pe, pe_to_sector, industry_pb) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .bind(symbol, now, close, o.overview?.market_cap_cr ?? null, o.ratios?.pe ?? null, o.ratios?.pe_to_sector_pe ?? null, o.ratios?.industry_pb ?? null).run();
+      const o = (r as unknown as { overview: Record<string, number | null>; ratios: Record<string, number | null>; shareholding: Record<string, number | string | null> });
+      const promoter = typeof o.shareholding?.promoter === "number" && o.shareholding.promoter >= 0 && o.shareholding.promoter <= 100 ? o.shareholding.promoter : null;
+      await env.DB.prepare("INSERT OR REPLACE INTO company_snapshot (symbol, fetched_at, price, market_cap_cr, pe, pe_to_sector, industry_pb, promoter_pct) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(symbol, now, close, o.overview?.market_cap_cr ?? null, o.ratios?.pe ?? null, o.ratios?.pe_to_sector_pe ?? null, o.ratios?.industry_pb ?? null, promoter).run();
       saved++;
     } else {
       failed++;

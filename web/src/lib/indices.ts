@@ -4,12 +4,14 @@
 // `etfs` are NSE-listed ETFs that track it, most traded first (a hand-kept list).
 
 export type IndexEtf = { symbol: string; name: string };
-export type IndexInfo = { slug: string; name: string; label: string; short: string; heatmap: string | null; about: string; etfs: IndexEtf[] };
+/** `news` holds words that mark a headline as about this index, besides its companies' names. */
+export type IndexInfo = { slug: string; name: string; label: string; short: string; heatmap: string | null; about: string; news: string[]; etfs: IndexEtf[] };
 
 export const INDICES: IndexInfo[] = [
   {
     slug: "nifty-50", short: "Nifty 50", name: "Nifty 50", label: "Nifty 50", heatmap: "nifty50",
     about: "The 50 largest and most traded companies on NSE, weighted by free-float market value. India's benchmark for the large-cap market.",
+    news: ["Nifty", "Nifty 50", "Sensex", "benchmark"],
     etfs: [
       { symbol: "NIFTYBEES", name: "Nippon India ETF Nifty 50 BeES" },
       { symbol: "NIFTYIETF", name: "ICICI Prudential Nifty 50 ETF" },
@@ -25,6 +27,7 @@ export const INDICES: IndexInfo[] = [
   {
     slug: "nifty-bank", short: "Bank Nifty", name: "Nifty Bank", label: "Nifty Bank", heatmap: "niftybank",
     about: "The most liquid and largest Indian banking stocks on NSE. The index behind most of India's bank derivatives.",
+    news: ["Bank Nifty", "Nifty Bank", "banks", "banking", "lender", "lenders", "RBI"],
     etfs: [
       { symbol: "BANKBEES", name: "Nippon India ETF Nifty Bank BeES" },
       { symbol: "SETFNIFBK", name: "SBI Nifty Bank ETF" },
@@ -37,16 +40,19 @@ export const INDICES: IndexInfo[] = [
   {
     slug: "nifty-midcap-100", short: "Midcap 100", name: "NIFTY Midcap 100", label: "Nifty Midcap 100", heatmap: "midcap100",
     about: "100 mid-sized companies, the ones ranked just below the Nifty 100 by market value. A gauge of the mid-cap market.",
+    news: ["midcap", "midcaps", "mid-cap", "mid-caps"],
     etfs: [{ symbol: "LICNMID100", name: "LIC MF Nifty Midcap 100 ETF" }],
   },
   {
     slug: "nifty-smallcap-100", short: "Smallcap 100", name: "NIFTY Smallcap 100", label: "Nifty Smallcap 100", heatmap: "smallcap100",
     about: "100 of the most traded small companies, ranked below the Midcap 150. Moves further than the large-cap indices, both ways.",
+    news: ["smallcap", "smallcaps", "small-cap", "small-caps"],
     etfs: [],
   },
   {
     slug: "nifty-it", short: "Nifty IT", name: "Nifty IT", label: "Nifty IT", heatmap: "niftyit",
     about: "India's listed IT services and software companies. Driven largely by overseas tech spending and the rupee.",
+    news: ["Nifty IT", "IT stocks", "IT services", "IT sector", "tech stocks"],
     etfs: [
       { symbol: "ITBEES", name: "Nippon India ETF Nifty IT" },
       { symbol: "IT", name: "Kotak Nifty IT ETF" },
@@ -59,6 +65,7 @@ export const INDICES: IndexInfo[] = [
   {
     slug: "india-vix", short: "India VIX", name: "India VIX", label: "India VIX", heatmap: null,
     about: "The market's expected volatility over the next 30 days, worked out from Nifty 50 option prices. It rises when traders pay up for protection, so it usually moves against the Nifty.",
+    news: ["VIX", "volatility", "Nifty", "Sensex"],
     etfs: [],
   },
 ];

@@ -2,6 +2,9 @@
   import { BRAND } from "$lib/brand";
   import IndexChart from "$lib/components/IndexChart.svelte";
   import StockTable from "$lib/components/StockTable.svelte";
+  import IndexConstituents from "$lib/components/IndexConstituents.svelte";
+  import IndexNews from "$lib/components/IndexNews.svelte";
+  import { onMount } from "svelte";
   import LiveStamp from "$lib/components/LiveStamp.svelte";
   import { INDICES } from "$lib/indices";
   import { date, num, pct, tone } from "$lib/format";
@@ -11,6 +14,11 @@
   const info = $derived(data.info);
   const days = $derived(data.days);
   const isVix = $derived(info.name === "India VIX");
+  // The badge letter: what follows "Nifty" (B for Bank, I for IT), or N when that's a number (Nifty 50).
+  const badge = $derived.by(() => {
+    const rest = info.label.replace(/^Nifty\s*/i, "");
+    return /^\d/.test(rest) ? "N" : rest.charAt(0);
+  });
 
   // Live level while the market is open (accounts with live access), else the last NSE close.
   $effect(() => (data.live ? useLiveMarket() : undefined));
@@ -90,17 +98,56 @@
     .map(([label, n]) => ({ label: label as string, value: ret(n as number) })).filter((r) => r.value != null));
   const pe = $derived(data.peRange);
 
-  // ── Tabs ──────────────────────────────────────────────────────
-  type Tab = "overview" | "constituents" | "etfs";
-  let tab = $state<Tab>("overview");
-  $effect(() => { void info.slug; tab = "overview"; });
-  const tabs = $derived([
-    { id: "overview" as Tab, label: "Overview" },
-    ...(data.constituents.length ? [{ id: "constituents" as Tab, label: "Constituents" }] : []),
-    ...(data.etfs.length ? [{ id: "etfs" as Tab, label: "ETFs" }] : []),
+  // ── One page, four sections: the bar scrolls to each and marks the one in view ──
+  type Sec = "overview" | "constituents" | "etfs" | "news";
+  const sections = $derived([
+    { id: "overview" as Sec, label: "Overview" },
+    ...(data.constituents.length ? [{ id: "constituents" as Sec, label: "Constituents" }] : []),
+    ...(data.etfs.length ? [{ id: "etfs" as Sec, label: "ETFs" }] : []),
+    { id: "news" as Sec, label: "News" },
   ]);
-  const adv = $derived(data.constituents.filter((s) => (s.change_pct ?? 0) > 0).length);
-  const dec = $derived(data.constituents.filter((s) => (s.change_pct ?? 0) < 0).length);
+  let active = $state<Sec>("overview");
+  let barTop = $state(0);
+  const STICKY_GAP = 8;
+
+  // The site's own sticky header sits above this bar; measure it so the bar docks just under it.
+  function measureHeader() {
+    // Where each stuck element ends once stuck: its own sticky offset plus its height (not where it sits now).
+    const stuck = [...document.querySelectorAll<HTMLElement>("header, header *, nav")]
+      .filter((el) => !el.closest(".ix") && getComputedStyle(el).position === "sticky" && el.offsetHeight > 0);
+    barTop = Math.max(0, ...stuck.map((el) => (parseFloat(getComputedStyle(el).top) || 0) + el.offsetHeight));
+  }
+
+  function go(id: Sec) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    active = id;
+    const bar = document.querySelector<HTMLElement>(".ixbar")?.offsetHeight ?? 0;
+    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - barTop - bar - STICKY_GAP, behavior: "smooth" });
+  }
+
+  onMount(() => {
+    measureHeader();
+    // The section whose top has passed the bar is the one being read.
+    const onScroll = () => {
+      const bar = document.querySelector<HTMLElement>(".ixbar")?.offsetHeight ?? 0;
+      const line = barTop + bar + 24;
+      let current: Sec = "overview";
+      for (const s of sections) {
+        const el = document.getElementById(s.id);
+        if (el && el.getBoundingClientRect().top <= line) current = s.id;
+      }
+      // At the very bottom the last section is the one in view, however short it is.
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) current = sections[sections.length - 1].id;
+      active = current;
+    };
+    const onResize = () => { measureHeader(); onScroll(); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize);
+    const hash = location.hash.slice(1) as Sec;
+    if (sections.some((x) => x.id === hash)) requestAnimationFrame(() => go(hash));
+    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onResize); };
+  });
 
   const fmt = (v: number | null | undefined) => (v == null ? "—" : v.toLocaleString("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 }));
   const signed = (v: number | null) => (v == null ? "" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${fmt(Math.abs(v))}`);
@@ -122,7 +169,7 @@
   <div class="grid">
     <aside class="card side">
       <div class="who">
-        <span class="mark" aria-hidden="true">{info.label.replace(/^Nifty\s*/i, "").charAt(0) || "N"}</span>
+        <span class="mark" aria-hidden="true">{badge}</span>
         <div>
           <h1>{info.label}</h1>
           <p class="sym">{info.name.toUpperCase()}</p>
@@ -144,7 +191,7 @@
             </a>
           {/each}
           {#if data.etfs.length > 3}
-            <button class="more" onclick={() => (tab = "etfs")}>See all {data.etfs.length} ETFs</button>
+            <button class="more" onclick={() => go("etfs")}>See all {data.etfs.length} ETFs</button>
           {/if}
         </div>
       {:else}
@@ -155,14 +202,14 @@
       {/if}
     </aside>
 
-    <section class="main">
-      <div class="ixtabs" role="tablist">
-        {#each tabs as t (t.id)}
-          <button role="tab" aria-selected={tab === t.id} class:on={tab === t.id} onclick={() => (tab = t.id)}>{t.label}</button>
+    <div class="main">
+      <nav class="ixbar" style="top: {barTop}px" aria-label="Sections">
+        {#each sections as t (t.id)}
+          <a href="#{t.id}" class:on={active === t.id} aria-current={active === t.id ? "true" : undefined} onclick={(e) => { e.preventDefault(); go(t.id); }}>{t.label}</a>
         {/each}
-      </div>
+      </nav>
 
-      {#if tab === "overview"}
+      <section id="overview" class="sect" aria-label="Overview">
         <div class="hl">
           <div><span>High</span><b>{fmt(view?.high)}</b></div>
           <div><span>Low</span><b>{fmt(view?.low)}</b></div>
@@ -213,14 +260,28 @@
           <p class="about">{info.about}</p>
         {/if}
         <p class="note">Levels and valuations from NSE's daily index report{data.live ? "; live levels and today's chart from Dhan" : ""}.{#if pe} <a href="/valuations?index={encodeURIComponent(info.name)}">P/E history ›</a>{/if}</p>
-      {:else if tab === "constituents"}
-        <p class="sub cons-head">{data.constituents.length} stocks · <span class="up">{adv} up</span> · <span class="down">{dec} down</span> · close of {date(data.constituentsAsOf)}, most traded first</p>
-        <StockTable rows={data.constituents} cols={["close", "change_pct", "turnover", "sector"]} logos />
-      {:else if tab === "etfs"}
-        <p class="sub cons-head">ETFs listed on NSE that track the {info.label}, most traded first.</p>
-        <StockTable rows={data.etfs} cols={["close", "change_pct", "turnover"]} />
+      </section>
+
+      {#if data.constituents.length}
+        <section id="constituents" class="sect" aria-labelledby="h-cons">
+          <h2 class="sech" id="h-cons">Constituents</h2>
+          <IndexConstituents rows={data.constituents} asOf={data.constituentsAsOf} label={info.label} liveAccess={data.live} />
+        </section>
       {/if}
-    </section>
+
+      {#if data.etfs.length}
+        <section id="etfs" class="sect" aria-labelledby="h-etfs">
+          <h2 class="sech" id="h-etfs">ETFs tracking the {info.label}</h2>
+          <p class="sub cons-head">Listed on NSE, most traded first.</p>
+          <StockTable rows={data.etfs} cols={["close", "change_pct", "turnover"]} logos />
+        </section>
+      {/if}
+
+      <section id="news" class="sect" aria-labelledby="h-news">
+        <h2 class="sech" id="h-news">News</h2>
+        <IndexNews slug={info.slug} label={info.label} />
+      </section>
+    </div>
   </div>
 </div>
 
@@ -256,9 +317,13 @@
   .about { margin: 8px 22px 0; font-family: var(--serif); font-size: 15px; line-height: 1.55; color: var(--ink-2); }
   .main .about { margin: 0; max-width: 68ch; }
 
-  .ixtabs { display: flex; gap: 28px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
-  .ixtabs button { flex: none; background: none; border: 0; padding: 10px 0 12px; font: inherit; font-size: 16px; color: var(--ink-2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
-  .ixtabs button.on { color: var(--ink); font-weight: 700; border-bottom-color: var(--ink); }
+  .ixbar { position: sticky; z-index: 15; display: flex; gap: 28px; background: var(--bg); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+  .ixbar a { flex: none; padding: 12px 0; font-size: 16px; color: var(--ink-2); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .ixbar a:hover { color: var(--ink); }
+  .ixbar a.on { color: var(--ink); font-weight: 700; border-bottom-color: var(--ink); }
+  .sect { scroll-margin-top: 120px; }
+  .sect + .sect { margin-top: 44px; padding-top: 28px; border-top: 1px solid var(--line-2); }
+  .sech { margin: 0 0 10px; font-size: 21px; letter-spacing: -0.01em; }
 
   .hl { display: flex; align-items: flex-end; gap: 32px; margin: 22px 0 8px; flex-wrap: wrap; }
   .hl div { display: grid; gap: 4px; }
@@ -295,7 +360,8 @@
     .hl { gap: 18px; }
     .hl b { font-size: 17px; }
     .adv { display: none; }
-    .ixtabs { gap: 20px; }
+    .ixbar { gap: 20px; }
+    .ixbar a { font-size: 15px; }
     .empty { height: 260px; }
   }
 </style>

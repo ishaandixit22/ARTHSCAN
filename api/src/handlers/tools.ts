@@ -82,6 +82,19 @@ const HEATMAP_INDICES: Record<string, { name: string; file: string }> = {
   niftyit: { name: "Nifty IT", file: "ind_niftyitlist" },
 };
 
+/** An index's constituent symbols from NSE's archive (the Next 50 derived from the Nifty 100 and 50). */
+async function indexSymbols(env: any, key: string): Promise<string[]> {
+  const list = async (file: string) =>
+    (await nseFetch(env, `https://nsearchives.nseindia.com/content/indices/${file}.csv`, 24 * 3600, (body) =>
+      body.split(/\r?\n/).slice(1).map((l) => l.split(",")[2]?.trim()).filter((x): x is string => !!x))).data;
+  if (key === "niftynext50") {
+    const [n100, n50] = await Promise.all([list(HEATMAP_INDICES.nifty100.file), list(HEATMAP_INDICES.nifty50.file)]);
+    const top = new Set(n50);
+    return n100.filter((sym) => !top.has(sym));
+  }
+  return list(HEATMAP_INDICES[key].file);
+}
+
 const BREADTH_UNIVERSE = "Every ordinary share traded on NSE that day: main board (EQ, BE, BZ) and SME (SM, ST). ETFs and funds are excluded.";
 
 const SHARES_ONLY = "COALESCE(s.instrument_type, 'ES') = 'ES'";
@@ -630,19 +643,9 @@ export const TOOLS: Tool[] = [
     handler: async (db, { period, index, sector, level, limit }, env) => {
       const col = ({ "1w": "ret_1w", "1m": "ret_1m", "3m": "ret_3m", "1y": "ret_1y" } as Record<string, string>)[period ?? "1d"] ?? "change_pct";
       const idx = index && String(index) in HEATMAP_INDICES ? HEATMAP_INDICES[String(index)] : null;
-      const constituents = async (file: string) =>
-        (await nseFetch(env, `https://nsearchives.nseindia.com/content/indices/${file}.csv`, 24 * 3600, (body) =>
-          body.split(/\r?\n/).slice(1).map((l) => l.split(",")[2]?.trim()).filter((x): x is string => !!x))).data;
       // The Nifty Next 50 is by definition the Nifty 100 without the Nifty 50; NSE's own Next 50 file
       // doesn't download from Cloudflare, so it's derived from the two that do.
-      let members: string[] | null = null;
-      if (idx && String(index) === "niftynext50") {
-        const [n100, n50] = await Promise.all([constituents(HEATMAP_INDICES.nifty100.file), constituents(HEATMAP_INDICES.nifty50.file)]);
-        const top = new Set(n50);
-        members = n100.filter((sym) => !top.has(sym));
-      } else if (idx) {
-        members = await constituents(idx.file);
-      }
+      const members: string[] | null = idx ? await indexSymbols(env, String(index)) : null;
       const wantSectors = level === "sectors" && !idx && !sector;
       // An index or a sector shows all its stocks; the market-wide views cap at the most traded.
       const cap = idx ? 600 : wantSectors ? 5000 : sector ? clampLimit(limit, 120, 500) : clampLimit(limit, 200, 500);
@@ -687,6 +690,47 @@ export const TOOLS: Tool[] = [
         as_of: asOf?.d, period: period ?? "1d",
         view: idx ? { kind: "index", key: String(index), name: idx.name } : sector ? { kind: "sector", name: String(sector) } : wantSectors ? { kind: "sectors", name: "All sectors" } : { kind: "market", name: "Most traded" },
         stocks: results.length, sizing: "turnover", sectors,
+      };
+    },
+  },
+  {
+    name: "get_index_constituents",
+    route: "/market/index-constituents",
+    title: "Index constituents and weights",
+    description: "An index's stocks with their free-float market cap and approximate index weight. Free-float market cap = price × shares outstanding × IWF, where shares come from the company's market cap and IWF (investable weight factor) is taken as 1 − promoter holding. Weights are each stock's share of the index's total free-float market cap, before NSE's capping rules, so they are estimates.",
+    inputSchema: {
+      type: "object",
+      properties: { index: { type: "string", enum: Object.keys(HEATMAP_INDICES), description: "Which index" } },
+      required: ["index"],
+    },
+    metered: true,
+    handler: async (db, { index }, env) => {
+      const key = String(index ?? "");
+      if (!(key in HEATMAP_INDICES)) throw new ToolError("E_BAD_ARGS", `index must be one of ${Object.keys(HEATMAP_INDICES).join(", ")}.`);
+      const members = await indexSymbols(env, key);
+      const { results } = await db.prepare(`SELECT s.symbol, s.name, s.isin, COALESCE(s.sector, 'Other') AS sector, m.close, m.change_pct, m.turnover, m.as_of,
+          c.market_cap_cr, c.price AS snap_price, c.promoter_pct
+        FROM stocks s JOIN stock_metrics m ON m.symbol = s.symbol AND m.as_of = (SELECT MAX(as_of) FROM stock_metrics)
+        LEFT JOIN company_snapshot c ON c.symbol = s.symbol
+        WHERE s.symbol IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(members))
+        .all<{ symbol: string; name: string; isin: string | null; sector: string; close: number | null; change_pct: number | null; turnover: number | null; as_of: string; market_cap_cr: number | null; snap_price: number | null; promoter_pct: number | null }>();
+      const rows = results.map((r) => {
+        // Shares outstanding from the market cap Dhan gave at the price we had that day.
+        const shares = r.market_cap_cr && r.snap_price ? (r.market_cap_cr * 1e7) / r.snap_price : null;
+        const iwf = r.promoter_pct != null ? Math.round((1 - r.promoter_pct / 100) * 100) / 100 : null;
+        const mcap_cr = shares && r.close ? (r.close * shares) / 1e7 : null;
+        const ff_mcap_cr = mcap_cr != null && iwf != null ? mcap_cr * iwf : null;
+        const { snap_price: _, market_cap_cr: __, ...rest } = r;
+        return { ...rest, shares: shares ? Math.round(shares) : null, iwf, mcap_cr: mcap_cr != null ? Math.round(mcap_cr) : null, ff_mcap_cr: ff_mcap_cr != null ? Math.round(ff_mcap_cr) : null, weight: null as number | null };
+      });
+      const total = rows.reduce((sum, r) => sum + (r.ff_mcap_cr ?? 0), 0);
+      for (const r of rows) r.weight = total && r.ff_mcap_cr != null ? Math.round((r.ff_mcap_cr / total) * 10000) / 100 : null;
+      rows.sort((a, z) => (z.weight ?? -1) - (a.weight ?? -1) || (z.mcap_cr ?? 0) - (a.mcap_cr ?? 0));
+      return {
+        index: HEATMAP_INDICES[key].name, as_of: results[0]?.as_of ?? null, members: members.length,
+        weighted: rows.filter((r) => r.weight != null).length, total_ff_mcap_cr: Math.round(total),
+        method: "Free-float market cap = close × shares outstanding × IWF; IWF = 1 − promoter holding (latest shareholding pattern); weight = share of the index total, before capping.",
+        constituents: rows,
       };
     },
   },
