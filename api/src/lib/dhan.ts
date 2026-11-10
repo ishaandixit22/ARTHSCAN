@@ -92,6 +92,17 @@ async function post(env: Env, path: string, body: unknown, what: string, timeout
 
 export { post as dhanPost };
 
+/** Asks again after a pause when Dhan refuses for the rate limit, which every job on the account shares. */
+export async function patient<T extends { ok: boolean }>(ask: () => Promise<T>, pauses = [1200, 2400, 3600]): Promise<T> {
+  let r = await ask();
+  for (const ms of pauses) {
+    if (r.ok || (r as { upstream?: number }).upstream !== 429) break;
+    await new Promise((done) => setTimeout(done, ms));
+    r = await ask();
+  }
+  return r;
+}
+
 /** The last few sessions of intraday candles for one stock. Times are IST shown as UTC seconds, for the chart. */
 export function intradayCandles(env: Env, symbol: string, range: string) {
   return cached(`candles/${symbol}/${range}`, CANDLE_TTL_S, async () => {
@@ -150,12 +161,38 @@ export function liveIndices(env: Env) {
   });
 }
 
+/** One index's minute candles for its latest session, with NSE's previous close as the base. Times are IST shown as UTC seconds. */
+export function indexIntraday(env: Env, name: string) {
+  const id = LIVE_INDICES[name];
+  if (id == null) return Promise.resolve(fail(404, `No live index called ${name}`));
+  return cached(`index-candles/${id}`, CANDLE_TTL_S, async () => {
+    const ist = (ms: number) => new Date(ms + IST_MS).toISOString().slice(0, 10);
+    const now = Date.now();
+    const r = await post(env, "/charts/intraday", {
+      securityId: String(id), exchangeSegment: "IDX_I", instrument: "INDEX", interval: "1", oi: false,
+      fromDate: `${ist(now - 7 * 86400_000)} 09:15:00`, toDate: `${ist(now + 86400_000)} 00:00:00`,
+    }, "index candles");
+    if (!r.ok) return r;
+    const data = r.data as Record<string, number[]>;
+    if (!Array.isArray(data.timestamp) || !data.timestamp.length) return fail(502, "Dhan returned no index candles");
+    const all = data.timestamp.map((t, i) => ({ time: Math.round(t + IST_MS / 1000), day: ist(t * 1000), open: data.open[i], high: data.high[i], low: data.low[i], close: data.close[i] }));
+    const day = all[all.length - 1].day;
+    const candles = all.filter((c) => c.day === day).map(({ day: _, ...c }) => c);
+    const official = await env.DB.prepare("SELECT close FROM index_daily WHERE index_name = ? AND date < ? ORDER BY date DESC LIMIT 1")
+      .bind(name, day).first<{ close: number }>().catch(() => null);
+    const before = all.filter((c) => c.day < day);
+    const prevClose = official?.close ?? before[before.length - 1]?.close ?? null;
+    return { ok: true as const, index: name, session: day, prevClose, candles };
+  });
+}
+
 /** Dhan's company snapshot: overview, ratios with industry averages, latest shareholding. `raw` skips parsing and the cache. */
 export async function companyInfo(env: Env, symbol: string, raw = false) {
   const run = async () => {
     const inst = await instrument(env, symbol);
     if (!inst) return fail(404, `No Dhan instrument for ${symbol}`);
-    const r = await post(env, "/data/companyinfo", { securityId: inst.id, exchangeSegment: inst.segment, instrument: "EQUITY", metrics: ["CO", "RATIOS", "SHP"] }, "company info");
+    // Short pauses: a stock page is waiting on this answer.
+    const r = await patient(() => post(env, "/data/companyinfo", { securityId: inst.id, exchangeSegment: inst.segment, instrument: "EQUITY", metrics: ["CO", "RATIOS", "SHP"] }, "company info"), [600, 1500]);
     if (!r.ok) return r;
     if (raw) return { ok: true as const, symbol, raw: r.data };
     // The sections sit in a one-element array somewhere under `data`; find the object that holds them.

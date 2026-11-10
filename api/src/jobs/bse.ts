@@ -10,6 +10,7 @@
 
 import type { Env } from "../env.js";
 import { dhanPost } from "../lib/dhan.js";
+import { marketOpen } from "../lib/market-hours.js";
 
 const DAY = 86400;
 const IST_MS = 5.5 * 3600_000;
@@ -51,6 +52,12 @@ async function correctCloses(env: Env, fixes: unknown[][]) {
 }
 
 /** One batch of chart loads: stocks never loaded (busiest first), then those loaded longest ago. Stops if Dhan keeps failing. */
+/** The ten-minute batch, outside trading hours: during them the intraday screens use nearly all of Dhan's limit. */
+export async function bseHistoryTick(env: Env, now = Date.now(), opts: { batch?: number; gapMs?: number } = {}) {
+  if (await marketOpen(env, now)) return { asked: 0, loaded: 0, failed: 0 };
+  return fillBseHistory(env, opts);
+}
+
 export async function fillBseHistory(env: Env, opts: { batch?: number; gapMs?: number } = {}) {
   const now = Math.floor(Date.now() / 1000);
   const { results: queue } = await env.DB.prepare(`SELECT symbol, dhan_security_id AS id FROM bse_stocks

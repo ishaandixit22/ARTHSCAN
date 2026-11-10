@@ -6,6 +6,6 @@ export function GET({ url }) {
   const body =
     env.INVITE_ONLY === "true"
       ? "User-agent: *\nDisallow: /\n"
-      : `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /settings/\nDisallow: /connect/\n\nSitemap: ${siteOrigin(url)}/sitemap.xml\n`;
+      : `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /settings/\nDisallow: /connect/\nDisallow: /stock/*/\nDisallow: /search\n\nSitemap: ${siteOrigin(url)}/sitemap.xml\n`;
   return new Response(body, { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=3600" } });
 }

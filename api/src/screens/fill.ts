@@ -2,7 +2,7 @@
 // waits on one long run and a provider limit only slows the fill.
 
 import type { Env } from "../env.js";
-import { dhanPost, companyInfo } from "../lib/dhan.js";
+import { companyInfo, dhanPost, patient } from "../lib/dhan.js";
 import { nseFetch } from "../lib/nse.js";
 import { providerName } from "../lib/results.js";
 import { INDIANAPI_TIMEOUT_MS } from "../lib/upstream.js";
@@ -19,16 +19,6 @@ const OLDER_DAILY_ROWS = 280;
 const OLDER_MONTH_ROWS = 180;
 const SNAPSHOT_DAYS = 7;
 const DAY = 86400;
-
-/** Asks again after a pause when Dhan refuses for the rate limit, which other jobs on the account also use up. */
-async function patient<T extends { ok: boolean; upstream?: number }>(ask: () => Promise<T>): Promise<T> {
-  let r = await ask();
-  for (let tries = 1; tries <= 3 && !r.ok && r.upstream === 429; tries++) {
-    await wait(1200 * tries);
-    r = await ask();
-  }
-  return r;
-}
 
 /** Older candles from Dhan, split into recent days and older months, on our share basis. */
 export function splitHistory(rows: { date: string; o: number; h: number; l: number; c: number; v: number }[], firstLocal: string, localClose: number | null) {

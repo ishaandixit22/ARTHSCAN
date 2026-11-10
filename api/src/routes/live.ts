@@ -12,7 +12,7 @@
 import { Hono, type Context } from "hono";
 import type { Account, AppEnv, Env, Principal } from "../env.js";
 import { chartCandles, isTimeframe, priceStats, quote } from "../lib/chart.js";
-import { CANDLE_RANGES, companyInfo, intradayCandles } from "../lib/dhan.js";
+import { CANDLE_RANGES, companyInfo, indexIntraday, intradayCandles } from "../lib/dhan.js";
 import { jsonError } from "../lib/http.js";
 import { type BreadthShow, liteMarket, liveBreadth, liveMarket } from "../live/market.js";
 
@@ -60,8 +60,17 @@ live.get("/candles", async (c) => {
   const r = await intradayCandles(c.env, symbol, range);
   return c.json(r, r.ok ? 200 : (r.status as 404));
 });
+// One index's minute candles for its latest session, for the index page's 1D chart.
+live.get("/index-candles", async (c) => {
+  const name = (c.req.query("index") ?? "").trim();
+  if (!name) return jsonError(c, 400, "E_BAD_ARGS", "index is required");
+  const r = await indexIntraday(c.env, name);
+  return c.json(r, r.ok ? 200 : (r.status as 404));
+});
 // Dhan's company snapshot: valuation and return ratios against industry averages, latest shareholding.
 live.get("/company", async (c) => {
+  // Only the website's server asks for this. Left open, anyone could spend the account's Dhan limit or read its data directly.
+  if (c.get("principal")?.kind !== "internal") return jsonError(c, 403, "E_LIVE_FORBIDDEN", "This data is only available on the website.");
   const symbol = (c.req.query("symbol") ?? "").trim().toUpperCase();
   if (!symbol) return jsonError(c, 400, "E_BAD_ARGS", "symbol is required");
   const r = await companyInfo(c.env, symbol, c.req.query("raw") != null);

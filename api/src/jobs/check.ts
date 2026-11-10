@@ -4,12 +4,14 @@
 //   sessions   every weekday or special session of the last week that has an NSE bhavcopy but no rows here → runDaily for it
 //   metrics    stock_metrics older than the latest session                              → recomputed
 //   bse        BSE-only prices behind the latest NSE session                            → refreshBse
+//   special    a special session NSE has marked that the code doesn't list                → a warning
+//   calendar   this year's NSE holiday list not read from NSE (or next year's, in late December) → a warning
 //
 // The outcome goes to pipeline_runs (jobs `check:*`) and to external_cache 'health:last_check',
 // which the public /health answer shows, so a missed or failed run is visible from outside.
 
 import type { Env } from "../env.js";
-import { isSessionDay } from "../lib/market-hours.js";
+import { holidayList, isSessionDay, tradingCalendar, unlistedSpecialSessions } from "../lib/market-hours.js";
 import { addDaysISO, todayIST } from "../lib/nse.js";
 import { refreshBse } from "./bse.js";
 import { bhavcopyUrl, nseFile, recomputeMetrics, runDaily } from "./daily.js";
@@ -95,6 +97,30 @@ export async function selfCheck(env: Env, now = Date.now()): Promise<CheckReport
     items.push({ check: "bse prices", status: after && after >= prices ? "fixed" : "failed", message: `Were ${bse ?? "never"}, now ${after ?? "never"} (saved ${r.saved})` });
   } else {
     items.push({ check: "bse prices", status: "ok", message: `As of ${bse}` });
+  }
+
+  // 4. Special sessions NSE has announced that the code doesn't know about: they wouldn't show live until listed.
+  const unlisted = await holidayList(env).then((list) => unlistedSpecialSessions(list, today)).catch(() => null);
+  if (unlisted?.length) {
+    items.push({ check: "special sessions", status: "behind", message: `NSE marks ${unlisted.map((u) => `${u.date} (${u.name})`).join(", ")} as a special session. Add the date and hours to SPECIAL_SESSIONS in the API and website, or live prices won't show that day.` });
+  } else if (unlisted) {
+    items.push({ check: "special sessions", status: "ok", message: "None coming up that aren't listed" });
+  }
+
+  // 5. The trading calendar: scans and refreshes skip NSE holidays, so each year needs NSE's list.
+  //    The live list is read daily and kept per year; a year without one treats every weekday as open.
+  const calendar = await tradingCalendar(env);
+  const year = today.slice(0, 4), next = String(Number(year) + 1);
+  const src = calendar.source[year];
+  if (src === "nse" || src === "saved") {
+    const late = today.slice(5) >= "12-20" && !calendar.source[next];
+    items.push({ check: "calendar", status: late ? "behind" : "ok", message: late
+      ? `NSE hasn't published its ${next} holiday list yet. It's read daily, and from 1 January every weekday counts as a trading day until it appears.`
+      : `NSE's ${year} holiday list (${[...calendar.holidays.keys()].filter((d) => d.startsWith(year)).length} holidays, ${src === "nse" ? "read today" : "stored copy; NSE didn't answer today"})` });
+  } else {
+    items.push({ check: "calendar", status: "behind", message: src === "built-in"
+      ? `Couldn't read NSE's ${year} holiday list; using the copy built into the code.`
+      : `No ${year} NSE holiday list yet: every weekday counts as a trading day, so scans run on holidays. It's read daily from NSE; add it to NSE_HOLIDAYS in api/src/lib/market-hours.ts if NSE keeps refusing.` });
   }
 
   const report: CheckReport = { at: new Date(now).toISOString(), latest_published: latestPublished, latest_loaded: await latest(env, "SELECT MAX(date) AS d FROM daily_prices"), items, ms: Date.now() - started };

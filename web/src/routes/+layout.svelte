@@ -7,16 +7,27 @@
   import MarketsMenu from "$lib/components/MarketsMenu.svelte";
   import NavDropdown from "$lib/components/NavDropdown.svelte";
   import NavIcon from "$lib/components/NavIcon.svelte";
+  import PreviewPrompt from "$lib/components/PreviewPrompt.svelte";
   import Search from "$lib/components/Search.svelte";
   import SiteFooter from "$lib/components/SiteFooter.svelte";
   import ThemeToggle from "$lib/components/ThemeToggle.svelte";
   import TickerTape from "$lib/components/TickerTape.svelte";
   import { BRAND } from "$lib/brand";
   import { ICON, isActive, navGroups, TOP_LINKS } from "$lib/nav";
+  import { usesFold } from "$lib/preview";
+  import { pageSeo } from "$lib/seo";
   import { viewport } from "$lib/viewport.svelte";
 
   let { data, children } = $props();
 
+  const seo = $derived(pageSeo(page.url.pathname));
+  // Signed out on a market page: the top of the page, then a sign-in prompt.
+  const fold = $derived(!!data.preview && usesFold(page.url.pathname));
+  // Tells search engines the faded part is gated, so showing them the full page isn't mistaken for cloaking.
+  const foldLd = `<script type="application/ld+json">${JSON.stringify({
+    "@context": "https://schema.org", "@type": "WebPage", isAccessibleForFree: false,
+    hasPart: { "@type": "WebPageElement", isAccessibleForFree: false, cssSelector: ".preview-fold" },
+  })}<\/script>`;
   // Derived so Live joins the menu on sign-in without a reload.
   const groups = $derived(navGroups(!!data.live));
   // The edition line under the masthead: today's date in India.
@@ -46,6 +57,14 @@
     if (early === "menu" || early === "search") panel = early;
   });
 </script>
+
+<svelte:head>
+  {#if seo.description}<meta name="description" content={seo.description} />{/if}
+  {#if seo.canonical}<link rel="canonical" href={seo.canonical} />{/if}
+  {#if seo.noindex}<meta name="robots" content="noindex" />{/if}
+  <meta property="og:site_name" content={BRAND} />
+  {#if fold}{@html foldLd}{/if}
+</svelte:head>
 
 <TickerTape quotes={data.ticker} liveAccess={!!data.live} />
 
@@ -94,7 +113,12 @@
 </nav>
 
 <main class="wrap" data-clarity-mask={/^\/(settings|connect|login|calculators)(\/|$)/.test(page.url.pathname) ? "true" : undefined}>
-  {@render children()}
+  {#if fold}
+    <div class="preview-fold">{@render children()}</div>
+    <PreviewPrompt />
+  {:else}
+    {@render children()}
+  {/if}
 </main>
 
 <SiteFooter logoKey={data.logoKey} />
@@ -108,6 +132,14 @@
 {/if}
 
 <style>
+  /* overflow: clip, not hidden: the clipped part can't be scrolled into view by focus or a link. The fade sits at the
+     cut, so on a page shorter than the cut it's clipped away and nothing is dimmed. */
+  .preview-fold { position: relative; max-height: 1150px; overflow: clip; }
+  .preview-fold::after { content: ""; position: absolute; top: 950px; left: 0; right: 0; height: 200px; background: linear-gradient(transparent, var(--bg)); pointer-events: none; z-index: 5; }
+  @media (max-width: 860px) {
+    .preview-fold { max-height: 1000px; }
+    .preview-fold::after { top: 800px; }
+  }
   /* The masthead: edition line, the name, tools. Full size on the front page, compact inside. */
   .mast { background: var(--bg); }
   .top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; padding-top: 14px; padding-bottom: 10px; }

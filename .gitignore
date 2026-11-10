@@ -23,3 +23,5 @@ arthscan-mcp/
 # Playwright run output
 test-results/
 playwright-report/
+
+.netlify

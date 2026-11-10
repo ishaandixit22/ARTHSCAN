@@ -76,6 +76,10 @@ const HEATMAP_INDICES: Record<string, { name: string; file: string }> = {
   nifty100: { name: "Nifty 100", file: "ind_nifty100list" },
   midcap150: { name: "Nifty Midcap 150", file: "ind_niftymidcap150list" },
   smallcap250: { name: "Nifty Smallcap 250", file: "ind_niftysmallcap250list" },
+  niftybank: { name: "Nifty Bank", file: "ind_niftybanklist" },
+  midcap100: { name: "Nifty Midcap 100", file: "ind_niftymidcap100list" },
+  smallcap100: { name: "Nifty Smallcap 100", file: "ind_niftysmallcap100list" },
+  niftyit: { name: "Nifty IT", file: "ind_niftyitlist" },
 };
 
 const BREADTH_UNIVERSE = "Every ordinary share traded on NSE that day: main board (EQ, BE, BZ) and SME (SM, ST). ETFs and funds are excluded.";
@@ -611,7 +615,7 @@ export const TOOLS: Tool[] = [
     name: "get_heatmap",
     route: "/market/heatmap",
     title: "Market heatmap",
-    description: "Stocks grouped by sector with their change for a period and their turnover, for a heatmap. Pick an index (Nifty 50, Nifty Next 50, Nifty 100, Midcap 150, Smallcap 250), one sector, or level=sectors for one tile per sector across the market. Without either, the most traded stocks.",
+    description: "Stocks grouped by sector with their change for a period and their turnover, for a heatmap. Pick an index (Nifty 50, Nifty Next 50, Nifty 100, Midcap 150, Smallcap 250, Nifty Bank, Midcap 100, Smallcap 100, Nifty IT), one sector, or level=sectors for one tile per sector across the market. Without either, the most traded stocks.",
     inputSchema: {
       type: "object",
       properties: {
@@ -695,14 +699,14 @@ export const TOOLS: Tool[] = [
       type: "object",
       properties: {
         index: { type: "string", description: "Exact index name, e.g. 'Nifty 50', 'Nifty Bank', 'Nifty Midcap 100'" },
-        days: { type: "integer", description: "History length in trading days when an index is given (default 250, max 1000)" },
+        days: { type: "integer", description: "History length in trading days when an index is given (default 250, max 5000)" },
       },
     },
     metered: true,
     handler: async (db, { index, days }) => {
       if (index) {
-        const { results } = await db.prepare(`SELECT date, close, change_pct, pe, pb, div_yield FROM index_daily
-          WHERE index_name = ? ORDER BY date DESC LIMIT ?`).bind(String(index), clampLimit(days, 250, 1000)).all<{ pe: number | null }>();
+        const { results } = await db.prepare(`SELECT date, open, high, low, close, change_pct, pe, pb, div_yield FROM index_daily
+          WHERE index_name = ? ORDER BY date DESC LIMIT ?`).bind(String(index), clampLimit(days, 250, 5000)).all<{ pe: number | null }>();
         if (!results.length) throw new ToolError("E_NOT_FOUND", `No index called '${index}'. Call get_index_valuations without an index to list them.`, 404);
         const pes = results.map((r) => r.pe).filter((v): v is number => v !== null).sort((a, b) => a - b);
         const pct = (v: number | null) => (v === null || !pes.length ? null : Math.round((pes.filter((p) => p <= v).length / pes.length) * 100));

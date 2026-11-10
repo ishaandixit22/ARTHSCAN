@@ -24,6 +24,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
     usage: locals.usage,
     live: locals.live,
     owner: locals.owner,
+    preview: locals.preview,
     // logo.dev publishable key: public by design (it ends up in image URLs), restricted to our domain on their side.
     logoKey: env.LOGODEV_KEY || null,
     ticker: NIFTY_50.map((s) => bySymbol.get(s)).filter(Boolean),

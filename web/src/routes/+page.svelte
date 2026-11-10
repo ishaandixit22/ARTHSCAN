@@ -3,6 +3,7 @@
   import CityTiles from "$lib/components/CityTiles.svelte";
   import Search from "$lib/components/Search.svelte";
   import { BRAND } from "$lib/brand";
+  import { indexHref, indexShort as indexLabel } from "$lib/indices";
   import LiveStamp from "$lib/components/LiveStamp.svelte";
   import { banWhen, cr, crSigned, crore, date, int, pct, tone } from "$lib/format";
   import { live, watch } from "$lib/live.svelte";
@@ -91,21 +92,31 @@
     { term: "FII & DII flows", plain: "Foreign (FII) and Indian (DII) institutions move the biggest money. When both buy, the market usually has a tailwind.", href: "/fii-dii", cta: "Follow the money" },
     { term: "Screening", plain: "Instead of chasing tips, set rules (growing profits, low debt, fair price) and let the screener find every stock that passes.", href: "/screener", cta: "Build your first screen" },
   ];
+  // Tells search engines the site's name, including the spelling people type.
+  const siteLd = `<script type="application/ld+json">${JSON.stringify([
+    { "@context": "https://schema.org", "@type": "WebSite", name: BRAND, alternateName: ["ArthScan", "arthscan.me"], url: "https://arthscan.me/" },
+    { "@context": "https://schema.org", "@type": "Organization", name: BRAND, url: "https://arthscan.me/", logo: "https://arthscan.me/icon-512.png" },
+  ])}<\/script>`;
 </script>
 
-<svelte:head><title>{BRAND} — the Indian stock market, explained as it moves</title></svelte:head>
+<svelte:head>
+  <title>{BRAND} — the Indian stock market, explained as it moves</title>
+  {@html siteLd}
+</svelte:head>
 
 <div class="front">
   {#if data.indices.length}
-    <section class="indices" aria-label={indicesLive ? "Index levels" : "Index closes"}>
+    <section class="indices" style="--n: {indices.length}" aria-label={indicesLive ? "Index levels" : "Index closes"}>
       {#each indices as i (i.index_name)}
-        <a href={i.index_name === "Nifty 50" || i.index_name === "Nifty Bank" ? "/valuations" : "/heatmap"}>
-          <span class="iname">{i.index_name}</span>
-          <b>{i.close?.toLocaleString("en-IN", { maximumFractionDigits: 2 }) ?? "—"}</b>
-          <span class={tone(i.change_pct)}>{pct(i.change_pct)}</span>
+        <a href={indexHref(i.index_name)}>
+          <span class="iname">{indexLabel(i.index_name)}</span>
+          <span class="iv">
+            <b>{i.close?.toLocaleString("en-IN", { maximumFractionDigits: 2 }) ?? "—"}</b>
+            <span class={tone(i.change_pct)}>{pct(i.change_pct)}</span>
+          </span>
         </a>
       {/each}
-      <span class="dateline asof">{#if indicesLive}<LiveStamp close="" />{:else}NSE close · {date(data.indicesAsOf)}{/if}</span>
+      <span class="dateline asof">{#if indicesLive}<LiveStamp close="" />{:else}NSE close · {date(data.indicesAsOf).replace(/ \d{4}$/, "")}{/if}</span>
     </section>
   {/if}
 
@@ -273,13 +284,15 @@
   .boards, .learn { content-visibility: auto; contain-intrinsic-size: auto 720px; }
 
   /* Index strip: the paper's market-data line under the masthead. */
-  .indices { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 0; padding: 9px 0; border-bottom: 1px solid var(--ink); font-stretch: 82%; }
-  .indices a { display: inline-flex; align-items: baseline; gap: 7px; padding: 0 18px; border-left: 1px solid var(--line-2); font-size: 14px; color: var(--ink); }
+  /* One row: an equal column per index (name over level and change), then the stamp. */
+  .indices { display: grid; grid-template-columns: repeat(var(--n, 6), minmax(0, 1fr)) auto; align-items: end; padding: 9px 0; border-bottom: 1px solid var(--ink); font-stretch: 82%; }
+  .indices a { display: grid; gap: 1px; min-width: 0; padding: 0 14px; border-left: 1px solid var(--line-2); font-size: 14px; color: var(--ink); }
   .indices a:first-child { padding-left: 0; border-left: 0; }
   .indices a:hover b { text-decoration: underline; text-underline-offset: 3px; }
-  .iname { font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; font-size: 12.5px; }
+  .iname { font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; font-size: 11.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .iv { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
   .indices b { font-weight: 850; }
-  .asof { margin-left: auto; }
+  .asof { padding-left: 14px; white-space: nowrap; }
 
   /* Page one: lead column, the city as the lead picture, listings. Column rules, no boxes. */
   .page1 { display: grid; grid-template-columns: minmax(0, 23fr) minmax(0, 55fr) minmax(0, 22fr); border-bottom: var(--rule-heavy); margin-top: -14px; }
@@ -383,8 +396,8 @@
     /* Read top down on a phone: the day's story, who moved, then the market as a picture. */
     .front { grid-template-columns: minmax(0, 1fr); gap: 26px; padding-bottom: 32px; }
     .page1 > * { min-width: 0; }
-    .indices { position: relative; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 8px 16px; }
-    .indices a { flex: none; white-space: nowrap; }
+    .indices { position: relative; display: flex; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 8px 16px; }
+    .indices a { flex: none; }
     .asof { display: none; }
     .page1 { display: flex; flex-direction: column; margin-top: -14px; }
     .page1 > * { padding: 16px 0 20px !important; border-left: 0 !important; }

@@ -51,7 +51,7 @@
   // 22:00 IST on session days as NSE publishes its files, and 08:30 IST the next
   // morning to catch anything published late. Each run loads only what's new.
   // They fire every day and the code skips days with no session (refreshDue, marketOpen in lib/market-hours.ts), so weekend special sessions such as Muhurat load too.
-  "triggers": { "crons": ["45 12 * * *", "0 14 * * *", "30 16 * * *", "0 3 * * *", "*/10 * * * *", "*/5 3-10 * * *", "30 4 * * *"] },
+  "triggers": { "crons": ["45 12 * * *", "0 14 * * *", "30 16 * * *", "0 3 * * *", "*/10 * * * *", "*/5 3-10 * * *", "30 4 * * *", "7,22,37,52 12-17 * * *"] },
   // Recomputing every stock's metrics needs more than the default CPU time.
   "limits": { "cpu_ms": 300000 }
 }

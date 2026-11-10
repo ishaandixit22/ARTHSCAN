@@ -1,6 +1,7 @@
 import { redirect, type Handle } from "@sveltejs/kit";
 import { env } from "$env/dynamic/private";
 import { api } from "$lib/server/api";
+import { needsSignIn } from "$lib/preview";
 import { cachedPage } from "$lib/server/page-cache";
 
 // Paths the API Worker owns. In production Cloudflare routes send them to it
@@ -10,11 +11,6 @@ const API_PATHS = /^\/(api|v1|mcp|oauth|\.well-known|health)(\/|$)/;
 
 // Reachable without signing in while the site is invite-only.
 const OPEN_PATHS = /^\/(login|robots\.txt|sitemap\.xml|favicon\.(svg|ico)|apple-touch-icon\.png|icon-(192|512)\.png)$/;
-
-// What a signed-out visitor can see while REQUIRE_SIGN_IN is on: the home page, the calculators and
-// the legal pages (Google's sign-in rules need the privacy policy public). The search data stays open
-// so the home page's search works; choosing a result then asks for sign-in.
-const PUBLIC_PATHS = /^\/($|calculators(\/|$)|terms$|privacy$|search\.json$|search-index\.json$|googlea2331a3f68c95126\.html$)/;
 
 // Content-Security-Policy itself comes from kit.csp in svelte.config.js, which
 // adds per-request nonces for SvelteKit's inline hydration script.
@@ -49,6 +45,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   event.locals.usage = null;
   event.locals.live = false;
   event.locals.owner = false;
+  event.locals.preview = false;
   const cookie = event.request.headers.get("cookie");
   if (cookie?.includes("al_session=")) {
     try {
@@ -71,7 +68,9 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   const signInRequired = env.REQUIRE_SIGN_IN === "true";
-  if (signInRequired && !event.locals.account && !OPEN_PATHS.test(event.url.pathname) && !PUBLIC_PATHS.test(event.url.pathname)) {
+  // Signed-out visitors can open nearly everything and see a preview of it (see $lib/preview).
+  event.locals.preview = signInRequired && !event.locals.account;
+  if (event.locals.preview && needsSignIn(event.url.pathname)) {
     redirect(303, `/login?return_to=${encodeURIComponent(event.url.pathname + event.url.search)}`);
   }
 

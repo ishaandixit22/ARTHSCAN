@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { recentNews } from "$lib/recent-news";
   import { page } from "$app/state";
   import { onMount, untrack } from "svelte";
   import ProChart from "$lib/components/ProChart.svelte";
@@ -17,6 +18,7 @@
   import LiveBadge from "$lib/components/LiveBadge.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import { BRAND } from "$lib/brand";
+  import PreviewPrompt from "$lib/components/PreviewPrompt.svelte";
   import { compact, crore, date, num, pct, price, tone } from "$lib/format";
   import { near } from "$lib/near";
   import { readStock } from "$lib/stock-reading";
@@ -163,6 +165,7 @@
     return () => clearInterval(timer);
   });
   const digest = $derived(desk.digest);
+  const news = $derived(recentNews<any>(digest?.news));
   let chartView = $state<"tradingview" | "intraday">("tradingview");
   const chartTick = $derived(lq ? { ltp: lq.ltp, volume: lq.volume } : session.open && desk.quote?.ltp ? { ltp: desk.quote.ltp, volume: desk.quote.volume } : null);
   const headPrice = $derived(bseOnly && desk.quote?.ltp && session.open ? desk.quote.ltp : m.close);
@@ -175,7 +178,7 @@
     const sym = c.symbol;
     extFund = null;
     extLoading = false;
-    if (!engaged || (data.financials.periods.length && data.shareholding.quarters.length)) return;
+    if (data.preview || !engaged || (data.financials.periods.length && data.shareholding.quarters.length)) return;
     extLoading = true;
     let stale = false;
     fetch(`/stock/${encodeURIComponent(sym)}/fundamentals`)
@@ -298,7 +301,10 @@
   ];
 </script>
 
-<svelte:head><title>{shortSymbol} · {c.name} — {BRAND}</title></svelte:head>
+<svelte:head>
+  <title>{c.name} share price today ({shortSymbol}) — {BRAND}</title>
+  <meta name="description" content={summary.length > 158 ? `${summary.slice(0, summary.lastIndexOf(" ", 155))}…` : summary} />
+</svelte:head>
 
 <div class="page" bind:this={root}>
   <!-- Identity and price -->
@@ -354,8 +360,8 @@
       <div class="moving">
         <h2>How the stock has moved</h2>
         <p>{summary}{#if extLoading && !data.financials.periods.length}<span class="sub"> Loading quarterly figures…</span>{/if}</p>
-        {#if digest?.news?.[0]}
-          <p class="latest"><b>In the news:</b> <a href={digest.news[0].url} target="_blank" rel="noopener noreferrer">{digest.news[0].headline}</a></p>
+        {#if news[0]}
+          <p class="latest"><b>In the news:</b> <a href={news[0].url} target="_blank" rel="noopener noreferrer">{news[0].headline}</a></p>
         {/if}
       </div>
     {/if}
@@ -364,6 +370,9 @@
 
   <StockReading {reading} />
 
+  {#if data.preview}
+    <PreviewPrompt title="Sign in to see {c.name} in depth" detail="The chart, financials, shareholding, technicals, forecasts, filings and peers. It's free, and takes one click with Google." />
+  {:else}
   <!-- Section rail: jumps down this one page -->
   <nav class="sections" aria-label="Stock sections" bind:this={rail}>
     <div class="tabs">
@@ -425,7 +434,7 @@
 
   <div id="news" class="block">
     <h2>News</h2>
-    <StockNews news={digest?.news ?? []} name={c.name} loading={deskLoading} />
+    <StockNews news={news} name={c.name} loading={deskLoading} />
   </div>
 
   {#if data.industryInfo}
@@ -573,6 +582,7 @@
       {/if}
     </section>
   </div>
+  {/if}
 </div>
 
 <style>
