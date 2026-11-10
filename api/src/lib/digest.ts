@@ -143,23 +143,96 @@ async function ask(env: Env, who: { isin: string | null; names: string[] }, symb
   throw last ?? new ToolError("E_NOT_FOUND", "The data provider has no profile for this company.", 404);
 }
 
-export async function stockDigest(env: Env, rawSymbol: string): Promise<{ source: string; fetched_at: string; data: Digest }> {
+const SOURCE = "Indian Stock API (indianapi.in)";
+const put = (env: Env, key: string, body: string, at: number) =>
+  env.DB.prepare("INSERT INTO external_cache (key, body, fetched_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET body = excluded.body, fetched_at = excluded.fetched_at")
+    .bind(key, body, at).run();
+
+/**
+ * One stock's digest. `stored`: only the copy we already keep, whatever its age, and never the provider,
+ * so the page can render About on the server (crawlers included) without spending the plan.
+ */
+export async function stockDigest(env: Env, rawSymbol: string, opts: { stored?: boolean } = {}): Promise<{ source: string; fetched_at: string; data: Digest }> {
   const symbol = rawSymbol.trim().toUpperCase();
-  const who = await identity(env, symbol);
-  if (!who) throw new ToolError("E_NOT_FOUND", `No stock with symbol ${symbol}.`, 404);
   const key = `digest:${symbol}`;
   const now = Math.floor(Date.now() / 1000);
   const row = await env.DB.prepare("SELECT body, fetched_at FROM external_cache WHERE key = ?").bind(key).first<{ body: string; fetched_at: number }>();
-  const stored = (fetched_at: number, data: Digest) => ({ source: "Indian Stock API (indianapi.in)", fetched_at: new Date(fetched_at * 1000).toISOString(), data });
-  if (row && now - row.fetched_at < FRESH_S) return stored(row.fetched_at, JSON.parse(row.body));
+  const stored = (fetched_at: number, data: Digest) => ({ source: SOURCE, fetched_at: new Date(fetched_at * 1000).toISOString(), data });
+  if (row && (opts.stored || now - row.fetched_at < FRESH_S)) return stored(row.fetched_at, JSON.parse(row.body));
+  if (opts.stored) throw new ToolError("E_NOT_FOUND", `No stored digest for ${symbol} yet.`, 404);
+  const who = await identity(env, symbol);
+  if (!who) throw new ToolError("E_NOT_FOUND", `No stock with symbol ${symbol}.`, 404);
   try {
     const data = await ask(env, who, symbol);
-    await env.DB.prepare("INSERT INTO external_cache (key, body, fetched_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET body = excluded.body, fetched_at = excluded.fetched_at")
-      .bind(key, JSON.stringify(data), now).run();
+    await put(env, key, JSON.stringify(data), now);
     return stored(now, data);
   } catch (err) {
     // An older copy beats nothing when the provider is out or its limit is used up.
     if (row) return stored(row.fetched_at, JSON.parse(row.body));
     throw err;
   }
+}
+
+/** A stored digest older than this is refreshed by the background fill. Visitors refresh busier pages sooner (FRESH_S). */
+const REFILL_S = 7 * 86400;
+/** A company the provider didn't know is asked about again after this long. */
+const RETRY_UNKNOWN_S = 30 * 86400;
+
+/**
+ * One batch of the background digest fill, so About is already stored when someone first opens a
+ * page: stocks with nothing stored first (largest turnover first, NSE then BSE-only), then the oldest.
+ * `dailyCap` (env DIGEST_DAILY_MAX, default 150) keeps it inside the provider plan, which the
+ * statement fill shares. Stops at the provider's quota error.
+ */
+export async function fillDigests(env: Env, opts: { maxRequests?: number; dailyCap?: number } = {}) {
+  if (!env.INDIANAPI_KEY) return { asked: 0, stored: 0, unknown: 0, skipped: "No provider key" as string | null };
+  const day = new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10);
+  const counter = `digests:count:${day}`;
+  const dailyCap = opts.dailyCap ?? (Number(env.DIGEST_DAILY_MAX) || 150);
+  const used = Number((await env.DB.prepare("SELECT body FROM external_cache WHERE key = ?").bind(counter).first<{ body: string }>())?.body ?? 0);
+  const room = Math.min(opts.maxRequests ?? 8, dailyCap - used);
+  if (room <= 0) return { asked: 0, stored: 0, unknown: 0, skipped: `Daily cap of ${dailyCap} requests reached` };
+
+  const now = Math.floor(Date.now() / 1000);
+  const stale = now - REFILL_S, retry = now - RETRY_UNKNOWN_S;
+  // One row per stock: its stored digest's age, or when the provider last said it didn't know it.
+  const { results: queue } = await env.DB.prepare(`
+    SELECT symbol, at FROM (
+      SELECT s.symbol, d.fetched_at AS at, n.fetched_at AS missed, COALESCE(m.turnover, 0) AS size, 0 AS bse
+        FROM stocks s
+        LEFT JOIN stock_metrics m ON m.symbol = s.symbol
+        LEFT JOIN external_cache d ON d.key = 'digest:' || s.symbol
+        LEFT JOIN external_cache n ON n.key = 'digest-none:' || s.symbol
+        WHERE m.as_of >= date((SELECT MAX(as_of) FROM stock_metrics), '-14 days')
+      UNION ALL
+      SELECT 'BSE-' || b.symbol, d.fetched_at, n.fetched_at, COALESCE(b.median_turnover, 0), 1
+        FROM bse_stocks b
+        LEFT JOIN external_cache d ON d.key = 'digest:BSE-' || b.symbol
+        LEFT JOIN external_cache n ON n.key = 'digest-none:BSE-' || b.symbol
+    )
+    WHERE (at IS NULL OR at < ?) AND (missed IS NULL OR missed < ?)
+    ORDER BY (at IS NULL) DESC, bse, at, size DESC LIMIT ?`)
+    .bind(stale, retry, room).all<{ symbol: string; at: number | null }>();
+
+  let asked = 0, stored = 0, unknown = 0, skipped: string | null = null;
+  for (const { symbol } of queue) {
+    const who = await identity(env, symbol);
+    if (!who) continue;
+    asked++;
+    try {
+      const data = await ask(env, who, symbol);
+      await put(env, `digest:${symbol}`, JSON.stringify(data), Math.floor(Date.now() / 1000));
+      stored++;
+    } catch (err) {
+      if (err instanceof ToolError && err.code === "E_NOT_FOUND") {
+        await put(env, `digest-none:${symbol}`, "", Math.floor(Date.now() / 1000));
+        unknown++;
+        continue;
+      }
+      skipped = err instanceof Error ? err.message : "The provider stopped answering";
+      break;
+    }
+  }
+  if (asked) await put(env, counter, String(used + asked), now);
+  return { asked, stored, unknown, skipped };
 }

@@ -96,7 +96,8 @@ live.get("/quote", async (c) => {
 live.get("/stats", async (c) => {
   const symbol = (c.req.query("symbol") ?? "").trim().toUpperCase();
   if (!symbol) return jsonError(c, 400, "E_BAD_ARGS", "symbol is required");
-  const r = await priceStats(c.env, symbol);
+  // stored=1: the stored figures only, never Dhan (the server-rendered page asks for these).
+  const r = await priceStats(c.env, symbol, { stored: c.req.query("stored") === "1" });
   return c.json(r, r.ok ? 200 : (r.status as 404));
 });
 // Movers, breadth, sector moves and intraday signals over every live stock.

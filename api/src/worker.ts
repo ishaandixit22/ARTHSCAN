@@ -15,6 +15,8 @@ import { runDaily } from "./jobs/daily.js";
 import { recordIpoCategories } from "./jobs/ipo-readings.js";
 import { fillWebsites, refreshFilings } from "./lib/sebi.js";
 import { fillStatements } from "./lib/statements.js";
+import { fillDigests } from "./lib/digest.js";
+import { fillPriceStats } from "./lib/chart.js";
 import { setBackground } from "./lib/nse.js";
 import { runIntradayCycle } from "./screens/run.js";
 import { screensTick } from "./screens/tick.js";
@@ -62,6 +64,9 @@ export default {
       setBackground((p) => ctx.waitUntil(p)); // the IPO readings read NSE's stored copies, which refresh behind the answer
       ctx.waitUntil(fillStatements(env).then((r) => r.asked && console.log(`statements: asked ${r.asked}, stored ${r.stored}, unknown ${r.unknown}${r.skipped ? ` (${r.skipped})` : ""}`)));
       ctx.waitUntil(bseHistoryTick(env).then((r) => r.asked && console.log(`bse history: asked ${r.asked}, loaded ${r.loaded}, failed ${r.failed}`)));
+      // Stock pages read About and their long-history figures from the database; these keep it filled ahead of visitors.
+      ctx.waitUntil(fillDigests(env).then((r) => r.asked && console.log(`digests: asked ${r.asked}, stored ${r.stored}, unknown ${r.unknown}${r.skipped ? ` (${r.skipped})` : ""}`)).catch((err) => console.error("digests:", err)));
+      ctx.waitUntil(fillPriceStats(env).then((r) => r.asked && console.log(`price stats: asked ${r.asked}, stored ${r.stored}, failed ${r.failed}${r.skipped ? ` (${r.skipped})` : ""}`)).catch((err) => console.error("price stats:", err)));
       ctx.waitUntil(recordIpoCategories(env).then((r) => r.saved && console.log(`ipo readings: saved ${r.saved} of ${r.issues}`)).catch((err) => console.error("ipo readings:", err)));
       ctx.waitUntil(refreshFilings(env).then((r) => { if (r.read) console.log(`sebi filings: ${r.filings} stored${r.error ? ` (${r.error})` : ""}`); return fillWebsites(env); }).then((r) => r.read && console.log(`sebi websites: read ${r.read}, found ${r.found}`)).catch((err) => console.error("sebi filings:", err)));
       ctx.waitUntil(screensTick(env).catch((err) => console.error("screens:", err)));

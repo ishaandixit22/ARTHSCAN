@@ -125,42 +125,68 @@
   });
 
   // ── About, news, long-history figures and the session's quote ──
-  // Loaded in the browser for people, not during the server render, so crawlers don't spend the plans.
+  // About and the long-history figures arrive with the page, from what's stored. The browser then asks
+  // for each part on its own, so a slow one never holds up the rest: the quote at once (it sits at the
+  // top), stored parts only when missing, and a refresh of an older About and news once the page is idle.
+  // Bots get only what came with the page, so crawlers don't spend the plans.
   type Desk = { quote: any | null; stats: any | null; digest: any | null };
   let desk = $state<Desk>({ quote: null, stats: null, digest: null });
-  let deskLoading = $state(true);
+  let quoteLoading = $state(true);
+  let statsLoading = $state(true);
+  let digestLoading = $state(true);
   const isBot = () => typeof navigator !== "undefined" && (navigator.webdriver || /bot|crawl|spider|slurp|lighthouse|headless/i.test(navigator.userAgent));
+  // A stored digest older than this is refreshed in the background, as the API would on a visit.
+  const DIGEST_FRESH_MS = 6 * 3600_000;
+  const deskPart = (sym: string, part: "quote" | "stats" | "digest") =>
+    fetch(`/stock/${encodeURIComponent(sym)}/desk?only=${part}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   $effect(() => {
     const sym = c.symbol;
-    desk = { quote: null, stats: null, digest: null };
-    deskLoading = true;
-    if (isBot()) {
-      deskLoading = false;
-      return;
-    }
+    const stored = untrack(() => ({ stats: data.stats, digest: data.digest }));
+    desk = { quote: null, stats: stored.stats, digest: stored.digest?.data ?? null };
+    quoteLoading = statsLoading = digestLoading = false;
+    if (isBot()) return;
     let stale = false;
-    fetch(`/stock/${encodeURIComponent(sym)}/desk`)
-      .then((r) => (r.ok ? r.json() : null))
-      .catch(() => null)
-      .then((d) => {
-        if (stale) return;
-        if (d) desk = { quote: d.quote, stats: d.stats, digest: d.digest };
-        deskLoading = false;
+    const done = <T,>(p: Promise<T>, use: (d: T) => void) => p.then((d) => { if (!stale && sym === c.symbol) use(d); });
+
+    quoteLoading = true;
+    done(deskPart(sym, "quote"), (d) => {
+      if (d?.quote) desk.quote = d.quote;
+      quoteLoading = false;
+    });
+    if (!stored.stats) {
+      statsLoading = true;
+      done(deskPart(sym, "stats"), (d) => {
+        if (d?.stats?.ok) desk.stats = d.stats;
+        statsLoading = false;
       });
-    return () => (stale = true);
+    }
+    const age = stored.digest ? Date.now() - Date.parse(stored.digest.fetched_at) : Infinity;
+    const refreshDigest = () => done(deskPart(sym, "digest"), (d) => {
+      if (d?.digest) desk.digest = d.digest;
+      digestLoading = false;
+    });
+    let idle: number | undefined;
+    if (!stored.digest) {
+      digestLoading = true;
+      refreshDigest();
+    } else if (age > DIGEST_FRESH_MS) {
+      // The stored copy is on screen already; newer news can wait for a quiet moment.
+      idle = "requestIdleCallback" in window ? requestIdleCallback(refreshDigest, { timeout: 4000 }) : (setTimeout(refreshDigest, 1500) as unknown as number);
+    }
+    return () => {
+      stale = true;
+      if (idle !== undefined) ("cancelIdleCallback" in window ? cancelIdleCallback(idle) : clearTimeout(idle));
+    };
   });
-  // While the market is open, a BSE stock's price is polled: the live feed carries NSE only. NSE's limits and VWAP refresh with it.
+  // While the market is open the quote is polled: a BSE stock's price (the live feed carries NSE only), and NSE's limits and VWAP.
   $effect(() => {
     const sym = c.symbol;
     if (!session.open || isBot()) return;
     const timer = setInterval(() => {
       if (document.hidden) return;
-      fetch(`/stock/${encodeURIComponent(sym)}/desk?only=quote`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d) => {
-          if (d?.quote && sym === c.symbol) desk.quote = d.quote;
-        })
-        .catch(() => {});
+      deskPart(sym, "quote").then((d) => {
+        if (d?.quote && sym === c.symbol) desk.quote = d.quote;
+      });
     }, 20_000);
     return () => clearInterval(timer);
   });
@@ -345,7 +371,7 @@
       <h2>About {c.name}</h2>
       {#if digest?.about}
         <p class="story">{digest.about}</p>
-      {:else if deskLoading}
+      {:else if digestLoading}
         <p class="story waiting" role="status">Loading what this company does…</p>
       {:else}
         <p class="story waiting">A description of this company isn't available from our source right now.{#if digest?.industry ?? c.sector}{" "}It is classed under {digest?.industry ?? c.sector}.{/if}</p>
@@ -407,12 +433,12 @@
 
   <div id="forecast" class="block">
     <h2>Forecast</h2>
-    <StockForecast analysts={digest?.analysts ?? null} loading={deskLoading} />
+    <StockForecast analysts={digest?.analysts ?? null} loading={digestLoading} />
   </div>
 
   <div id="technicals" class="block">
     <h2>Technicals</h2>
-    <TechnicalPanel technicals={desk.stats?.technicals ?? null} loading={deskLoading} />
+    <TechnicalPanel technicals={desk.stats?.technicals ?? null} loading={statsLoading} />
     {#if m.cross_signal || m.breakout || (m.vol_ratio ?? 0) >= 3}
       <p class="signals">
         {#if m.cross_signal}<span class="chip {m.cross_signal === 'golden' ? 'up' : 'down'}">{m.cross_signal} cross · {date(m.cross_date)}</span>{/if}
@@ -424,17 +450,17 @@
 
   <div id="price-volume" class="block">
     <h2>Price &amp; Volume</h2>
-    <PriceVolume stats={desk.stats} loading={deskLoading} />
+    <PriceVolume stats={desk.stats} loading={statsLoading} />
   </div>
 
   <div id="seasonality" class="block">
     <h2>Seasonality</h2>
-    <SeasonalityPanel stats={desk.stats} name={c.name} loading={deskLoading} />
+    <SeasonalityPanel stats={desk.stats} name={c.name} loading={statsLoading} />
   </div>
 
   <div id="news" class="block">
     <h2>News</h2>
-    <StockNews news={news} name={c.name} loading={deskLoading} />
+    <StockNews news={news} name={c.name} loading={digestLoading} />
   </div>
 
   {#if data.industryInfo}

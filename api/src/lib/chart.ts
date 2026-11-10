@@ -3,6 +3,7 @@
 
 import type { Env } from "../env.js";
 import { cached, dhanPost, fail, type Fail, instrument } from "./dhan.js";
+import { inSessionHours, istClock } from "./market-hours.js";
 import {
   beta, type Candle, dailyCandles, type Day, extremes, monthlyCandles, returns, rollUpIntraday, seasonality, technicals, volumeAnalysis, weeklyCandles,
 } from "./price-stats.js";
@@ -84,8 +85,48 @@ type RawQuote = {
   ohlc?: { open?: number; high?: number; low?: number; close?: number };
 };
 
-/** Open, high, low, volume, average price and circuit limits for one stock. `date` is the session it last traded, if any. */
-export function quote(env: Env, symbol: string) {
+type Quote = Awaited<ReturnType<typeof restQuote>>;
+type FeedQuote = { ltp: number; prevClose: number | null; change: number | null; open: number | null; high: number | null; low: number | null; volume: number | null; atp: number | null; ltt: number | null };
+// The live feed's tick is current if it traded this recently; otherwise ask Dhan's quote API.
+const FEED_FRESH_S = 5 * 60;
+const CIRCUIT_TTL_S = 6 * 3600;
+
+/**
+ * Open, high, low, volume, average price and circuit limits for one stock. `date` is the session it last traded, if any.
+ * During the session an NSE stock's figures come from the live feed, which already holds every tick in
+ * memory: no Dhan call, and none of the quote API's one-a-second limit. Circuit limits are set once a
+ * day, so they come from a quote API answer kept for hours.
+ */
+export async function quote(env: Env, symbol: string): Promise<Quote> {
+  if (!symbol.startsWith("BSE-") && env.LIVE_FEED && inSessionHours()) {
+    const live = await feedQuote(env, symbol).catch(() => null);
+    if (live) {
+      const limits = await cached(`circuits/${symbol}`, CIRCUIT_TTL_S, () => restQuote(env, symbol));
+      return {
+        ok: true as const, symbol, fetched_at: new Date().toISOString(),
+        date: live.ltt ? istDate(live.ltt * 1000) : null,
+        ltp: live.ltp, change: live.change,
+        open: live.open, high: live.high, low: live.low, prev_close: live.prevClose,
+        volume: live.volume, vwap: live.atp,
+        value: live.volume && live.atp ? Math.round(live.volume * live.atp) : null,
+        upper_circuit: limits.ok ? limits.upper_circuit : null, lower_circuit: limits.ok ? limits.lower_circuit : null,
+      };
+    }
+  }
+  return restQuote(env, symbol);
+}
+
+async function feedQuote(env: Env, symbol: string): Promise<FeedQuote | null> {
+  const stub = env.LIVE_FEED!.get(env.LIVE_FEED!.idFromName("dhan"));
+  const res = await stub.fetch(new Request(`https://live/snapshot?symbols=${encodeURIComponent(symbol)}`));
+  if (!res.ok) return null;
+  const body = (await res.json()) as { status?: { state?: string }; quotes?: Record<string, FeedQuote> };
+  const q = body.quotes?.[symbol];
+  if (body.status?.state !== "live" || !q?.ltp || !q.ltt || Date.now() / 1000 - q.ltt > FEED_FRESH_S) return null;
+  return q;
+}
+
+function restQuote(env: Env, symbol: string) {
   return cached(`quote/${symbol}`, QUOTE_TTL_S, async () => {
     const inst = await instrument(env, symbol);
     if (!inst) return fail(404, `No Dhan instrument for ${symbol}`);
@@ -179,23 +220,122 @@ export async function chartCandles(env: Env, symbol: string, tf: string, before?
 // ── Long-history figures for the stock page ────────────────────────
 
 /** Returns, seasonality, all-time extremes, beta, volume and technicals, worked out from the daily history. */
-export async function priceStats(env: Env, symbol: string) {
+async function computeStats(env: Env, symbol: string, withToday: boolean) {
+  const hist = withToday ? await dailyWithToday(env, symbol) : await dailyHistory(env, symbol);
+  if (!hist.ok) return hist;
+  const { days } = hist;
+  const nifty = await niftyHistory(env);
+  // NSE's file gives delivery percentages; Dhan and the BSE-only tables have none.
+  const delivery = new Map<string, number | null>();
+  if (!symbol.startsWith("BSE-")) {
+    const { results } = await env.DB.prepare("SELECT date, deliv_pct FROM daily_prices WHERE symbol = ? ORDER BY date DESC LIMIT 25").bind(symbol).all<{ date: string; deliv_pct: number | null }>();
+    for (const row of results) delivery.set(row.date, row.deliv_pct);
+  }
+  return {
+    ok: true as const, symbol, as_of: days[days.length - 1].date,
+    returns: returns(days), extremes: extremes(days), seasonality: seasonality(days),
+    beta: nifty.ok ? beta(days, nifty.days) : null,
+    volume: volumeAnalysis(days, delivery), technicals: technicals(days),
+  };
+}
+
+type StatsRow = { as_of: string | null; computed_at: number | null; body: string | null; latest: string | null };
+
+/** The stored figures and the last session we hold for the stock, in one query. */
+function statsRow(env: Env, symbol: string) {
+  const bse = symbol.startsWith("BSE-");
+  return env.DB.prepare(`SELECT p.as_of, p.computed_at, p.body,
+      (SELECT MAX(date) FROM ${bse ? "bse_daily_prices" : "daily_prices"} WHERE symbol = ?) AS latest
+    FROM (SELECT 1) LEFT JOIN price_stats p ON p.symbol = ?`)
+    .bind(bse ? symbol.slice(4) : symbol, symbol).first<StatsRow>();
+}
+
+// The evening refresh stores the session (with NSE's delivery figures) by about 18:30 IST, 13:00 UTC.
+const SESSION_STORED_UTC = "13:00:00";
+
+/**
+ * Whether stored figures still cover the last session. Figures worked out after the close but before
+ * our evening load are kept until that load lands, then worked out once more to pick up its delivery figures.
+ */
+function current(row: StatsRow | null, now = Date.now()) {
+  if (!row?.as_of || row.computed_at == null) return false;
+  if (!row.latest) return now / 1000 - row.computed_at < 86400;
+  if (row.as_of > row.latest) return true;
+  if (row.as_of < row.latest) return false;
+  return row.computed_at >= Date.parse(`${row.latest}T${SESSION_STORED_UTC}Z`) / 1000;
+}
+
+async function storeStats(env: Env, symbol: string, out: { as_of: string }) {
+  await env.DB.prepare("INSERT INTO price_stats (symbol, as_of, body, computed_at) VALUES (?, ?, ?, ?) ON CONFLICT(symbol) DO UPDATE SET as_of = excluded.as_of, body = excluded.body, computed_at = excluded.computed_at")
+    .bind(symbol, out.as_of, JSON.stringify(out), Math.floor(Date.now() / 1000)).run();
+}
+
+/**
+ * The long-history figures for the stock page, from price_stats when they cover the last session.
+ * Otherwise they are worked out (one Dhan history call) and, outside market hours, stored. During the
+ * session the stored figures run to the previous close; the live quote carries today's move.
+ * `stored`: the stored row only, whatever its age, never Dhan (for the server-rendered page).
+ */
+export async function priceStats(env: Env, symbol: string, opts: { stored?: boolean } = {}) {
+  const row = await statsRow(env, symbol).catch(() => null);
+  if (row?.body && (opts.stored || current(row))) return JSON.parse(row.body) as Awaited<ReturnType<typeof computeStats>>;
+  if (opts.stored) return fail(404, `No stored figures for ${symbol} yet`);
   return cached(`stats/${symbol}`, 3600, async () => {
-    const hist = await dailyWithToday(env, symbol);
-    if (!hist.ok) return hist;
-    const { days } = hist;
-    const nifty = await niftyHistory(env);
-    // NSE's file gives delivery percentages; Dhan and the BSE-only tables have none.
-    const delivery = new Map<string, number | null>();
-    if (!symbol.startsWith("BSE-")) {
-      const { results } = await env.DB.prepare("SELECT date, deliv_pct FROM daily_prices WHERE symbol = ? ORDER BY date DESC LIMIT 25").bind(symbol).all<{ date: string; deliv_pct: number | null }>();
-      for (const row of results) delivery.set(row.date, row.deliv_pct);
-    }
-    return {
-      ok: true as const, symbol, as_of: days[days.length - 1].date,
-      returns: returns(days), extremes: extremes(days), seasonality: seasonality(days),
-      beta: nifty.ok ? beta(days, nifty.days) : null,
-      volume: volumeAnalysis(days, delivery), technicals: technicals(days),
-    };
+    const open = inSessionHours();
+    const out = await computeStats(env, symbol, open);
+    if (out.ok && !open) await storeStats(env, symbol, out).catch(() => {});
+    // Dhan's history can be briefly unavailable; yesterday's figures beat none.
+    if (!out.ok && row?.body) return JSON.parse(row.body) as typeof out;
+    return out;
   });
+}
+
+// Intraday screens call Dhan every 5 minutes from 08:30 to 16:25 IST and share its rate limit, so the fill stays out of that window.
+const FILL_QUIET_FROM = 8 * 60 + 15, FILL_QUIET_TO = 16 * 60 + 30;
+
+/**
+ * One batch of the overnight figures fill: every stock whose stored figures miss its last session,
+ * NSE by turnover first, then BSE-only. One Dhan history call each, one after another (Dhan's data
+ * limit is 5 a second). About 90 batches a night cover all 5,700 stocks.
+ */
+export async function fillPriceStats(env: Env, opts: { max?: number; now?: number } = {}) {
+  const now = opts.now ?? Date.now();
+  const clock = istClock(now);
+  const weekday = clock.weekday >= 1 && clock.weekday <= 5;
+  if (weekday && clock.minutes >= FILL_QUIET_FROM && clock.minutes < FILL_QUIET_TO) return { asked: 0, stored: 0, failed: 0, skipped: "market hours" as string | null };
+  const max = opts.max ?? 70;
+  const stamp = `|| 'T${SESSION_STORED_UTC}Z'`;
+  // A row is due when it misses the last stored session, or was worked out before that session was stored.
+  const due = (latest: string) => `(p.symbol IS NULL OR p.as_of < ${latest} OR (p.as_of = ${latest} AND p.computed_at < CAST(strftime('%s', ${latest} ${stamp}) AS INTEGER)))`;
+  const { results: nse } = await env.DB.prepare(`
+    SELECT m.symbol, m.as_of AS latest FROM stock_metrics m LEFT JOIN price_stats p ON p.symbol = m.symbol
+    WHERE m.as_of >= date((SELECT MAX(as_of) FROM stock_metrics), '-14 days') AND ${due("m.as_of")}
+    ORDER BY (p.symbol IS NULL) DESC, COALESCE(m.turnover, 0) DESC LIMIT ?`).bind(max).all<{ symbol: string; latest: string }>();
+  const bse = nse.length < max ? (await env.DB.prepare(`
+    SELECT 'BSE-' || b.symbol AS symbol, b.latest FROM (
+      SELECT s.symbol, s.median_turnover, (SELECT MAX(date) FROM bse_daily_prices d WHERE d.symbol = s.symbol) AS latest FROM bse_stocks s
+    ) b LEFT JOIN price_stats p ON p.symbol = 'BSE-' || b.symbol
+    WHERE b.latest IS NOT NULL AND ${due("b.latest")}
+    ORDER BY (p.symbol IS NULL) DESC, COALESCE(b.median_turnover, 0) DESC LIMIT ?`).bind(max - nse.length).all<{ symbol: string; latest: string }>()).results : [];
+
+  let asked = 0, stored = 0, failed = 0, skipped: string | null = null;
+  for (const { symbol, latest } of [...nse, ...bse]) {
+    asked++;
+    const out = await computeStats(env, symbol, false).catch(() => null);
+    if (out?.ok) {
+      await storeStats(env, symbol, out);
+      stored++;
+    } else {
+      failed++;
+      // Rate-limited: leave the rest for the next batch rather than spend the limit on refusals.
+      if (!out || out.status === 429 || out.upstream === 429) {
+        skipped = out ? "Dhan rate limit" : "Dhan did not answer";
+        break;
+      }
+      // No history to work from (Dhan has none and we store too little): note it for this session, so it
+      // doesn't head the queue every batch. The page answers the same failure either way.
+      await storeStats(env, symbol, { ...out, as_of: latest }).catch(() => {});
+    }
+  }
+  return { asked, stored, failed, skipped };
 }

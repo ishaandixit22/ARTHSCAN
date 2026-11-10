@@ -32,6 +32,8 @@ export interface Env {
   INDIANAPI_BASE_URL?: string;
   /** Provider requests the background statement fill may spend per day (default 300; raise it to match the plan). */
   STATEMENTS_DAILY_MAX?: string;
+  /** Provider requests the background digest (About, news) fill may spend per day (default 150). */
+  DIGEST_DAILY_MAX?: string;
   /** ipoguru.in key, a secret: IPO calendar, premium, subscription and company data. Its plan decides what /ipos can show. */
   IPOGURU_API_KEY?: string;
   /** ipoalerts.in key, a secret: grey-market premium for the IPO board. Without it the premium fields stay empty. */

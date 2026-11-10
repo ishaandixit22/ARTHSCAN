@@ -71,9 +71,16 @@ export const MARKET_DATA_TOOLS: Tool[] = [
     route: "/ext/digest",
     title: "Company digest",
     description: "What a company does, its leadership, recent news about it, the analyst rating mix and its corporate actions, trimmed from the Indian Stock API and refreshed every few hours.",
-    inputSchema: { type: "object", properties: { stock: { type: "string", description: "Symbol, e.g. TATASTEEL, or BSE-<symbol> for a stock listed only on BSE" } }, required: ["stock"] },
+    inputSchema: {
+      type: "object",
+      properties: {
+        stock: { type: "string", description: "Symbol, e.g. TATASTEEL, or BSE-<symbol> for a stock listed only on BSE" },
+        stored: { type: "string", description: "1 for the stored copy only, whatever its age, without asking the provider" },
+      },
+      required: ["stock"],
+    },
     metered: true,
-    handler: async (_db, { stock }, env) => stockDigest(env, String(stock ?? "")),
+    handler: async (_db, { stock, stored }, env) => stockDigest(env, String(stock ?? ""), { stored: stored === "1" || stored === true }),
   },
   {
     name: "get_trending",
