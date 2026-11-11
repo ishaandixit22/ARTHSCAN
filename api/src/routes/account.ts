@@ -16,6 +16,7 @@ import { sessionCookie } from "../lib/cookie.js";
 import { jsonError } from "../lib/http.js";
 import { requireSession } from "../middleware/auth.js";
 import { inviteOnly, isInvited } from "../lib/access.js";
+import { recordSignup } from "../lib/analytics.js";
 import { canSeeLive, isOwner } from "./live.js";
 
 const SESSION_TTL_SEC = 30 * 24 * 3600;
@@ -61,6 +62,7 @@ account.post("/auth/dev", async (c) => {
     acct = { id: newId("acct_") };
     await c.env.DB.prepare("INSERT INTO accounts (id, name, email, google_sub) VALUES (?, ?, ?, ?)")
       .bind(acct.id, String(body.name ?? "").trim() || email.split("@")[0], email, sub).run();
+    await recordSignup(c.env, acct.id, c.req.header("cookie"));
   }
   c.header("Set-Cookie", await startSession(c.env, acct.id, "dev"));
   return c.json({ ok: true });
@@ -92,6 +94,7 @@ account.get("/auth/google/callback", async (c) => {
   } else {
     await c.env.DB.prepare("INSERT INTO accounts (id, name, email, avatar_url, google_sub) VALUES (?, ?, ?, ?, ?)")
       .bind(accountId, identity.name ?? identity.email ?? "Account", identity.email, identity.picture, identity.sub).run();
+    await recordSignup(c.env, accountId, c.req.header("cookie"));
   }
   c.header("Set-Cookie", await startSession(c.env, accountId, "google"), { append: true });
   return c.redirect(result.returnTo);

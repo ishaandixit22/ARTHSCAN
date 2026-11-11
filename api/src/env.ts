@@ -17,6 +17,8 @@ export interface Env {
   BSE_PAGES?: string;
   /** Comma-separated owner emails, for LIVE_ACCESS="owner" and owner-only settings. */
   OWNER_EMAILS?: string;
+  /** Comma-separated staff and test emails, left out of the analytics numbers along with OWNER_EMAILS. */
+  INTERNAL_EMAILS?: string;
   /** Dhan live feed. Client id and token are secrets; the URL can point at a test server. */
   DHAN_CLIENT_ID?: string;
   DHAN_ACCESS_TOKEN?: string;

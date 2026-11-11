@@ -34,6 +34,9 @@ async function liveIsPublic(): Promise<boolean> {
   return livePublic.value;
 }
 
+// Signed-in views of these pages are the site's "queries" for the active-user count (docs/analytics.md).
+const QUERY_PAGES = /^\/(screener|fii-dii|breadth|fo-ban|heatmap|signals|sectors|valuations|indices|stock)(\/|$)/;
+
 export const handle: Handle = async ({ event, resolve }) => {
   // One address for the site. Logo.dev's key also accepts only this domain, so logos fail on www.
   if (event.url.hostname === "www.arthscan.me") redirect(308, `https://arthscan.me${event.url.pathname}${event.url.search}`);
@@ -82,6 +85,11 @@ export const handle: Handle = async ({ event, resolve }) => {
     const calls = (event.locals.timings ?? []).map((t, i) => `api${i};desc="${t.path.slice(0, 40)}";dur=${t.ms}`);
     response.headers.set("Server-Timing", [`page;dur=${Date.now() - t0}`, ...calls].join(", "));
     if (inviteOnly) response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    const group = event.url.pathname.match(QUERY_PAGES)?.[1];
+    if (group && event.locals.account && event.request.method === "GET" && response.ok) {
+      const logged = api("/api/analytics/query", { method: "POST", body: { account_id: event.locals.account.id, group }, allowError: true }).catch(() => {});
+      event.platform?.ctx?.waitUntil(logged);
+    }
     return response;
   };
   // Signed-out pages are the same for everyone; a session cookie always gets its own render.
